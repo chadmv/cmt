@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SynColorConfig version="1.0">
+   <AutoConfigure graphicsMonitor="false" />
+   <SharedHome dir="D:/chadv/Documents/maya/synColor/Shared/" />
+   <ReferenceTable>
+      <Ref alias="OutputToSceneBridge" path="misc/identity.ctf" basePath="Autodesk" />
+      <Ref alias="SceneToOutputBridge" path="RRT+ODT/ACES_to_CIE-XYZ_v0.1.1.ctf" basePath="Autodesk" />
+      <Ref alias="broadcastMonitor" path="display/broadcast/CIE-XYZ_to_HD-video.ctf" basePath="Autodesk" />
+      <Ref alias="defaultLook" path="misc/identity.ctf" basePath="Autodesk" />
+      <Ref alias="graphicsMonitor" path="interchange/sRGB/CIE-XYZ_to_sRGB.ctf" basePath="Autodesk" />
+   </ReferenceTable>
+</SynColorConfig>

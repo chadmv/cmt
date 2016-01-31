@@ -1,0 +1,16 @@
+//Maya Preference 2016 (Release 1)
+//
+//
+windowPref -topLeftCorner 225 150 -widthHeight 250 400 -maximized false -parentMain true outlinerPanel1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 700 400 -maximized false -parentMain true hyperGraphPanel1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 660 400 -maximized false -parentMain true graphEditor1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 660 400 -maximized false -parentMain true dopeSheetPanel1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 660 400 -maximized false -parentMain true clipEditorPanel1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 524 470 -maximized false -parentMain true devicePanel1Window;
+windowPref -topLeftCorner 75 75 -widthHeight 1440 900 -maximized false -parentMain true hyperShadePanel1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 700 400 -maximized false -parentMain true dynPaintScriptedPanelWindow;
+windowPref -topLeftCorner 250 200 -widthHeight 550 562 -maximized false -parentMain true blindDataEditor1Window;
+windowPref -topLeftCorner 250 200 -widthHeight 1120 640 -maximized false -parentMain true polyTexturePlacementPanel1Window;
+windowPref -topLeftCorner 538 1475 -widthHeight 1498 720 -maximized false -parentMain true scriptEditorPanel1Window;
+windowPref -topLeftCorner 466 1146 -widthHeight 450 320 -maximized false -parentMain true NewFeatureHighlightWnd;
+windowPref -topLeftCorner 0 0 -widthHeight 1280 1024 -maximized false -parentMain false MayaWindow;

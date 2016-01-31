@@ -1,0 +1,7 @@
+//Maya Preference 2016 (Release 1)
+//
+//
+filePathEditor -registerType "audio.filename" -typeLabel "Audio" ;
+filePathEditor -registerType "file" -typeLabel "Texture" ;
+filePathEditor -registerType "imagePlane.imageName" -typeLabel "Image Plane" ;
+filePathEditor -registerType "reference" -typeLabel "Reference" ;
