@@ -1,9 +1,18 @@
-import maya.cmds as cmds
-import maya.api.OpenMaya as OpenMaya
+"""A tool used to orient joints with common orientations.
+
+The tool mostly assumes the X axis is the primary axis and joints always rotate forward on the Z axis.
+
+Usage:
+import cmt.rig.orientjoints
+cmt.rig.orientjoints.OrientJointsWindow()
+"""
+
 from functools import partial
 import logging
-log = logging.getLogger(__name__)
+import maya.cmds as cmds
+import maya.api.OpenMaya as OpenMaya
 
+log = logging.getLogger(__name__)
 MESSAGE_ATTRIBUTE = 'cmt_jointOrient'
 ORIENT_GROUP = 'cmt_orient_grp'
 
@@ -20,7 +29,7 @@ class OrientJointsWindow(object):
         margin_width = 4
         cmds.frameLayout(bv=False, label='Quick Actions', collapsable=True, mw=margin_width)
         cmds.gridLayout(numberOfColumns=2, cellWidthHeight=(175, 65))
-        cmds.button(label='Make Planar Orientation', command=make_planar)
+        cmds.button(label='Make Planar Orientation', command=self.make_planar)
         cmds.button(label='Project to Planar Position', command=partial(make_position_planar))
         cmds.button(label='Align Up With Child', command=self.align_with_child)
         cmds.button(label='Zero Orient', command=self.zero_orient)
@@ -66,6 +75,10 @@ class OrientJointsWindow(object):
         reset_orientation = cmds.checkBox(self.reset_orientation, query=True, value=True)
         template_joints(reorient_children=reorient_children, reset_orientation=reset_orientation)
 
+    def make_planar(self, *args):
+        joints = cmds.ls(sl=True, type='joint') or []
+        make_planar(joints)
+
     def zero_orient(self, *args):
         joints = cmds.ls(sl=True, type='joint') or []
         zero_orient(joints)
@@ -100,9 +113,8 @@ class Axis:
     z = 'Z'
 
 
-def make_planar(*args):
-    sel = cmds.ls(sl=True, type='joint')
-    for joint in sel:
+def make_planar(joints):
+    for joint in joints:
         parent = cmds.listRelatives(joint, parent=True, path=True)
         if not parent:
             log.warning('Cannot make %s planar because it does not have a parent.', joint)
@@ -115,8 +127,8 @@ def make_planar(*args):
         cmds.makeIdentity(joint, apply=True)
         _reparent_children(joint, children)
 
-    if sel:
-        cmds.select(sel)
+    if joints:
+        cmds.select(joints)
 
 
 def make_position_planar(*args):
@@ -142,10 +154,17 @@ def make_position_planar(*args):
 
 
 def align_with_child(joints):
+    """Aligns the up axis of the given joints with their respective child joint.
+
+    @param joints: List of joints to orient.
+    """
     for joint in joints:
         children = _unparent_children(joint)
-        cmds.delete(cmds.aimConstraint(children[0], joint, aim=(1, 0, 0), upVector=(0, 1, 0), worldUpType="objectrotation", worldUpVector=(0, 1, 0), worldUpObject=children[0]))
-        cmds.makeIdentity(joint, apply=True)
+        if children:
+            cmds.delete(cmds.aimConstraint(children[0], joint, aim=(1, 0, 0), upVector=(0, 1, 0),
+                                           worldUpType="objectrotation", worldUpVector=(0, 1, 0),
+                                           worldUpObject=children[0]))
+            cmds.makeIdentity(joint, apply=True)
         _reparent_children(joint, children)
 
     if joints:
@@ -163,8 +182,8 @@ def zero_orient(joints):
 
 
 def orient_to_world(joints):
-    """
-    Orients the given joints with the world.
+    """Orients the given joints with the world.
+
     @param joints: Joints to orient.
     """
     for joint in joints:
@@ -186,8 +205,8 @@ def orient_to_world(joints):
 
 
 def offset_orient(joints, amount, axis):
-    """
-    Offsets the orient by the given amount
+    """Offsets the orient by the given amount
+
     @param joints: Joints to orient.
     @param amount: Amount to offset by.
     @param axis: Which axis X, Y or Z
@@ -205,8 +224,8 @@ def offset_orient(joints, amount, axis):
 
 
 def _unparent_children(joint):
-    """
-    Helper function to unparent any children of the given joint.
+    """Helper function to unparent any children of the given joint.
+
     @param joint: Joint whose children to unparent.
     @return: A list of the unparented children.
     """
@@ -215,8 +234,7 @@ def _unparent_children(joint):
 
 
 def _reparent_children(joint, children):
-    """
-    Helper function to reparent any children of the given joint.
+    """Helper function to reparent any children of the given joint.
     @param joint: Joint whose children to reparent.
     @param children: List of transforms to reparent
     """
