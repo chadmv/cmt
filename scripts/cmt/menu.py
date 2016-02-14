@@ -18,6 +18,21 @@ def create_menu():
                   label='Orient Joints',
                   command='import cmt.rig.orientjoints as oj; oj.OrientJointsWindow()',
                   image='orientJoint.png')
+    cmds.menuItem(parent=rig_menu,
+                  label='Rename Chain',
+                  command='import cmt.name; cmt.name.rename_chain_ui()',
+                  image='menuIconModify.png',
+                  imageOverlayLabel='name')
+
+    utility_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Utility')
+    cmds.menuItem(parent=utility_menu,
+                  label='Unit Test Runner',
+                  command='import cmt.test.mayaunittestui; cmt.test.mayaunittestui.show()',
+                  imageOverlayLabel='Test')
+    cmds.menuItem(parent=utility_menu,
+                  label='Resource Browser',
+                  command='import maya.app.general.resourceBrowser as rb; rb.resourceBrowser().run()',
+                  imageOverlayLabel='name')
 
     cmds.menuItem(parent=menu, divider=True, dividerLabel='About')
     cmds.menuItem(parent=menu,

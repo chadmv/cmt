@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Command-line unit test runner for mayapy.
 
@@ -18,8 +19,8 @@ CMT_ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__
 
 
 def get_maya_location(maya_version):
-    """
-    Get the location where Maya is installed.
+    """Get the location where Maya is installed.
+
     @param maya_version The maya version number.
     @return The path to where Maya is installed.
     """
@@ -38,8 +39,8 @@ def get_maya_location(maya_version):
 
 
 def mayapy(maya_version):
-    """
-    Get the mayapy executable path.
+    """Get the mayapy executable path.
+
     @param maya_version The maya version number.
     @return: The mayapy executable path.
     """
@@ -50,15 +51,15 @@ def mayapy(maya_version):
 
 
 def create_clean_maya_app_dir():
-    """
-    Creates a copy of the clean Maya preferences so we can create predictable results.
+    """Creates a copy of the clean Maya preferences so we can create predictable results.
+
     @return: The path to the clean MAYA_APP_DIR folder.
     """
     app_dir = os.path.join(CMT_ROOT_DIR, 'tests', 'clean_maya_app_dir')
-    temp_dir = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
+    temp_dir = tempfile.gettempdir()
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
-    dst = os.path.join(temp_dir, 'maya_app_dir')
+    dst = os.path.join(temp_dir, 'maya_app_dir{0}'.format(uuid.uuid4()))
     shutil.copytree(app_dir, dst)
     return dst
 
@@ -70,7 +71,7 @@ def main():
                         type=int,
                         default=2016)
     pargs = parser.parse_args()
-    mayaunittest = os.path.join(CMT_ROOT_DIR, 'scripts', 'cmt', 'mayaunittest.py')
+    mayaunittest = os.path.join(CMT_ROOT_DIR, 'scripts', 'cmt', 'test', 'mayaunittest.py')
     cmd = [mayapy(pargs.maya), mayaunittest]
     if not os.path.exists(cmd[0]):
         raise RuntimeError('Maya {0} is not installed on this system.'.format(pargs.maya))
