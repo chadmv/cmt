@@ -8,9 +8,11 @@ Usage:
 python runmayatests.py -m 2016
 """
 import argparse
+import errno
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import tempfile
 import uuid
@@ -50,7 +52,7 @@ def mayapy(maya_version):
     return python_exe
 
 
-def create_clean_maya_app_dir():
+def create_clean_maya_app_dir(directory=None):
     """Creates a copy of the clean Maya preferences so we can create predictable results.
 
     @return: The path to the clean MAYA_APP_DIR folder.
@@ -59,9 +61,26 @@ def create_clean_maya_app_dir():
     temp_dir = tempfile.gettempdir()
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
-    dst = os.path.join(temp_dir, 'maya_app_dir{0}'.format(uuid.uuid4()))
+    dst = directory if directory else os.path.join(temp_dir, 'maya_app_dir{0}'.format(str(uuid.uuid4())))
+    if os.path.exists(dst):
+        shutil.rmtree(dst, ignore_errors=False, onerror=remove_read_only)
     shutil.copytree(app_dir, dst)
     return dst
+
+
+def remove_read_only(func, path, exc):
+    """Called by shutil.rmtree when it encounters a readonly file.
+
+    :param func:
+    :param path:
+    :param exc:
+    """
+    excvalue = exc[1]
+    if func in (os.rmdir, os.remove) and excvalue.errno == errno.EACCES:
+        os.chmod(path, stat.S_IRWXU| stat.S_IRWXG| stat.S_IRWXO) # 0777
+        func(path)
+    else:
+        raise RuntimeError('Could not remove {0}'.format(path))
 
 
 def main():
@@ -70,13 +89,18 @@ def main():
                         help='Maya version',
                         type=int,
                         default=2016)
+    parser.add_argument('-mad', '--maya-app-dir',
+                        help='Just create a clean MAYA_APP_DIR and exit')
     pargs = parser.parse_args()
     mayaunittest = os.path.join(CMT_ROOT_DIR, 'scripts', 'cmt', 'test', 'mayaunittest.py')
     cmd = [mayapy(pargs.maya), mayaunittest]
     if not os.path.exists(cmd[0]):
         raise RuntimeError('Maya {0} is not installed on this system.'.format(pargs.maya))
 
-    maya_app_dir = create_clean_maya_app_dir()
+    app_directory = pargs.maya_app_dir
+    maya_app_dir = create_clean_maya_app_dir(app_directory)
+    if app_directory:
+        return
     # Create clean prefs
     os.environ['MAYA_APP_DIR'] = maya_app_dir
     # Clear out any MAYA_SCRIPT_PATH value so we know we're in a clean env.

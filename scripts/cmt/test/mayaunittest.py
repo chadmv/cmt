@@ -39,6 +39,9 @@ import uuid
 import logging
 import maya.cmds as cmds
 
+# The environment variable that signifies tests are being run with the custom TestResult class.
+CMT_TESTING_VAR = 'CMT_UNITTEST'
+
 
 def run_tests(directories=None, test=None, test_suite=None):
     """Run all the tests in the given paths.
@@ -133,7 +136,7 @@ class Settings(object):
     # Specifies where files generated during tests should be stored
     # Use a uuid subdirectory so tests that are running concurrently such as on a build server
     # do not conflict with each other.
-    temp_dir = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
+    temp_dir = os.path.join(tempfile.gettempdir(), 'mayaunittest', str(uuid.uuid4()))
 
     # Controls whether temp files should be deleted after running all tests in the test case
     delete_files = True
@@ -239,6 +242,8 @@ class TestCase(unittest.TestCase):
                 if os.path.exists(f):
                     os.remove(f)
             cls.files_create = []
+            if os.path.exists(Settings.temp_dir):
+                shutil.rmtree(Settings.temp_dir)
 
     @classmethod
     def get_temp_filename(cls, file_name):
@@ -271,6 +276,12 @@ class TestCase(unittest.TestCase):
         for a, b in zip(first, second):
             self.assertAlmostEqual(a, b, places, msg, delta)
 
+    def tearDown(self):
+        if Settings.file_new and CMT_TESTING_VAR not in os.environ.keys():
+            # If running tests without the custom runner, like with PyCharm, the file new of the TestResult class isn't
+            # used so call file new here
+            cmds.file(f=True, new=True)
+
 
 class TestResult(unittest.TextTestResult):
     """Customize the test result so we can do things like do a file new between each test and suppress script
@@ -283,6 +294,9 @@ class TestResult(unittest.TextTestResult):
     def startTestRun(self):
         """Called before any tests are run."""
         super(TestResult, self).startTestRun()
+        # Create an environment variable that specifies tests are being run through the custom runner.
+        os.environ[CMT_TESTING_VAR] = '1'
+
         ScriptEditorState.suppress_output()
         if Settings.buffer_output:
             # Disable any logging while running tests. By disabling critical, we are disabling logging
@@ -297,6 +311,8 @@ class TestResult(unittest.TextTestResult):
         ScriptEditorState.restore_output()
         if Settings.delete_files and os.path.exists(Settings.temp_dir):
             shutil.rmtree(Settings.temp_dir)
+
+        del os.environ[CMT_TESTING_VAR]
 
         super(TestResult, self).stopTestRun()
 
