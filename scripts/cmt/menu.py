@@ -13,6 +13,7 @@ def create_menu():
     gmainwindow = mel.eval('$tmp = $gMainWindow;')
     menu = cmds.menu(parent=gmainwindow, tearOff=True, label='CMT')
 
+    # Rig
     rig_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Rigging')
     cmds.menuItem(parent=rig_menu,
                   label='Orient Joints',
@@ -23,6 +24,18 @@ def create_menu():
                   command='import cmt.name; cmt.name.rename_chain_ui()',
                   image='menuIconModify.png',
                   imageOverlayLabel='name')
+
+    # Deform
+    deform_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Deform')
+    cmds.menuItem(parent=deform_menu, divider=True, dividerLabel='Skinning')
+    cmds.menuItem(parent=deform_menu,
+                  label='Export Skin Weights',
+                  command='import cmt.deform.skinio as skinio; skinio.export_skin()',
+                  image='exportSmoothSkin.png')
+    cmds.menuItem(parent=deform_menu,
+                  label='Import Skin Weights',
+                  command='import cmt.deform.skinio as skinio; skinio.import_skin(to_selected_shapes=True)',
+                  image='importSmoothSkin.png')
 
     utility_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Utility')
     cmds.menuItem(parent=utility_menu,
