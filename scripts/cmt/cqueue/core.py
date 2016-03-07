@@ -1,0 +1,284 @@
+"""Contains the base Component class and the ComponentQueue, which are the two main classes
+of the component execution system.
+"""
+
+from PySide import QtGui
+import importlib
+import json
+import os
+import pprint
+import uuid
+import logging
+logger = logging.getLogger(__name__)
+
+
+class Component(object):
+    """A Component is an independent operation that will be executed in the ComponentQueue.  New components deriving
+    from this class must implement the execute method.  If the derived Component has any custom input data, it should
+    implement the _data method.  For UI support, derived components must override the draw method.
+    """
+    @classmethod
+    def image(cls, size=32):
+        """Get the icon path of the Component.
+
+        To create an icon for a Component, create a png, jpg or svg with the same name as the
+        Component in the same directory.
+
+        :param size: Desired dimension of the image.
+        :return: The path of the icon image.
+        """
+        module = importlib.import_module(cls.__module__)
+        path = module.__file__
+        base = os.path.splitext(path)[0]
+        for ext in ['png', 'jpg', 'jpeg', 'svg']:
+            full_path = '{0}.{1}'.format(base, ext)
+            if os.path.exists(full_path):
+                path = full_path
+                break
+        else:
+            path = ':/hsNothing.png'
+        return QtGui.QPixmap(path).scaled(size, size)
+
+    @classmethod
+    def name(cls):
+        """Get the module path to this Component.  It will be the Python package path used to import the Component."""
+        return cls.__module__
+
+    def __init__(self, **kwargs):
+        # True or False to skip execution of this component
+        self.enabled = kwargs.get('enabled', True)
+        # True or False to pause the queue execution after this component runs
+        self.break_point = kwargs.get('break_point', False)
+        # The unique id of this component
+        self.uuid = str(kwargs.get('uuid', uuid.uuid4()))
+
+    def set_enabled(self, value):
+        """Set whether this Component is enabled or not.
+
+        Disabled components will be skipped during ComponentQueue execution.  This function
+        is implemented because the UI needs a function to call and can't set the value
+        directly in the variable.
+
+        :param value: True to enable the Component.
+        """
+        self.enabled = value
+
+    def execute(self):
+        """Executes the Component.
+
+        Derived classes must implement this method to execute the desired operation.
+        """
+        raise NotImplementedError('execute method not implemented.')
+
+    def _data(self):
+        """Get the component data dictionary for this component.
+
+        Derived classes should implement this method if it requires any custom input data.
+
+        :return: A dictionary containing the data required to execute the component.
+        """
+        return {}
+
+    def data(self):
+        """Get the component data dictionary used for rebuilding the component.
+
+        :return: A dictionary containing all the data required to rebuild the component.
+        """
+        base_data = {
+            'name': self.name(),
+            'enabled': self.enabled,
+            'break_point': self.break_point,
+            'uuid': self.uuid,
+        }
+        derived_data = self._data()
+        base_data.update(derived_data)
+        return base_data
+
+    def draw(self, layout):
+        """Renders the component PySide widgets into the given layout.
+
+        Derived classes should implement this method to render the component in the UI.
+
+        :param layout: The parent layout to add the Component widgets to.
+        """
+        layout.addWidget(QtGui.QLabel('No arguments required.'))
+
+
+class ComponentQueue(object):
+    """A queue of Components to execute"""
+
+    def __init__(self):
+        self.__components = []
+        self.__current = 0  # For iterator
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.__current >= len(self.__components):
+            self.__current = 0
+            raise StopIteration
+        else:
+            self.__current += 1
+            return self.__components[self.__current - 1]
+
+    def add(self, component):
+        """Add a new component to the queue.
+
+        :param component: Component instance to add.
+        """
+        self.__components.append(component)
+
+    def insert(self, index, component):
+        """Insert a component at the given index.
+
+        :param index: Index to insert the component.
+        :param component: The component to insert.
+        """
+        self.__components.insert(index, component)
+
+    def remove(self, index):
+        """Remove a component from the queue.
+
+        :param index: The index or Component to remove.
+        :return: The removed Component.
+        """
+        if isinstance(index, Component):
+            comp = index
+            self.__components.remove(comp)
+        else:
+            comp = self.__components.pop(index)
+        return comp
+
+    def index(self, component):
+        """Return the index of the given component.
+
+        :param component: A Component object.
+        :return: Index of the Component in the ComponentQueue.
+        :raises: ValueError if the Component is not in the queue.
+        """
+        return self.__components.index(component)
+
+    def length(self):
+        """Get the number of components in the queue."""
+        return len(self.__components)
+
+    def execute(self):
+        """Execute all the Components in the queue."""
+        for comp in self.__components:
+            if comp.enabled:
+                comp_data = pprint.pformat(comp._data(), indent=4)
+                logger.info('Executing {0} with data:\n{1}'.format(comp.name(), comp_data))
+                comp.execute()
+            if comp.break_point:
+                break
+
+    def data(self):
+        """Get the queue component data.
+
+        :return: A list of the component data in the queue.
+        """
+        data = []
+        for comp in self.__components:
+            data.append(comp.data())
+        return data
+
+    def export(self, file_path):
+        """Export the queue to disk.
+
+        :param file_path: Export file path.
+        """
+        data = self.data()
+        fh = open(file_path, 'w')
+        json.dump(data, fh, indent=4)
+        fh.close()
+
+
+def load_queue(file_path):
+    """Load a queue from disk.
+
+    :param file_path: Path to a json file.
+    :return A ComponentQueue loaded with Components.
+    """
+    fh = open(file_path, 'r')
+    data = json.load(fh)
+    fh.close()
+    return load_data(data)
+
+
+def load_data(data):
+    """Generates a queue from a list of Component data.
+
+    :param data: A list of Component data generated from ComponentQueue.data.
+    :return: A ComponentQueue full of Components.
+    """
+    queue = ComponentQueue()
+    for component_data in data:
+        component_name = component_data.get('name')
+        if not component_name:
+            logger.warning('Component missing name.')
+            continue
+        try:
+            component = load_component_class(**component_data)
+        except ImportError:
+            raise RuntimeError('Component {0} does not exist.'.format(component_name))
+        queue.add(component)
+    return queue
+
+
+def get_components(directory=None):
+    """Given a directory path, returns a list of all the component names that are available.
+
+    :param directory: Directory path containing component files.
+    :return: A list of component module paths or an empty list if no components are found.
+    """
+    if directory is None:
+        component_paths = os.environ.get('CMT_CQUEUE_COMPONENT_PATH', '').split(os.pathsep)
+        component_paths.insert(0, 'cmt.cqueue.components')
+    elif isinstance(directory, basestring):
+        component_paths = [directory, ]
+    else:
+        component_paths = directory
+
+    result = []
+    for component_path in component_paths:
+        if not component_path:
+            continue
+        try:
+            module = importlib.import_module(component_path)
+        except ImportError:
+            logger.warning('Could not import {0}.  Is it in the PYTHONPATH?'.format(component_path))
+            continue
+        full_path = module.__path__[0]
+        # Create the full importable path to each component
+        for root, dirs, files in os.walk(full_path):
+            partial_path = '{0}.{1}'.format(component_path, root.replace(full_path, ''))
+            partial_path = partial_path.replace(os.path.sep, '.')
+            result += ['{0}{1}'.format(partial_path, os.path.splitext(f)[0]) for f in files
+                       if not f[0] in ('_', '.') and f.endswith('.py')]
+    return result
+
+
+def get_component_class(name):
+    """Given a component name, returns the Component class.
+
+    :param name: Name of the component module path.
+    """
+    module = importlib.import_module(name)
+    try:
+        return module.Component
+    except AttributeError:
+        return None
+
+
+def load_component_class(name, *args, **kwargs):
+    """Given a component name, returns the Component class instance.
+
+    :param name: Name of the component module path.
+    :param args: Any positional arguments to pass into  the Component constructor.
+    :param kwargs: Any keyword arguments to pass into the Component constructor.
+    """
+    component_class = get_component_class(name)
+    return component_class(*args, **kwargs)
+
+

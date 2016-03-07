@@ -16,6 +16,10 @@ def create_menu():
     # Rig
     rig_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Rigging')
     cmds.menuItem(parent=rig_menu,
+                  label='CQueue',
+                  command='import cmt.cqueue.window; cmt.cqueue.window.show()',
+                  imageOverlayLabel='cqueue')
+    cmds.menuItem(parent=rig_menu,
                   label='Orient Joints',
                   command='import cmt.rig.orientjoints as oj; oj.OrientJointsWindow()',
                   image='orientJoint.png')
