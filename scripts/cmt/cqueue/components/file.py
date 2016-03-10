@@ -36,7 +36,7 @@ class Component(core.Component):
 
         cmds.file(file_path, **kwargs)
 
-    def data(self):
+    def _data(self):
         return {
             'operation': self.operation.value(),
             'file_path': self.file_path.value(),

@@ -7,6 +7,7 @@ import importlib
 import json
 import os
 import pprint
+import traceback
 import uuid
 import logging
 logger = logging.getLogger(__name__)
@@ -163,13 +164,25 @@ class ComponentQueue(object):
         """Get the number of components in the queue."""
         return len(self.__components)
 
-    def execute(self):
-        """Execute all the Components in the queue."""
+    def execute(self, on_error=None):
+        """Execute all the Components in the queue.
+
+        :param on_error: An optional callback function that gets called when an exception occurs.
+                         The callback function has the signature func(message, component).
+        """
         for comp in self.__components:
             if comp.enabled:
                 comp_data = pprint.pformat(comp._data(), indent=4)
                 logger.info('Executing {0} with data:\n{1}'.format(comp.name(), comp_data))
-                comp.execute()
+                try:
+                    comp.execute()
+                except:
+                    error = traceback.format_exc()
+                    if on_error:
+                        on_error(message=error, component=comp)
+                    logger.critical(error)
+                    break
+
             if comp.break_point:
                 break
 
@@ -214,16 +227,27 @@ def load_data(data):
     """
     queue = ComponentQueue()
     for component_data in data:
-        component_name = component_data.get('name')
-        if not component_name:
-            logger.warning('Component missing name.')
-            continue
-        try:
-            component = load_component_class(**component_data)
-        except ImportError:
-            raise RuntimeError('Component {0} does not exist.'.format(component_name))
-        queue.add(component)
+        component = load_component_data(component_data)
+        if component:
+            queue.add(component)
     return queue
+
+
+def load_component_data(data):
+    """Instantiate a Component from a Component data dictionary.
+
+    :param data: A Component data dictionary generated from Component.data
+    :return: The instantiated Component.
+    """
+    component_name = data.get('name')
+    if not component_name:
+        logger.warning('Component missing name.')
+        return None
+    try:
+        component = load_component_class(**data)
+    except ImportError:
+        raise RuntimeError('Component {0} does not exist.'.format(component_name))
+    return component
 
 
 def get_components(directory=None):

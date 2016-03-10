@@ -1,4 +1,5 @@
 import os
+import json
 from functools import partial
 from PySide import QtGui
 from PySide import QtCore
@@ -58,14 +59,23 @@ def save_recent_queues(latest_file_path):
     SETTINGS.setValue(SETTINGS_QUEUES, values)
 
 
+def restore_cursor():
+    """Restores the cursor from any custom shape."""
+    override_cursor = QtGui.qApp.overrideCursor()
+    if override_cursor:
+        QtGui.qApp.restoreOverrideCursor()
+
+
 # Singleton window
 _win = None
 
 def show():
     """Shows the CQueue window."""
     global _win
-    if _win is None:
-        _win = CQueueWindow()
+    if _win:
+        _win.parent().close()
+        _win.parent().deleteLater()
+    _win = CQueueWindow()
     _win.show(dockable=True)
     _win.parent().setAcceptDrops(True)
 
@@ -78,7 +88,6 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
         self.setWindowTitle('CQueue')
         self.setObjectName('CQueueWindow')
         self.resize(1280, 600)
-        self.queue = core.ComponentQueue()
         self.recent_menu = None
         self.create_menu()
 
@@ -94,11 +103,9 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
         widget = QtGui.QWidget()
         vbox = QtGui.QVBoxLayout(widget)
         vbox.setContentsMargins(0, 0, 0, 0)
-        button = QtGui.QPushButton('Add Components to Queue')
-        button.released.connect(self.add_selected_components_to_queue)
-        vbox.addWidget(button)
         self.component_tree = QtGui.QTreeView()
         self.component_tree.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.component_tree.setDragEnabled(True)
         vbox.addWidget(self.component_tree)
         splitter.addWidget(widget)
 
@@ -107,10 +114,8 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
         vbox = QtGui.QVBoxLayout(widget)
         scroll_area = QtGui.QScrollArea()
         scroll_area.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        self.queue_widget = QtGui.QWidget()
+        self.queue_widget = QueueWidget(parent=self)
         self.queue_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        self.queue_layout = QtGui.QVBoxLayout(self.queue_widget)
-        self.queue_layout.addStretch()
         scroll_area.setWidget(self.queue_widget)
         scroll_area.setWidgetResizable(True)
         vbox.addWidget(scroll_area)
@@ -198,8 +203,7 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
 
     def new_queue(self):
         """Clears the current queue and makes a new queue."""
-        self.queue = core.ComponentQueue()
-        self.display_queue(self.queue)
+        self.queue_widget.set_queue(core.ComponentQueue())
 
     def load_queue(self, file_path=None):
         """Load the specified queue.  If not queue is specified, display a dialog to load a queue from disk.
@@ -214,8 +218,8 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
                                                           '',
                                                           QtGui.QFileDialog.DontUseNativeDialog)[0]
         if file_path:
-            self.queue = core.load_queue(file_path)
-            self.display_queue(self.queue)
+            queue = core.load_queue(file_path)
+            self.queue_widget.set_queue(queue)
             save_recent_queues(file_path)
             self.populate_recent_queue_menu()
 
@@ -228,37 +232,36 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
                                                       '',
                                                       QtGui.QFileDialog.DontUseNativeDialog)[0]
         if file_path:
-            self.queue.export(file_path)
-
-    def display_queue(self, queue):
-        """Renders the queue in the queue panel.
-
-        :param queue: ComponentQueue to display.
-        """
-        delete_layout_contents(self.queue_layout)
-        for comp in queue:
-            comp_widget = ComponentWidget(comp, queue, self)
-            self.queue_layout.addWidget(comp_widget)
-        self.queue_layout.addStretch()
+            self.queue_widget.queue.export(file_path)
 
     def add_selected_components_to_queue(self):
         """Adds the selected components in the component tree to the queue."""
         indices = self.component_tree.selectionModel().selectedRows()
-        # We want to insert the widgets before the stretch so get last index
-        last = self.queue_layout.count() - 1
         for index in indices:
             node = index.internalPointer()
             if node.children:
                 # Only leaf nodes are Components.
                 continue
-            comp = core.load_component_class(node.component_path)
-            self.queue.add(comp)
-            comp_widget = ComponentWidget(comp, self.queue, self)
-            self.queue_layout.insertWidget(last, comp_widget)
-            last += 1
+            self.queue_widget.add_component_to_queue(node.component_path)
 
     def execute_queue(self):
-        self.queue.execute()
+        self.queue_widget.reset_component_widget_status()
+        self.queue_widget.queue.execute(on_error=self.on_component_execution_error)
+
+    def on_component_execution_error(self, message, component):
+        widget = self.queue_widget.get_component_widget(component)
+        if widget:
+            widget.set_color(ComponentWidget.error_color)
+        msg = QtGui.QMessageBox(self)
+        msg.setWindowTitle('Execution Error')
+        msg.setText('Component {0} failed to execute.'.format(component.name()))
+        msg.setDetailedText(message)
+        msg.setIcon(QtGui.QMessageBox.Critical)
+        # Need to spacer to set the message box width since setFixedWidth does not work.
+        spacer = QtGui.QSpacerItem(500, 0, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        layout = msg.layout()
+        layout.addItem(spacer, layout.rowCount(), 0, 1, layout.columnCount())
+        msg.show()
 
 
 class ComponentNode(shortcuts.BaseTreeNode):
@@ -304,7 +307,7 @@ class ComponentModel(QtCore.QAbstractItemModel):
         if role == QtCore.Qt.DisplayRole:
             return node.name
         elif role == QtCore.Qt.DecorationRole:
-            return node.image()
+            return node.image(size=32)
         elif role == QtCore.Qt.ToolTipRole:
             return node.tooltip()
 
@@ -314,6 +317,9 @@ class ComponentModel(QtCore.QAbstractItemModel):
 
     def flags(self, index):
         fl = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+        node = index.internalPointer()
+        if not node.children:
+            fl |= QtCore.Qt.ItemIsDragEnabled
         return fl
 
     def parent(self, index):
@@ -340,26 +346,208 @@ class ComponentModel(QtCore.QAbstractItemModel):
         else:
             return QtCore.QModelIndex()
 
+    def mimeTypes(self):
+        return 'text/plain'
+
+    def mimeData(self, indices):
+        pks = ' '.join([idx.internalPointer().component_path for idx in indices])
+        data = QtCore.QMimeData()
+        data.setText(pks)
+        return data
+
+
+class QueueWidget(QtGui.QWidget):
+    """The ComponentQueue tree view.  Overriden so we can do drag and drop"""
+    def __init__(self, queue=None, parent=None):
+        super(QueueWidget, self).__init__(parent)
+        self.setAcceptDrops(True)
+        self.queue_layout = QtGui.QVBoxLayout(self)
+        self.queue_layout.addStretch()
+        self.queue = queue if queue else core.ComponentQueue()
+        self.drop_indicator = DropIndicator()
+        self.hide_indicator()
+        self.drag_component = None
+
+    def set_queue(self, queue):
+        delete_layout_contents(self.queue_layout)
+        for comp in queue:
+            comp_widget = ComponentWidget(comp, queue, parent=self)
+            self.queue_layout.addWidget(comp_widget)
+        self.queue_layout.addStretch()
+
+    def mousePressEvent(self, event):
+        child = self.childAt(event.pos())
+        if not child:
+            return
+        try:
+            comp_data = child.comp.data()
+        except AttributeError:
+            return
+        pos = child.mapFromParent(event.pos())
+        if not child.grab_rect().contains(pos):
+            return
+
+        # Create the drag object with the component data we are moving
+        mime_data = QtCore.QMimeData()
+        mime_data.setText(json.dumps(comp_data))
+        drag = QtGui.QDrag(self)
+        drag.setMimeData(mime_data)
+        # img = QtGui.QImage(child.size(), QtGui.QImage.Format_RGB888)
+        # painter = QtGui.QPainter(img)
+        # child.render(painter, QtCore.QPoint())
+        # drag.setPixmap(QtGui.QPixmap.fromImage(img))
+        hotspot = event.pos() - child.pos()
+        drag.setHotSpot(hotspot)
+
+        self.drop_indicator.setFixedHeight(child.height())
+        self.drop_indicator.show()
+        QtGui.qApp.setOverrideCursor(QtGui.QCursor(QtCore.Qt.OpenHandCursor))
+        index = self.get_component_index_at_position(event.pos())
+        # Monkey patch the index
+        self.drop_indicator.index = index
+        self.queue_layout.insertWidget(index, self.drop_indicator)
+        child.hide()
+        self.drag_component = child
+        if drag.exec_(QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
+            pass
+            # child.remove()
+        else:
+            child.show()
+        restore_cursor()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            index = self.get_component_index_at_position(event.pos())
+            self.place_indicator(index)
+            if event.source() in self.children():
+                event.setDropAction(QtCore.Qt.MoveAction)
+                event.accept()
+            else:
+                event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText() and event.pos().x() < self.width() and event.pos().y() < self.height():
+            index = self.get_component_index_at_position(event.pos())
+            self.place_indicator(index)
+            if event.source() in self.children():
+                event.setDropAction(QtCore.Qt.MoveAction)
+                event.accept()
+            else:
+                event.setDropAction(QtCore.Qt.CopyAction)
+                event.acceptProposedAction()
+        else:
+            self.hide_indicator()
+            event.ignore()
+
+    def place_indicator(self, index):
+        if index != self.drop_indicator.index or self.drop_indicator.index == -1:
+            indicator_index = self.queue_layout.indexOf(self.drop_indicator)
+            if indicator_index > -1:
+                self.queue_layout.takeAt(indicator_index)
+            self.drop_indicator.index = index
+            self.queue_layout.insertWidget(index, self.drop_indicator)
+            self.drop_indicator.show()
+
+    def dropEvent(self, event):
+        if event.mimeData().hasText() and event.pos().x() < self.width() and event.pos().y() < self.height():
+            self.hide_indicator()
+            index = self.get_component_index_at_position(event.pos())
+            text = event.mimeData().text()
+            if '{' in text:
+                # We received json serialized component data
+                event.setDropAction(QtCore.Qt.MoveAction)
+                event.accept()
+                self.drag_component.move(index)
+                self.drag_component.show()
+                # component_data = json.loads(text)
+                # component = core.load_component_data(component_data)
+                # self.add_component_to_queue(component, index)
+            else:
+                event.setDropAction(QtCore.Qt.CopyAction)
+                event.accept()
+                components = [component for component in event.mimeData().text().split()]
+                for component_path in components:
+                    self.add_component_to_queue(component_path, index)
+        else:
+            event.ignore()
+
+    def hide_indicator(self):
+        indicator_index = self.queue_layout.indexOf(self.drop_indicator)
+        if indicator_index != -1:
+            self.queue_layout.takeAt(indicator_index)
+        self.drop_indicator.hide()
+        self.drop_indicator.index = -1
+
+    def get_component_index_at_position(self, position):
+        # Snap to the middle so we get over a ComponentWidget
+        position.setX(self.width() / 2)
+        # If the position is between ComponentWidgets, snap to the next lowest widget.
+        index = 0
+        for child in self.children():
+            if isinstance(child, ComponentWidget):
+                child_y = child.pos().y()
+                if position.y() < child_y:
+                    break
+                index += 1
+        return index
+
+    def add_component_to_queue(self, component_path, index=None):
+        """Adds the selected components in the component tree to the queue."""
+        if index is None:
+            index = self.queue_layout.count() - 1
+        comp = component_path if isinstance(component_path, core.Component)\
+            else core.load_component_class(component_path)
+        self.queue.insert(index, comp)
+        comp_widget = ComponentWidget(comp, self.queue, parent=self)
+        self.queue_layout.insertWidget(index, comp_widget)
+
+    def get_component_widget(self, component):
+        """Get the ComponentWidget of a Component.
+
+        :param component: A Component instance.
+        :return: The ComponentWidget of the Componenent.
+        """
+        for child in self.children():
+            if isinstance(child, ComponentWidget) and child.comp is component:
+                return child
+        return None
+
+    def reset_component_widget_status(self):
+        """Resets the execution status of all the ComponentWidgets."""
+        for child in self.children():
+            if isinstance(child, ComponentWidget):
+                child.set_color(ComponentWidget.normal_color)
+
 
 class ComponentWidget(QtGui.QFrame):
     """The widget used to display a Component in the ComponentQueue."""
+    normal_color = QtGui.QColor(72, 170, 181)
+    error_color = QtGui.QColor(217, 83, 79)
+
     def __init__(self, comp, queue, parent=None):
         super(ComponentWidget, self).__init__(parent)
+        self.setMouseTracking(True)
         self.queue_layout = parent.queue_layout
         self.queue = queue
         self.comp = comp
         vbox = QtGui.QVBoxLayout(self)
         self.setFrameStyle(QtGui.QFrame.StyledPanel)
+        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Maximum)
+        self.over_grab_hotspot = False
+        self.color = ComponentWidget.normal_color
 
         # Header
         hbox = QtGui.QHBoxLayout()
+        self.header_layout = hbox
         vbox.addLayout(hbox)
         enabled = QtGui.QCheckBox()
         enabled.setToolTip('Enable/Disable Component')
         hbox.addWidget(enabled)
         # Image label
         label = QtGui.QLabel()
-        label.setPixmap(comp.image())
+        label.setPixmap(comp.image(size=24))
         hbox.addWidget(label)
         # Name label
         label = QtGui.QLabel(comp.name().split('.')[-1])
@@ -380,33 +568,13 @@ class ComponentWidget(QtGui.QFrame):
         button.setDefaultAction(action)
         hbox.addWidget(button)
 
-        action = QtGui.QAction('Up', self)
-        icon = QtGui.QIcon(QtGui.QPixmap(':/nudgeUp.png'))
-        action.setIcon(icon)
-        action.setToolTip('Move up')
-        action.setStatusTip('Move up')
-        action.triggered.connect(self.move_up)
-        button = QtGui.QToolButton()
-        button.setDefaultAction(action)
-        hbox.addWidget(button)
-
-        action = QtGui.QAction('Down', self)
-        icon = QtGui.QIcon(QtGui.QPixmap(':/nudgeDown.png'))
-        action.setIcon(icon)
-        action.setToolTip('Move down')
-        action.setStatusTip('Move down')
-        action.triggered.connect(self.move_down)
-        button = QtGui.QToolButton()
-        button.setDefaultAction(action)
-        hbox.addWidget(button)
-
         action = QtGui.QAction('Delete', self)
         icon = QtGui.QIcon(QtGui.QPixmap(':/smallTrash.png'))
         action.setIcon(icon)
         message = 'Delete Component'
         action.setToolTip(message)
         action.setStatusTip(message)
-        action.triggered.connect(self.remove)
+        action.triggered.connect(partial(self.remove, prompt=True))
         button = QtGui.QToolButton()
         button.setDefaultAction(action)
         hbox.addWidget(button)
@@ -421,13 +589,9 @@ class ComponentWidget(QtGui.QFrame):
         button.setDefaultAction(action)
         hbox.addWidget(button)
 
-        widget = QtGui.QFrame()
-        widget.setFrameStyle(QtGui.QFrame.HLine)
-        vbox.addWidget(widget)
-
         content_widget = QtGui.QWidget()
         content_layout = QtGui.QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setContentsMargins(0, 8, 0, 0)
         vbox.addWidget(content_widget)
         comp.draw(content_layout)
         enabled.toggled.connect(content_widget.setEnabled)
@@ -437,40 +601,92 @@ class ComponentWidget(QtGui.QFrame):
         content_widget.setVisible(False)
         content_layout.addStretch()
 
-    def move_up(self):
-        """Move this Component up in the queue."""
-        index = self.queue.index(self.comp)
-        if index == 0:
-            # Already at the top
-            return
+    def grab_rect(self):
+        """Get the rectangle describing the grab hotspot."""
+        return QtCore.QRect(0, 0, 8, self.height()-1)
+
+    def set_color(self, color):
+        """Set the color of status bar on the widget.
+
+        :param color: The new color.
+        """
+        self.color = color
+        self.update()
+
+    def paintEvent(self, event):
+        """Override the paintEvent to draw the grab hotspot.
+
+        :param event:
+        """
+        super(ComponentWidget, self).paintEvent(event)
+        painter = QtGui.QPainter(self)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(self.color)
+        painter.drawRect(self.grab_rect())
+
+    def mouseMoveEvent(self, event):
+        contains = self.grab_rect().contains(event.pos())
+        if contains and not self.over_grab_hotspot:
+            QtGui.qApp.setOverrideCursor(QtGui.QCursor(QtCore.Qt.OpenHandCursor))
+            self.over_grab_hotspot = True
+        elif not contains and self.over_grab_hotspot:
+            restore_cursor()
+            self.over_grab_hotspot = False
+
+    def leaveEvent(self, event):
+        if self.over_grab_hotspot:
+            restore_cursor()
+            self.over_grab_hotspot = False
+
+    def move(self, new_index):
+        """Move the component to the specified index in the queue.
+
+        :param new_index: Index to move to.
+        """
+        index = self.index()
         # Reorder the Component in the Queue
         self.queue.remove(index)
-        self.queue.insert(index-1, self.comp)
+
+        if new_index and new_index > self.queue.length():
+            # When we are moving a component to the bottom, the index may get greater than the max allowed
+            new_index = self.queue.length()
+
+        self.queue.insert(new_index, self.comp)
         # Reorder the ComponentWidget in the layout
         self.queue_layout.takeAt(index)
-        self.queue_layout.insertWidget(index-1, self)
+        self.queue_layout.insertWidget(new_index, self)
 
-    def move_down(self):
-        """Move this Component down in the queue."""
+    def index(self):
+        """Get the index of the Component. """
+        return self.queue.index(self.comp)
+
+    def remove(self, prompt=False):
+        """Remove this Component from the queue.
+
+        :param prompt: True to display a message box confirming the removal of the Component.
+        """
+        if prompt:
+            msg_box = QtGui.QMessageBox()
+            msg_box.setIcon(QtGui.QMessageBox.Question)
+            msg_box.setText('Are you sure you want to remove this component?')
+            msg_box.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.Cancel)
+            if msg_box.exec_() != QtGui.QMessageBox.Yes:
+                return
         index = self.queue.index(self.comp)
-        if index == self.queue.length() - 1:
-            # Already at the bottom
-            return
-        # Reorder the Component in the Queue
         self.queue.remove(index)
-        self.queue.insert(index+1, self.comp)
-        # Reorder the ComponentWidget in the layout
         self.queue_layout.takeAt(index)
-        self.queue_layout.insertWidget(index+1, self)
+        self.deleteLater()
 
-    def remove(self):
-        """Remove this Component from the queue."""
-        msg_box = QtGui.QMessageBox()
-        msg_box.setIcon(QtGui.QMessageBox.Question)
-        msg_box.setText('Are you sure you want to remove this component?')
-        msg_box.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.Cancel)
-        if msg_box.exec_() == QtGui.QMessageBox.Yes:
-            index = self.queue.index(self.comp)
-            self.queue.remove(index)
-            self.queue_layout.takeAt(index)
-            self.deleteLater()
+
+class DropIndicator(QtGui.QWidget):
+    """The widget used to display a Component in the ComponentQueue."""
+
+    def __init__(self, parent=None):
+        super(DropIndicator, self).__init__(parent)
+        self.setFixedHeight(45)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        color = QtGui.QColor(72, 170, 181)
+        painter.setPen(color)
+        painter.drawRect(0, 0, self.width()-1, self.height()-1)
