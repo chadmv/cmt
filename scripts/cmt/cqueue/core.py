@@ -276,10 +276,29 @@ def get_components(directory=None):
         full_path = module.__path__[0]
         # Create the full importable path to each component
         for root, dirs, files in os.walk(full_path):
-            partial_path = '{0}.{1}'.format(component_path, root.replace(full_path, ''))
-            partial_path = partial_path.replace(os.path.sep, '.')
-            result += ['{0}{1}'.format(partial_path, os.path.splitext(f)[0]) for f in files
-                       if not f[0] in ('_', '.') and f.endswith('.py')]
+            result = extract_component_module_path(component_path, files, full_path, root, result)
+    return result
+
+
+def extract_component_module_path(component_path, files, full_path, root, result):
+    """Extracts any component files from the given component path.
+
+    :param component_path: Base component path (e.g. cmt.cqueue.components)
+    :param files: List of files in the the directory.
+    :param full_path: Full path on disk to the component path.
+    :param root: The path to the current directory.
+    :param result: Storage for the component module paths.
+    :return: The list of discovered component module paths.
+    """
+    partial_path = root.replace(full_path, '')
+    if root != full_path:
+        partial_path = partial_path[1:]
+    partial_path = '{0}.{1}'.format(component_path, partial_path)
+    partial_path = partial_path.replace(os.path.sep, '.')
+    if not partial_path.endswith('.'):
+        partial_path += '.'
+    result += ['{0}{1}'.format(partial_path, os.path.splitext(f)[0]) for f in files
+               if f[0] not in ('_', '.') and f.endswith('.py')]
     return result
 
 

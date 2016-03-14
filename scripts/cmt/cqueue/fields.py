@@ -27,6 +27,9 @@ class Field(object):
     def value(self):
         return self._value
 
+    def set_value(self, value):
+        self._value = value
+
     def copy(self):
         """Returns a copy of the Field.
 
@@ -52,6 +55,11 @@ class BooleanField(Field):
 
     def value(self):
         return self._widget.isChecked() if self._widget else self._value
+
+    def set_value(self, value):
+        super(BooleanField, self).set_value(value)
+        if self._widget:
+            self._widget.setChecked(value)
 
     def copy(self):
         """Returns a copy of the Field"""
@@ -80,6 +88,11 @@ class CharField(Field):
 
     def value(self):
         return self._widget.text() if self._widget else self._value
+
+    def set_value(self, value):
+        super(CharField, self).set_value(value)
+        if self._widget:
+            self._widget.setText(value)
 
     def copy(self):
         """Returns a copy of the Field"""
@@ -118,6 +131,11 @@ class FloatField(Field):
     def value(self):
         return self._widget.value() if self._widget else self._value
 
+    def set_value(self, value):
+        super(FloatField, self).set_value(value)
+        if self._widget:
+            self._widget.setValue(value)
+
     def copy(self):
         """Returns a copy of the Field"""
         return FloatField(name=self.name, value=self.value(), help_text=self.help_text,
@@ -153,6 +171,11 @@ class ChoiceField(Field):
     def value(self):
         return self._widget.currentText() if self._widget else self._value
 
+    def set_value(self, value):
+        super(ChoiceField, self).set_value(value)
+        if self._widget:
+            self._widget.setCurrentIndex(self._widget.setCurrentIndex(value))
+
     def copy(self):
         """Returns a copy of the Field"""
         return ChoiceField(choices=self.choices, name=self.name, value=self.value(),
@@ -184,18 +207,19 @@ class FilePathField(Field):
         return widget
 
     def browse(self):
-        file_path = QtGui.QFileDialog.getOpenFileName(
-            None,
-            self.name,
-            '',
-            self.filter,
-            '',
-            QtGui.QFileDialog.DontUseNativeDialog)[0]
+        root = cmds.workspace(q=True, rd=True)
+        file_path = cmds.fileDialog2(fileFilter=self.filter, dialogStyle=2, caption=self.name,
+                                     fileMode=1, returnFilter=False, startingDirectory=root)
         if file_path:
-            self._widget.setText(file_path)
+            self._widget.setText(file_path[0])
 
     def value(self):
         return self._widget.text() if self._widget else self._value
+
+    def set_value(self, value):
+        super(FilePathField, self).set_value(value)
+        if self._widget:
+            self._widget.setText(value)
 
     def copy(self):
         """Returns a copy of the Field"""
@@ -235,6 +259,11 @@ class MayaNodeField(Field):
 
     def value(self):
         return self._widget.text() if self._widget else self._value
+
+    def set_value(self, value):
+        super(MayaNodeField, self).set_value(value)
+        if self._widget:
+            self._widget.setText(value)
 
     def copy(self):
         """Returns a copy of the Field"""

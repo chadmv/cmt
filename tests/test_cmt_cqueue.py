@@ -26,6 +26,16 @@ class CQueueTests(TestCase):
         components = core.get_components()
         self.assertIn('cmt.cqueue.components.file', components)
 
+    def test_extract_component_module_path(self):
+        result = []
+        result = core.extract_component_module_path('cmt.cqueue.components',
+                                                    files=['__init__.py', 'skeleton.py', 'skeleton.pyc'],
+                                                    full_path=os.path.join('cmt', 'cqueue', 'components'),
+                                                    root=os.path.join('cmt', 'cqueue', 'components', 'rig'),
+                                                    result=result)
+        print result
+        self.assertListEqual(['cmt.cqueue.components.rig.skeleton'], result)
+
     def test_component_base_data(self):
         comp = core.Component()
         data = comp.data()

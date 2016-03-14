@@ -1,12 +1,17 @@
 import maya.cmds as cmds
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
+from PySide import QtGui
 
 
 class Component(core.Component):
     """A Component that imports or references in a Maya file."""
     import_operation = 'Import'
     reference_operation = 'Reference'
+
+    @classmethod
+    def image(cls, size=32):
+        return QtGui.QPixmap(':/fileOpen.png').scaled(size, size)
 
     def __init__(self, file_path='', namespace='', **kwargs):
         super(Component, self).__init__(**kwargs)

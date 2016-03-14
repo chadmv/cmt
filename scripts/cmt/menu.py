@@ -28,6 +28,14 @@ def create_menu():
                   command='import cmt.name; cmt.name.rename_chain_ui()',
                   image='menuIconModify.png',
                   imageOverlayLabel='name')
+    cmds.menuItem(parent=rig_menu,
+                  label='Export Skeleton',
+                  command='import cmt.rig.skeleton as skeleton; skeleton.dump()',
+                  image='kinJoint.png')
+    cmds.menuItem(parent=rig_menu,
+                  label='Import Skeleton',
+                  command='import cmt.rig.skeleton as skeleton; skeleton.load()',
+                  image='kinJoint.png')
 
     # Deform
     deform_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Deform')
