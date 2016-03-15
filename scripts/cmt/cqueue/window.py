@@ -379,9 +379,7 @@ class QueueWidget(QtGui.QWidget):
         child = self.childAt(event.pos())
         if not child:
             return
-        try:
-            comp_data = child.comp.data()
-        except AttributeError:
+        if not isinstance(child, ComponentWidget):
             return
         pos = child.mapFromParent(event.pos())
         if not child.grab_rect().contains(pos):
@@ -389,28 +387,22 @@ class QueueWidget(QtGui.QWidget):
 
         # Create the drag object with the component data we are moving
         mime_data = QtCore.QMimeData()
-        mime_data.setText(json.dumps(comp_data))
+        mime_data.setText(json.dumps(child.comp.data()))
         drag = QtGui.QDrag(self)
         drag.setMimeData(mime_data)
-        # img = QtGui.QImage(child.size(), QtGui.QImage.Format_RGB888)
-        # painter = QtGui.QPainter(img)
-        # child.render(painter, QtCore.QPoint())
-        # drag.setPixmap(QtGui.QPixmap.fromImage(img))
         hotspot = event.pos() - child.pos()
         drag.setHotSpot(hotspot)
 
+        self.drop_indicator.index = -1
         self.drop_indicator.setFixedHeight(child.height())
-        self.drop_indicator.show()
         QtGui.qApp.setOverrideCursor(QtGui.QCursor(QtCore.Qt.OpenHandCursor))
         index = self.get_component_index_at_position(event.pos())
-        # Monkey patch the index
-        self.drop_indicator.index = index
-        self.queue_layout.insertWidget(index, self.drop_indicator)
+        self.place_indicator(index)
         child.hide()
         self.drag_component = child
+        self.drag_start_index = index
         if drag.exec_(QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
             pass
-            # child.remove()
         else:
             child.show()
         restore_cursor()
@@ -452,18 +444,17 @@ class QueueWidget(QtGui.QWidget):
 
     def dropEvent(self, event):
         if event.mimeData().hasText() and event.pos().x() < self.width() and event.pos().y() < self.height():
+            index = self.drop_indicator.index
             self.hide_indicator()
-            index = self.get_component_index_at_position(event.pos())
             text = event.mimeData().text()
             if '{' in text:
                 # We received json serialized component data
                 event.setDropAction(QtCore.Qt.MoveAction)
                 event.accept()
+                if index >= self.drag_start_index:
+                    index -= 1
                 self.drag_component.move(index)
                 self.drag_component.show()
-                # component_data = json.loads(text)
-                # component = core.load_component_data(component_data)
-                # self.add_component_to_queue(component, index)
             else:
                 event.setDropAction(QtCore.Qt.CopyAction)
                 event.accept()
@@ -484,13 +475,13 @@ class QueueWidget(QtGui.QWidget):
         # Snap to the middle so we get over a ComponentWidget
         position.setX(self.width() / 2)
         # If the position is between ComponentWidgets, snap to the next lowest widget.
+        components = [child for child in self.children() if isinstance(child, ComponentWidget)]
+        components.sort(key=lambda node: node.pos().y())
         index = 0
-        for child in self.children():
-            if isinstance(child, ComponentWidget):
-                child_y = child.pos().y()
-                if position.y() < child_y:
-                    break
-                index += 1
+        for child in components:
+            if child.isVisible() and position.y() < child.pos().y():
+                break
+            index += 1
         return index
 
     def add_component_to_queue(self, component_path, index=None):
@@ -541,6 +532,7 @@ class ComponentWidget(QtGui.QFrame):
         # Header
         hbox = QtGui.QHBoxLayout()
         self.header_layout = hbox
+        hbox.setContentsMargins(16, 4, 4, 4)
         vbox.addLayout(hbox)
         enabled = QtGui.QCheckBox()
         enabled.setToolTip('Enable/Disable Component')
@@ -591,7 +583,7 @@ class ComponentWidget(QtGui.QFrame):
 
         content_widget = QtGui.QWidget()
         content_layout = QtGui.QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(0, 8, 0, 0)
+        content_layout.setContentsMargins(16, 8, 0, 0)
         vbox.addWidget(content_widget)
         comp.draw(content_layout)
         enabled.toggled.connect(content_widget.setEnabled)
@@ -603,7 +595,7 @@ class ComponentWidget(QtGui.QFrame):
 
     def grab_rect(self):
         """Get the rectangle describing the grab hotspot."""
-        return QtCore.QRect(0, 0, 8, self.height()-1)
+        return QtCore.QRect(0, 0, 16, self.height()-1)
 
     def set_color(self, color):
         """Set the color of status bar on the widget.

@@ -313,14 +313,18 @@ class ContainerField(object):
             layout = QtGui.QHBoxLayout(widget)
         else:
             layout = QtGui.QVBoxLayout(widget)
+        if not self.border:
+            layout.setContentsMargins(0, 0, 0, 0)
         for field in self.fields:
             layout.addWidget(field.widget())
-        layout.addStretch()
+        if self.orientation == ContainerField.vertical:
+            # Only add a stretch to vertical layouts because horizontal layout will get too squished
+            layout.addStretch()
         return widget
 
     def copy(self):
         """Returns a copy of the Field"""
-        container = ContainerField(orientation=self.orientation)
+        container = ContainerField(orientation=self.orientation, border=self.border)
         for field in self.fields:
             container.add_field(field.copy())
         return container
