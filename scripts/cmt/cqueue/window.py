@@ -366,7 +366,6 @@ class QueueWidget(QtGui.QWidget):
         self.queue = queue if queue else core.ComponentQueue()
         self.drop_indicator = DropIndicator()
         self.hide_indicator()
-        self.drag_component = None
 
     def set_queue(self, queue):
         delete_layout_contents(self.queue_layout)
@@ -393,17 +392,21 @@ class QueueWidget(QtGui.QWidget):
         hotspot = event.pos() - child.pos()
         drag.setHotSpot(hotspot)
 
-        self.drop_indicator.index = -1
+        # Resize the indicator so it has the same height as the ComponentWidget we are dragging
         self.drop_indicator.setFixedHeight(child.height())
-        QtGui.qApp.setOverrideCursor(QtGui.QCursor(QtCore.Qt.OpenHandCursor))
+        QtGui.qApp.setOverrideCursor(QtGui.QCursor(QtCore.Qt.ClosedHandCursor))
         index = self.get_component_index_at_position(event.pos())
-        self.place_indicator(index)
+        component_widget_index = self.queue_layout.indexOf(child)
+        self.queue_layout.takeAt(component_widget_index)
         child.hide()
-        self.drag_component = child
-        self.drag_start_index = index
+        self.place_indicator(index)
         if drag.exec_(QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
-            pass
+            drop_indicator_index = self.queue_layout.indexOf(self.drop_indicator)
+            self.hide_indicator()
+            self.queue_layout.insertWidget(drop_indicator_index, child)
+            child.show()
         else:
+            self.queue_layout.insertWidget(component_widget_index, child)
             child.show()
         restore_cursor()
 
@@ -445,17 +448,13 @@ class QueueWidget(QtGui.QWidget):
     def dropEvent(self, event):
         if event.mimeData().hasText() and event.pos().x() < self.width() and event.pos().y() < self.height():
             index = self.drop_indicator.index
-            self.hide_indicator()
             text = event.mimeData().text()
             if '{' in text:
                 # We received json serialized component data
                 event.setDropAction(QtCore.Qt.MoveAction)
                 event.accept()
-                if index >= self.drag_start_index:
-                    index -= 1
-                self.drag_component.move(index)
-                self.drag_component.show()
             else:
+                self.hide_indicator()
                 event.setDropAction(QtCore.Qt.CopyAction)
                 event.accept()
                 components = [component for component in event.mimeData().text().split()]
@@ -475,11 +474,13 @@ class QueueWidget(QtGui.QWidget):
         # Snap to the middle so we get over a ComponentWidget
         position.setX(self.width() / 2)
         # If the position is between ComponentWidgets, snap to the next lowest widget.
-        components = [child for child in self.children() if isinstance(child, ComponentWidget)]
+        child_count = self.queue_layout.count()
+        components = [self.queue_layout.itemAt(i).widget() for i in range(child_count)]
+        components = [comp for comp in components if isinstance(comp, ComponentWidget)]
         components.sort(key=lambda node: node.pos().y())
         index = 0
         for child in components:
-            if child.isVisible() and position.y() < child.pos().y():
+            if position.y() < child.pos().y() + child.height() * 0.5:
                 break
             index += 1
         return index
