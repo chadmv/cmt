@@ -2,6 +2,7 @@ import maya.cmds as cmds
 from PySide import QtGui
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
+import cmt.shortcuts as shortcuts
 import logging
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,10 @@ class Component(core.Component):
         1: 'Y',
         2: 'Z',
     }
+
+    @classmethod
+    def image(cls, size=32):
+        return QtGui.QPixmap(shortcuts.get_icon_path('swingTwist')).scaled(size, size)
 
     def __init__(self, swingtwists=None, **kwargs):
         """Constructor
@@ -65,12 +70,6 @@ class Component(core.Component):
                                                       value=swingtwist.get('swing', 1.0),
                                                       help_text='The swing amount',
                                                       max_value=1.0))
-            row_container.add_field(fields.BooleanField(name='Invert Twist',
-                                                        value=swingtwist.get('invertTwist', False),
-                                                        help_text='Whether to invert the twist.'))
-            row_container.add_field(fields.BooleanField(name='Invert Swing',
-                                                        value=swingtwist.get('invertSwing', False),
-                                                        help_text='Whether to invert the swing.'))
             row_container.add_field(fields.ChoiceField(
                 name='Twist Axis',
                 value=Component.twist_axis[swingtwist.get('twistAxis', 0)],
@@ -87,14 +86,9 @@ class Component(core.Component):
                 continue
             name = container[1][0].value()
             logger.info('Creating swingtwist on {0} from {1}'.format(driven, driver))
-            node = cmds.swingTwist(driver, driven, name=name)
-
             attributes = get_swingtwist_attribute_dictionary(container)
-            for attr, value in attributes.items():
-                try:
-                    cmds.setAttr('{0}.{1}'.format(node, attr), value)
-                except RuntimeError:
-                    pass
+            cmds.swingTwist(driver, driven, name=name, **attributes)
+
 
     def _data(self):
         # Convert the fields back into a list of dictionaries
@@ -124,7 +118,5 @@ def get_swingtwist_attribute_dictionary(container):
     return {
         'twist': container[1][1].value(),
         'swing': container[1][2].value(),
-        'invertTwist': container[1][3].value(),
-        'invertSwing': container[1][4].value(),
-        'twistAxis': 'XYZ'.index(container[1][5].value()),
+        'twistAxis': 'XYZ'.index(container[1][3].value()),
     }

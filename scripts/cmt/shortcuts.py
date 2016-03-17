@@ -1,5 +1,6 @@
 """Contains commonly used functions and classes shared by many modules in cmt.
 """
+import os
 import re
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
@@ -186,3 +187,18 @@ class BaseTreeNode(object):
         """Get the table display data"""
         return ''
 
+
+def get_icon_path(name):
+    """Get the path of the given icon name.
+
+    :param name: Name of an icon in the icons directory.
+    :return: The full path to the icon or None if it does not exist.
+    """
+    icon_directory = os.path.join(os.path.dirname(__file__), '..', '..', 'icons')
+    image_extensions = ['png', 'svg', 'jpg', 'jpeg']
+    for root, dirs, files in os.walk(icon_directory):
+        for ext in image_extensions:
+            full_path = os.path.join(root, '{0}.{1}'.format(name, ext))
+            if os.path.exists(full_path):
+                return os.path.normpath(full_path)
+    return None
