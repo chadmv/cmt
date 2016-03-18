@@ -1,4 +1,3 @@
-import maya.cmds as cmds
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 import cmt.rig.skeleton as skeleton

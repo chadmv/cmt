@@ -123,7 +123,7 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
         hbox = QtGui.QHBoxLayout()
         vbox.addLayout(hbox)
         button = QtGui.QPushButton('Execute')
-        button.released.connect(self.execute_queue)
+        button.released.connect(self.queue_widget.execute_queue)
         hbox.addWidget(button)
 
         splitter.setSizes([50, 300])
@@ -244,25 +244,6 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
                 # Only leaf nodes are Components.
                 continue
             self.queue_widget.add_component_to_queue(node.component_path)
-
-    def execute_queue(self):
-        self.queue_widget.reset_component_widget_status()
-        self.queue_widget.queue.execute(on_error=self.on_component_execution_error)
-
-    def on_component_execution_error(self, message, component):
-        widget = self.queue_widget.get_component_widget(component)
-        if widget:
-            widget.set_color(ComponentWidget.error_color)
-        msg = QtGui.QMessageBox(self)
-        msg.setWindowTitle('Execution Error')
-        msg.setText('Component {0} failed to execute.'.format(component.name()))
-        msg.setDetailedText(message)
-        msg.setIcon(QtGui.QMessageBox.Critical)
-        # Need to spacer to set the message box width since setFixedWidth does not work.
-        spacer = QtGui.QSpacerItem(500, 0, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        layout = msg.layout()
-        layout.addItem(spacer, layout.rowCount(), 0, 1, layout.columnCount())
-        msg.show()
 
 
 class ComponentNode(shortcuts.BaseTreeNode):
@@ -510,6 +491,29 @@ class QueueWidget(QtGui.QWidget):
         comp_widget = ComponentWidget(comp, self.queue, parent=self)
         self.queue_layout.insertWidget(index, comp_widget)
 
+    def execute_queue(self):
+        # Reset the execution status of all the ComponentWidgets
+        for child in self.children():
+            if isinstance(child, ComponentWidget):
+                child.set_color(ComponentWidget.normal_color)
+
+        self.queue.execute(on_error=self.on_component_execution_error)
+
+    def on_component_execution_error(self, message, component):
+        widget = self.get_component_widget(component)
+        if widget:
+            widget.set_color(ComponentWidget.error_color)
+        msg = QtGui.QMessageBox(self)
+        msg.setWindowTitle('Execution Error')
+        msg.setText('Component {0} failed to execute.'.format(component.name()))
+        msg.setDetailedText(message)
+        msg.setIcon(QtGui.QMessageBox.Critical)
+        # Need to spacer to set the message box width since setFixedWidth does not work.
+        spacer = QtGui.QSpacerItem(500, 0, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        layout = msg.layout()
+        layout.addItem(spacer, layout.rowCount(), 0, 1, layout.columnCount())
+        msg.show()
+
     def get_component_widget(self, component):
         """Get the ComponentWidget of a Component.
 
@@ -521,17 +525,13 @@ class QueueWidget(QtGui.QWidget):
                 return child
         return None
 
-    def reset_component_widget_status(self):
-        """Resets the execution status of all the ComponentWidgets."""
-        for child in self.children():
-            if isinstance(child, ComponentWidget):
-                child.set_color(ComponentWidget.normal_color)
-
 
 class ComponentWidget(QtGui.QFrame):
     """The widget used to display a Component in the ComponentQueue."""
     normal_color = QtGui.QColor(72, 170, 181)
     error_color = QtGui.QColor(217, 83, 79)
+    break_point_disabled_icon = QtGui.QIcon(QtGui.QPixmap(':/stopClip.png'))
+    break_point_enabled_icon = QtGui.QIcon(QtGui.QPixmap(':/timestop.png'))
 
     def __init__(self, comp, queue, parent=None):
         super(ComponentWidget, self).__init__(parent)
@@ -550,24 +550,6 @@ class ComponentWidget(QtGui.QFrame):
         self.header_layout = hbox
         hbox.setContentsMargins(16, 4, 4, 4)
         vbox.addLayout(hbox)
-        enabled = QtGui.QCheckBox()
-        enabled.setToolTip('Enable/Disable Component')
-        hbox.addWidget(enabled)
-        # Image label
-        label = QtGui.QLabel()
-        label.setPixmap(comp.image(size=24))
-        hbox.addWidget(label)
-
-        # Execute button
-        action = QtGui.QAction('Execute', self)
-        icon = QtGui.QIcon(QtGui.QPixmap(':/timeplay.png'))
-        action.setIcon(icon)
-        action.setToolTip('Execute the component')
-        action.setStatusTip('Execute the component')
-        action.triggered.connect(comp.execute)
-        button = QtGui.QToolButton()
-        button.setDefaultAction(action)
-        hbox.addWidget(button)
 
         # Expand toggle
         expand_action = QtGui.QAction('Toggle', self)
@@ -579,6 +561,39 @@ class ComponentWidget(QtGui.QFrame):
         button = QtGui.QToolButton()
         button.setDefaultAction(expand_action)
         hbox.addWidget(button)
+
+        # Enable checkbox
+        enabled = QtGui.QCheckBox()
+        enabled.setToolTip('Enable/Disable Component')
+        hbox.addWidget(enabled)
+
+        # Breakpoint
+        self.break_point_action = QtGui.QAction('Breakpoint', self)
+        self.break_point_action.setCheckable(True)
+        self.break_point_action.setIcon(self.break_point_disabled_icon)
+        self.break_point_action.setToolTip('Set break point at component.')
+        self.break_point_action.setStatusTip('Set break point at component.')
+        self.break_point_action.toggled.connect(self.set_break_point)
+        button = QtGui.QToolButton()
+        button.setDefaultAction(self.break_point_action)
+        hbox.addWidget(button)
+
+        # Execute button
+        action = QtGui.QAction('Execute', self)
+        icon = QtGui.QIcon(QtGui.QPixmap(':/timeplay.png'))
+        action.setIcon(icon)
+        action.setToolTip('Execute the component')
+        action.setStatusTip('Execute the component')
+        action.triggered.connect(partial(self.execute_component, on_error=parent.on_component_execution_error))
+        button = QtGui.QToolButton()
+        button.setDefaultAction(action)
+        hbox.addWidget(button)
+
+        # Image label
+        label = QtGui.QLabel()
+        label.setPixmap(comp.image(size=24))
+        label.setToolTip(comp.__class__.__doc__)
+        hbox.addWidget(label)
 
         # Name label
         label = QtGui.QLabel(comp.name().split('.')[-1])
@@ -623,6 +638,15 @@ class ComponentWidget(QtGui.QFrame):
         expand_action.toggled.connect(content_widget.setVisible)
         content_widget.setVisible(False)
         content_layout.addStretch()
+
+    def execute_component(self, on_error):
+        self.set_color(ComponentWidget.normal_color)
+        self.comp.capture_execute(on_error=on_error)
+
+    def set_break_point(self, value):
+        self.comp.break_point = value
+        icon = self.break_point_enabled_icon if value else self.break_point_disabled_icon
+        self.break_point_action.setIcon(icon)
 
     def grab_rect(self):
         """Get the rectangle describing the grab hotspot."""

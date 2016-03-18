@@ -1,5 +1,19 @@
 """Contains the base Component class and the ComponentQueue, which are the two main classes
 of the component execution system.
+
+To create a new Component, inherit from the core.Component class and implement the execute method:
+
+class Component(core.Component):
+    def __init__(self, sphere_name='', **kwargs):
+        super(Component, self).__init__(**kwargs)
+        self.sphere_name = fields.CharField(name='Sphere Name', value=sphere_name)
+        self.add_field(self.sphere_name)
+
+    def execute(self):
+        cmds.polySphere(name=self.sphere_name.value())
+
+    def draw(self, layout):
+        layout.addWidget(self.sphere_name.widget())
 """
 
 from PySide import QtGui
@@ -73,6 +87,26 @@ class Component(object):
         """
         raise NotImplementedError('execute method not implemented.')
 
+    def capture_execute(self, on_error=None):
+        """Executes the Component allowing the caller to pass in a callback function to call if the execution
+        fails.
+
+        :param on_error: An optional callback function that gets called when an exception occurs.
+                         The callback function has the signature func(message, component).
+        :return: True if the component successfully ran.
+        """
+        comp_data = pprint.pformat(self.data(), indent=4)
+        logger.info('Executing {0} with data:\n{1}'.format(self.name(), comp_data))
+        try:
+            self.execute()
+        except:
+            error = traceback.format_exc()
+            if on_error:
+                on_error(message=error, component=self)
+            logger.critical(error)
+            return False
+        return True
+
     def data(self):
         """Get the component data dictionary used for rebuilding the component.
 
@@ -89,6 +123,14 @@ class Component(object):
         return data
 
     def add_field(self, field):
+        """Adds a field to the Component.
+
+        Fields must be added to a Component in order to be automatically serialized on export.  Note that
+        fields inside an ArrayField or ContainerField do not need to be explicitly added to a Component as the
+        ArrayField or ContainerField will automatically pass the serialized data to the Component.
+
+        :param field: Field to add.
+        """
         self.fields.append(field)
 
     def draw(self, layout):
@@ -178,17 +220,8 @@ class ComponentQueue(object):
                          The callback function has the signature func(message, component).
         """
         for comp in self.__components:
-            if comp.enabled:
-                comp_data = pprint.pformat(comp.data(), indent=4)
-                logger.info('Executing {0} with data:\n{1}'.format(comp.name(), comp_data))
-                try:
-                    comp.execute()
-                except:
-                    error = traceback.format_exc()
-                    if on_error:
-                        on_error(message=error, component=comp)
-                    logger.critical(error)
-                    break
+            if comp.enabled and not comp.capture_execute(on_error):
+                break
 
             if comp.break_point:
                 break
