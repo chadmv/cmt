@@ -1,5 +1,6 @@
 import os
 import json
+import webbrowser
 from functools import partial
 from PySide import QtGui
 from PySide import QtCore
@@ -401,10 +402,15 @@ class QueueWidget(QtGui.QWidget):
         child.hide()
         self.place_indicator(index)
         if drag.exec_(QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
+            # The drag reorder was accepted so do the actual move
             drop_indicator_index = self.queue_layout.indexOf(self.drop_indicator)
             self.hide_indicator()
             self.queue_layout.insertWidget(drop_indicator_index, child)
             child.show()
+            self.queue.clear()
+            components = self.get_ordered_component_widgets()
+            for widget in components:
+                self.queue.add(widget.comp)
         else:
             self.queue_layout.insertWidget(component_widget_index, child)
             child.show()
@@ -474,10 +480,7 @@ class QueueWidget(QtGui.QWidget):
         # Snap to the middle so we get over a ComponentWidget
         position.setX(self.width() / 2)
         # If the position is between ComponentWidgets, snap to the next lowest widget.
-        child_count = self.queue_layout.count()
-        components = [self.queue_layout.itemAt(i).widget() for i in range(child_count)]
-        components = [comp for comp in components if isinstance(comp, ComponentWidget)]
-        components.sort(key=lambda node: node.pos().y())
+        components = self.get_ordered_component_widgets()
         index = 0
         for child in components:
             if position.y() < child.pos().y() + child.height() * 0.5:
@@ -485,9 +488,21 @@ class QueueWidget(QtGui.QWidget):
             index += 1
         return index
 
+    def get_ordered_component_widgets(self):
+        """Get the ComponentWidgets ordered top to bottom.
+
+        :return: A list of ComponentWidgets.
+        """
+        child_count = self.queue_layout.count()
+        components = [self.queue_layout.itemAt(i).widget() for i in range(child_count)]
+        components = [comp for comp in components if isinstance(comp, ComponentWidget)]
+        components.sort(key=lambda node: node.pos().y())
+        return components
+
     def add_component_to_queue(self, component_path, index=None):
         """Adds the selected components in the component tree to the queue."""
         if index is None:
+            # If no index is specified, append to the end
             index = self.queue_layout.count() - 1
         comp = component_path if isinstance(component_path, core.Component)\
             else core.load_component_class(component_path)
@@ -542,15 +557,8 @@ class ComponentWidget(QtGui.QFrame):
         label = QtGui.QLabel()
         label.setPixmap(comp.image(size=24))
         hbox.addWidget(label)
-        # Name label
-        label = QtGui.QLabel(comp.name().split('.')[-1])
-        label.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
-        font = QtGui.QFont()
-        font.setPointSize(14)
-        label.setFont(font)
-        hbox.addWidget(label)
-        hbox.addStretch()
 
+        # Execute button
         action = QtGui.QAction('Execute', self)
         icon = QtGui.QIcon(QtGui.QPixmap(':/timeplay.png'))
         action.setIcon(icon)
@@ -560,6 +568,38 @@ class ComponentWidget(QtGui.QFrame):
         button = QtGui.QToolButton()
         button.setDefaultAction(action)
         hbox.addWidget(button)
+
+        # Expand toggle
+        expand_action = QtGui.QAction('Toggle', self)
+        expand_action.setCheckable(True)
+        icon = QtGui.QIcon(QtGui.QPixmap(':/arrowDown.png'))
+        expand_action.setIcon(icon)
+        expand_action.setToolTip('Toggle details')
+        expand_action.setStatusTip('Toggle details')
+        button = QtGui.QToolButton()
+        button.setDefaultAction(expand_action)
+        hbox.addWidget(button)
+
+        # Name label
+        label = QtGui.QLabel(comp.name().split('.')[-1])
+        label.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
+        label.setToolTip(comp.__class__.__doc__)
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        label.setFont(font)
+        hbox.addWidget(label)
+        hbox.addStretch()
+
+        if comp.help_url():
+            action = QtGui.QAction('Help', self)
+            icon = QtGui.QIcon(QtGui.QPixmap(':/help.png'))
+            action.setIcon(icon)
+            action.setToolTip('Open help documentation.')
+            action.setStatusTip('Open help documentation.')
+            action.triggered.connect(partial(webbrowser.open, comp.help_url()))
+            button = QtGui.QToolButton()
+            button.setDefaultAction(action)
+            hbox.addWidget(button)
 
         action = QtGui.QAction('Delete', self)
         icon = QtGui.QIcon(QtGui.QPixmap(':/smallTrash.png'))
@@ -572,16 +612,6 @@ class ComponentWidget(QtGui.QFrame):
         button.setDefaultAction(action)
         hbox.addWidget(button)
 
-        action = QtGui.QAction('Toggle', self)
-        action.setCheckable(True)
-        icon = QtGui.QIcon(QtGui.QPixmap(':/arrowDown.png'))
-        action.setIcon(icon)
-        action.setToolTip('Toggle details')
-        action.setStatusTip('Toggle details')
-        button = QtGui.QToolButton()
-        button.setDefaultAction(action)
-        hbox.addWidget(button)
-
         content_widget = QtGui.QWidget()
         content_layout = QtGui.QVBoxLayout(content_widget)
         content_layout.setContentsMargins(16, 8, 0, 0)
@@ -590,7 +620,7 @@ class ComponentWidget(QtGui.QFrame):
         enabled.toggled.connect(content_widget.setEnabled)
         enabled.setChecked(comp.enabled)
         enabled.toggled.connect(comp.set_enabled)
-        action.toggled.connect(content_widget.setVisible)
+        expand_action.toggled.connect(content_widget.setVisible)
         content_widget.setVisible(False)
         content_layout.addStretch()
 

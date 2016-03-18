@@ -4,20 +4,38 @@ import sys
 import maya.cmds as cmds
 from cmt.test import TestCase
 import cmt.cqueue.core as core
+import cmt.cqueue.fields as fields
 
 
 class Component(core.Component):
-    def __init__(self, sphere_name, **kwargs):
+    def __init__(self, sphere_name='', **kwargs):
         super(Component, self).__init__(**kwargs)
-        self.sphere_name = sphere_name
+        self.sphere_name = fields.CharField(name='Sphere Name', value=sphere_name)
+        self.add_field(self.sphere_name)
 
     def execute(self):
-        cmds.polySphere(name=self.sphere_name)
+        cmds.polySphere(name=self.sphere_name.value())
 
-    def _data(self):
-        return {
-            'sphere_name': self.sphere_name
-        }
+
+class ContainerComponent(core.Component):
+    def __init__(self, spheres=None, **kwargs):
+        super(ContainerComponent, self).__init__(**kwargs)
+        self.array_field = fields.ArrayField(name='spheres')
+        self.add_field(self.array_field)
+        if spheres is None:
+            spheres = [{'sphere_name': 'sphere1'}]
+        for sphere in spheres:
+            container = fields.ContainerField(name='sphere')
+            self.array_field.add_field(container)
+            container.add_field(fields.CharField(name='Sphere Name', value=sphere['sphere_name']))
+            container.add_field(fields.FloatField(name='Radius', value=sphere.get('radius', 1.0)))
+
+    def execute(self):
+        for sphere in self.array_field:
+            name = sphere[0].value()
+            radius = sphere[1].value()
+            cmds.polySphere(name=name, radius=radius)
+
 
 
 class CQueueTests(TestCase):
@@ -33,7 +51,6 @@ class CQueueTests(TestCase):
                                                     full_path=os.path.join('cmt', 'cqueue', 'components'),
                                                     root=os.path.join('cmt', 'cqueue', 'components', 'rig'),
                                                     result=result)
-        print result
         self.assertListEqual(['cmt.cqueue.components.rig.skeleton'], result)
 
     def test_component_base_data(self):
@@ -44,6 +61,25 @@ class CQueueTests(TestCase):
             'enabled': True,
             'break_point': False,
             'uuid': comp.uuid,
+        }
+        self.assertDictEqual(expected, data)
+
+    def test_component_data_with_array_of_containers_is_correct(self):
+        spheres = [
+            {'sphere_name': 'sphere1', 'radius': 2.5},
+            {'sphere_name': 'sphere2', 'radius': 5.0},
+        ]
+        comp = ContainerComponent(spheres)
+        data = comp.data()
+        expected = {
+            'name': 'test_cmt_cqueue',
+            'enabled': True,
+            'break_point': False,
+            'uuid': comp.uuid,
+            'spheres': [
+                ['sphere1', 2.5],
+                ['sphere2', 5.0],
+            ]
         }
         self.assertDictEqual(expected, data)
 
@@ -153,5 +189,4 @@ class CQueueTests(TestCase):
         queue.execute()
         self.assertTrue(cmds.objExists('sphere1'))
         self.assertTrue(cmds.objExists('sphere2'))
-
 

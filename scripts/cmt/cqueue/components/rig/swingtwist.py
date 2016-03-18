@@ -19,9 +19,9 @@ class Component(core.Component):
     def image(cls, size=32):
         return QtGui.QPixmap(shortcuts.get_icon_path('swingTwist')).scaled(size, size)
 
-    def __init__(self, swingtwists=None, **kwargs):
+    def __init__(self, swing_twists=None, **kwargs):
         """Constructor
-        :param swingtwists: A list of dictionaries describing the swingTwist nodes that need to be
+        :param swing_twists: A list of dictionaries describing the swingTwist nodes that need to be
                            created:
             {
                 'driven': node,
@@ -29,26 +29,25 @@ class Component(core.Component):
                 'name': name,
                 'twist': 1.0,
                 'swing': 0.2,
-                'invertTwist': False,
-                'invertSwing': False,
             }
         """
         super(Component, self).__init__(**kwargs)
-        self.swingtwists = fields.ArrayField(add_label_text='Add SwingTwist')
-        if not swingtwists:
+        self.swingtwists = fields.ArrayField(name='Swing Twists', add_label_text='Add SwingTwist')
+        self.add_field(self.swingtwists)
+        if not swing_twists:
             # Create default entries if none specified
-            swingtwists = [
+            swing_twists = [
                 {'name': 'swingTwist#'}
             ]
         twist_axes = self.twist_axis.values()
         twist_axes.sort()
         # The fields will be arranged in two row containers
         # [[driver, driven], [name, twist, swing, invertTwist, invertSwing, twistAxis]]
-        for swingtwist in swingtwists:
-            container = fields.ContainerField(orientation=fields.ContainerField.vertical)
+        for swingtwist in swing_twists:
+            container = fields.ContainerField(name='Swing Twist', orientation=fields.ContainerField.vertical)
             self.swingtwists.add_field(container)
 
-            row_container = fields.ContainerField(border=False)
+            row_container = fields.ContainerField(name='Row', border=False)
             container.add_field(row_container)
             row_container.add_field(fields.MayaNodeField(name='Driver',
                                                          value=swingtwist.get('driver', ''),
@@ -57,7 +56,7 @@ class Component(core.Component):
                                                          value=swingtwist.get('driven', ''),
                                                          help_text='The node to be driven'))
 
-            row_container = fields.ContainerField(border=False)
+            row_container = fields.ContainerField(name='Row', border=False)
             container.add_field(row_container)
             row_container.add_field(fields.CharField(
                 name='Name', value=swingtwist.get('name', 'swingTwist#'),
@@ -65,10 +64,12 @@ class Component(core.Component):
             row_container.add_field(fields.FloatField(name='Twist',
                                                       value=swingtwist.get('twist', 1.0),
                                                       help_text='The twist amount',
+                                                      min_value=-1.0,
                                                       max_value=1.0))
             row_container.add_field(fields.FloatField(name='Swing',
                                                       value=swingtwist.get('swing', 1.0),
                                                       help_text='The swing amount',
+                                                      min_value=-1.0,
                                                       max_value=1.0))
             row_container.add_field(fields.ChoiceField(
                 name='Twist Axis',
@@ -84,39 +85,14 @@ class Component(core.Component):
             if not cmds.objExists(driver) or not cmds.objExists(driven):
                 logger.warning('{0} or {1} does not exist.'.format(driver, driven))
                 continue
-            name = container[1][0].value()
             logger.info('Creating swingtwist on {0} from {1}'.format(driven, driver))
-            attributes = get_swingtwist_attribute_dictionary(container)
-            cmds.swingTwist(driver, driven, name=name, **attributes)
-
-
-    def _data(self):
-        # Convert the fields back into a list of dictionaries
-        swingtwists = []
-        for container in self.swingtwists:
-            attributes = get_swingtwist_attribute_dictionary(container)
-            attributes['name'] = container[1][0].value()
-            attributes['driver'] = container[0][0].value()
-            attributes['driven'] = container[0][1].value()
-            swingtwists.append(attributes)
-        return {
-            'swingtwists': swingtwists
-        }
+            name = container[1][0].value()
+            twist = container[1][1].value()
+            swing = container[1][2].value()
+            twist_axis = 'XYZ'.index(container[1][3].value())
+            cmds.swingTwist(driver, driven, name=name, twist=twist, swing=swing, twistAxis=twist_axis)
 
     def draw(self, layout):
         """Renders the component PySide widgets into the given layout."""
         layout.addWidget(self.swingtwists.widget())
 
-
-def get_swingtwist_attribute_dictionary(container):
-    """Convenience function to turn a ContainerField into a dictionary holding all the attributes
-    of the swingTwist.
-
-    :param container: A ContainerField containing all the
-    :return:
-    """
-    return {
-        'twist': container[1][1].value(),
-        'swing': container[1][2].value(),
-        'twistAxis': 'XYZ'.index(container[1][3].value()),
-    }

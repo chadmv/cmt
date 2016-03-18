@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 class Component(object):
     """A Component is an independent operation that will be executed in the ComponentQueue.  New components deriving
-    from this class must implement the execute method.  If the derived Component has any custom input data, it should
-    implement the _data method.  For UI support, derived components must override the draw method.
+    from this class must implement the execute method.  For UI support, derived components must override the draw
+    method.
     """
     @classmethod
     def image(cls, size=32):
@@ -52,6 +52,8 @@ class Component(object):
         self.break_point = kwargs.get('break_point', False)
         # The unique id of this component
         self.uuid = str(kwargs.get('uuid', uuid.uuid4()))
+        # The list of fields
+        self.fields = []
 
     def set_enabled(self, value):
         """Set whether this Component is enabled or not.
@@ -71,29 +73,23 @@ class Component(object):
         """
         raise NotImplementedError('execute method not implemented.')
 
-    def _data(self):
-        """Get the component data dictionary for this component.
-
-        Derived classes should implement this method if it requires any custom input data.
-
-        :return: A dictionary containing the data required to execute the component.
-        """
-        return {}
-
     def data(self):
         """Get the component data dictionary used for rebuilding the component.
 
         :return: A dictionary containing all the data required to rebuild the component.
         """
-        base_data = {
+        data = {
             'name': self.name(),
             'enabled': self.enabled,
             'break_point': self.break_point,
             'uuid': self.uuid,
         }
-        derived_data = self._data()
-        base_data.update(derived_data)
-        return base_data
+        for field in self.fields:
+            data.update(field.data())
+        return data
+
+    def add_field(self, field):
+        self.fields.append(field)
 
     def draw(self, layout):
         """Renders the component PySide widgets into the given layout.
@@ -103,6 +99,13 @@ class Component(object):
         :param layout: The parent layout to add the Component widgets to.
         """
         layout.addWidget(QtGui.QLabel('No arguments required.'))
+
+    def help_url(self):
+        """Get the url of help documentation for the Component.
+
+        :return: The help url.
+        """
+        return ''
 
 
 class ComponentQueue(object):
@@ -151,6 +154,10 @@ class ComponentQueue(object):
             comp = self.__components.pop(index)
         return comp
 
+    def clear(self):
+        """Clears all the Components in the ComponentQueue."""
+        self.__components = []
+
     def index(self, component):
         """Return the index of the given component.
 
@@ -172,7 +179,7 @@ class ComponentQueue(object):
         """
         for comp in self.__components:
             if comp.enabled:
-                comp_data = pprint.pformat(comp._data(), indent=4)
+                comp_data = pprint.pformat(comp.data(), indent=4)
                 logger.info('Executing {0} with data:\n{1}'.format(comp.name(), comp_data))
                 try:
                     comp.execute()

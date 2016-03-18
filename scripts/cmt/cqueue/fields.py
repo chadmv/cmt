@@ -13,7 +13,7 @@ class Field(object):
     Derived classes should implement the widget, value, and copy methods.
     """
 
-    def __init__(self, name=None, value=None, help_text=''):
+    def __init__(self, name, value=None, help_text=''):
         """Constructor.  No QWidgets should be created in the constructor or else Maya will crash
         in batch/testing mode."""
         self.name = name
@@ -38,12 +38,15 @@ class Field(object):
         """
         raise NotImplementedError('No copy implemented for Field.')
 
+    def data(self):
+        return {self.name.lower().replace(' ', '_'): self.value()}
+
 
 class BooleanField(Field):
     """A checkbox field that holds True or False."""
 
-    def __init__(self, *args, **kwargs):
-        super(BooleanField, self).__init__(*args, **kwargs)
+    def __init__(self, name, value=True, *args, **kwargs):
+        super(BooleanField, self).__init__(name, value, *args, **kwargs)
         self._widget = None
 
     def widget(self):
@@ -69,8 +72,8 @@ class BooleanField(Field):
 class CharField(Field):
     """A Field that holds a string value."""
 
-    def __init__(self, *args, **kwargs):
-        super(CharField, self).__init__(*args, **kwargs)
+    def __init__(self, name, value='', *args, **kwargs):
+        super(CharField, self).__init__(name, value, *args, **kwargs)
         self._widget = None
 
     def widget(self):
@@ -79,6 +82,7 @@ class CharField(Field):
         hbox = QtGui.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
         label = QtGui.QLabel(self.name)
+        label.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
         label.setToolTip(self.help_text)
         hbox.addWidget(label)
         self._widget = QtGui.QLineEdit(self._value)
@@ -102,9 +106,9 @@ class CharField(Field):
 class FloatField(Field):
     """A Field that holds a float value."""
 
-    def __init__(self, min_value=0.0, max_value=100.0, precision=2, single_step=0.1,
+    def __init__(self, name, value=0.0, min_value=0.0, max_value=100.0, precision=2, single_step=0.1,
                  *args, **kwargs):
-        super(FloatField, self).__init__(*args, **kwargs)
+        super(FloatField, self).__init__(name, value, *args, **kwargs)
         self._widget = None
         self.min_value = min_value
         self.max_value = max_value
@@ -146,8 +150,8 @@ class FloatField(Field):
 class ChoiceField(Field):
     """A Field with a dropdown."""
 
-    def __init__(self, choices, *args, **kwargs):
-        super(ChoiceField, self).__init__(*args, **kwargs)
+    def __init__(self, name, choices, value='', *args, **kwargs):
+        super(ChoiceField, self).__init__(name, value, *args, **kwargs)
         self._widget = None
         self.choices = choices
         if not self._value:
@@ -160,6 +164,7 @@ class ChoiceField(Field):
         hbox.setContentsMargins(0, 0, 0, 0)
         label = QtGui.QLabel(self.name)
         label.setToolTip(self.help_text)
+        label.setSizePolicy(QtGui.QSizePolicy.Maximum, QtGui.QSizePolicy.Fixed)
         hbox.addWidget(label)
         self._widget = QtGui.QComboBox()
         self._widget.setToolTip(self.help_text)
@@ -185,8 +190,8 @@ class ChoiceField(Field):
 class FilePathField(Field):
     """A Field that holds a file path and presents a Browse file dialog."""
 
-    def __init__(self, filter='Any File (*)', *args, **kwargs):
-        super(FilePathField, self).__init__(*args, **kwargs)
+    def __init__(self, name, value='', filter='Any File (*)', *args, **kwargs):
+        super(FilePathField, self).__init__(name, value, *args, **kwargs)
         self.filter = filter
         self._widget = None
 
@@ -230,8 +235,8 @@ class FilePathField(Field):
 class MayaNodeField(Field):
     """A Field that holds the name of a Maya node and presents a set from selected button."""
 
-    def __init__(self, *args, **kwargs):
-        super(MayaNodeField, self).__init__(*args, **kwargs)
+    def __init__(self, name, value='', *args, **kwargs):
+        super(MayaNodeField, self).__init__(name, value, *args, **kwargs)
         self._widget = None
 
     def widget(self):
@@ -270,7 +275,7 @@ class MayaNodeField(Field):
         return MayaNodeField(name=self.name, value=self.value(), help_text=self.help_text)
 
 
-class ContainerField(object):
+class ContainerField(Field):
     """A field that can contain many other fields.  This is usually used with ArrayField to add
     multiple groups of Fields.  It can also be use to orient groups of Fields horizontally or
     vertically.
@@ -278,11 +283,12 @@ class ContainerField(object):
     horizontal = 0
     vertical = 1
 
-    def __init__(self, orientation=horizontal, border=True):
+    def __init__(self, name, orientation=horizontal, border=True):
         """Constructor
         :param orientation: ContainerField.horizontal or ContainerField.vertical.
         :param border: True to display a border around the container.
         """
+        super(ContainerField, self).__init__(name)
         self.orientation = orientation
         self.border = border
         self.fields = []
@@ -329,11 +335,15 @@ class ContainerField(object):
             container.add_field(field.copy())
         return container
 
+    def value(self):
+        return [field.value() for field in self.fields]
 
-class ArrayField(object):
+
+class ArrayField(Field):
     """A field that can dynamically add or remove fields."""
 
-    def __init__(self, add_label_text='Add New Element'):
+    def __init__(self, name, add_label_text='Add New Element'):
+        super(ArrayField, self).__init__(name)
         self.fields = []
         self.add_label_text = add_label_text
         self.__current = 0  # For iterator
@@ -413,3 +423,6 @@ class ArrayField(object):
         self.fields.pop(index-1)
         widget = layout.takeAt(index)
         widget.widget().deleteLater()
+
+    def value(self):
+        return [field.value() for field in self.fields]
