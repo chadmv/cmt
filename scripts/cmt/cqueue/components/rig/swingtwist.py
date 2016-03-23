@@ -96,3 +96,23 @@ class Component(core.Component):
         """Renders the component PySide widgets into the given layout."""
         layout.addWidget(self.swingtwists.widget())
 
+    def component_data(self):
+        """Override data to export with customized format
+
+        :return: A list of the component data in the queue.
+        """
+        swingtwists = []
+        for container in self.swingtwists:
+            swingtwists.append({
+                'driver': container[0][0].value(),
+                'driven': container[0][1].value(),
+                'name': container[1][0].value(),
+                'twist': container[1][1].value(),
+                'swing': container[1][2].value(),
+                'twistAxis': 'XYZ'.index(container[1][3].value()),
+            })
+        data = {
+            'swing_twists': swingtwists
+        }
+        return data
+
