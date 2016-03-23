@@ -355,6 +355,7 @@ class QueueWidget(QtGui.QWidget):
             comp_widget = ComponentWidget(comp, queue, parent=self)
             self.queue_layout.addWidget(comp_widget)
         self.queue_layout.addStretch()
+        self.queue = queue
 
     def mousePressEvent(self, event):
         child = self.childAt(event.pos())

@@ -118,6 +118,17 @@ class Component(object):
             'break_point': self.break_point,
             'uuid': self.uuid,
         }
+        data.update(self.component_data())
+        return data
+
+    def component_data(self):
+        """Get the component data dictionary used for rebuilding the component.
+
+        This function can be overridden if the user wants to customize how the data is serialized to disk.
+
+        :return: A dictionary containing all the input data required to rebuild the component.
+        """
+        data = {}
         for field in self.fields:
             data.update(field.data())
         return data

@@ -124,8 +124,8 @@ class FloatField(Field):
         label.setToolTip(self.help_text)
         hbox.addWidget(label)
         self._widget = QtGui.QDoubleSpinBox()
-        self._widget.setValue(self._value)
         self._widget.setRange(self.min_value, self.max_value)
+        self._widget.setValue(self._value)
         self._widget.setDecimals(self.precision)
         self._widget.setSingleStep(self.single_step)
         self._widget.setToolTip(self.help_text)
@@ -330,7 +330,7 @@ class ContainerField(Field):
 
     def copy(self):
         """Returns a copy of the Field"""
-        container = ContainerField(orientation=self.orientation, border=self.border)
+        container = ContainerField(self.name, orientation=self.orientation, border=self.border)
         for field in self.fields:
             container.add_field(field.copy())
         return container
@@ -380,7 +380,7 @@ class ArrayField(Field):
 
     def copy(self):
         """Returns a copy of the Field"""
-        array_field = ArrayField(add_label_text=self.add_label_text)
+        array_field = ArrayField(self.name, add_label_text=self.add_label_text)
         for field in self.fields:
             array_field.add_field(field.copy())
         return array_field
