@@ -198,16 +198,19 @@ class SwingTwistNode(OpenMayaMPx.MPxNode):
         rotate_axis = rotate_axis.asQuaternion()
 
         rotation = rotate_axis.inverse() * rotation * joint_orient.inverse()
-
-        # Get the reference twist vector
         rotation_matrix = rotation.asMatrix()
+
+        # Calculate swing
         target_vector = [OpenMaya.MVector(rotation_matrix(x, 0), rotation_matrix(x, 1), rotation_matrix(x, 2))
                          for x in range(3)][twist_axis]
         reference_vector = [OpenMaya.MVector.xAxis, OpenMaya.MVector.yAxis, OpenMaya.MVector.zAxis][twist_axis]
-
-        # Calculate swing and twist
         swing = reference_vector.rotateTo(target_vector)
-        twist = rotation * swing.inverse()
+
+        # Calculate twist
+        target_vector = [OpenMaya.MVector(rotation_matrix(x, 0), rotation_matrix(x, 1), rotation_matrix(x, 2))
+                         for x in [1, 2, 0]][twist_axis]
+        reference_vector = [OpenMaya.MVector.yAxis, OpenMaya.MVector.zAxis, OpenMaya.MVector.xAxis][twist_axis]
+        twist = reference_vector.rotateTo(target_vector)
 
         # Scale by the input weights
         rest = OpenMaya.MQuaternion()
@@ -320,7 +323,7 @@ class SwingTwistCommand(OpenMayaMPx.MPxCommand):
         self._dgmod.newPlugValueFloat(plug_twist, twist)
 
         # Set the twist axis
-        twist_axis = arg_data.flagArgumentLong(self.twistaxis_flag_short, 0) if arg_data.isFlagSet(self.twistaxis_flag_short) else 0
+        twist_axis = arg_data.flagArgumentInt(self.twistaxis_flag_short, 0) if arg_data.isFlagSet(self.twistaxis_flag_short) else 0
         plug_twist_axis = fn_node.findPlug(SwingTwistNode.twist_axis, False)
         self._dgmod.newPlugValueShort(plug_twist_axis, twist_axis)
 
