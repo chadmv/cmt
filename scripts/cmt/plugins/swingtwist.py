@@ -206,8 +206,10 @@ class SwingTwistNode(OpenMayaMPx.MPxNode):
         reference_vector = [OpenMaya.MVector.xAxis, OpenMaya.MVector.yAxis, OpenMaya.MVector.zAxis][twist_axis]
         swing = reference_vector.rotateTo(target_vector)
 
+        twist = rotation * swing.inverse()
+        twist_matrix = twist.asMatrix()
         # Calculate twist
-        target_vector = [OpenMaya.MVector(rotation_matrix(x, 0), rotation_matrix(x, 1), rotation_matrix(x, 2))
+        target_vector = [OpenMaya.MVector(twist_matrix(x, 0), twist_matrix(x, 1), twist_matrix(x, 2))
                          for x in [1, 2, 0]][twist_axis]
         reference_vector = [OpenMaya.MVector.yAxis, OpenMaya.MVector.zAxis, OpenMaya.MVector.xAxis][twist_axis]
         twist = reference_vector.rotateTo(target_vector)
