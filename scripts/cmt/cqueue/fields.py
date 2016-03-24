@@ -147,6 +147,56 @@ class FloatField(Field):
                           precision=self.precision, single_step=self.single_step)
 
 
+class VectorField(Field):
+    """A Field that holds 3 floats."""
+
+    def __init__(self, name, value=(0.0, 0.0, 0.0), precision=4, *args, **kwargs):
+        super(VectorField, self).__init__(name, value, *args, **kwargs)
+        self._widget_x = None
+        self._widget_y = None
+        self._widget_z = None
+        self.precision = precision
+
+    def widget(self):
+        """Get the QWidget of the Field."""
+        widget = QtGui.QWidget()
+        hbox = QtGui.QHBoxLayout(widget)
+        hbox.setContentsMargins(0, 0, 0, 0)
+        label = QtGui.QLabel(self.name)
+        label.setToolTip(self.help_text)
+        hbox.addWidget(label)
+        validator = QtGui.QDoubleValidator(-999999.0, 999999.0, self.precision)
+        self._widget_x = QtGui.QLineEdit(str(self._value[0]))
+        self._widget_x.setToolTip(self.help_text)
+        self._widget_x.setValidator(validator)
+        hbox.addWidget(self._widget_x)
+
+        self._widget_y = QtGui.QLineEdit(str(self._value[1]))
+        self._widget_y.setToolTip(self.help_text)
+        self._widget_y.setValidator(validator)
+        hbox.addWidget(self._widget_y)
+
+        self._widget_z = QtGui.QLineEdit(str(self._value[2]))
+        self._widget_z.setToolTip(self.help_text)
+        self._widget_z.setValidator(validator)
+        hbox.addWidget(self._widget_z)
+        return widget
+
+    def value(self):
+        return [float(x.text()) for x in [self._widget_x, self._widget_y, self._widget_z]] if self._widget_x else self._value
+
+    def set_value(self, value):
+        super(FloatField, self).set_value(value)
+        if self._widget_x:
+            self._widget_x.setText(value[0])
+            self._widget_y.setText(value[1])
+            self._widget_z.setText(value[2])
+
+    def copy(self):
+        """Returns a copy of the Field"""
+        return VectorField(name=self.name, value=self.value(), help_text=self.help_text, precision=self.precision)
+
+
 class ChoiceField(Field):
     """A Field with a dropdown."""
 
@@ -235,9 +285,13 @@ class FilePathField(Field):
 class MayaNodeField(Field):
     """A Field that holds the name of a Maya node and presents a set from selected button."""
 
-    def __init__(self, name, value='', *args, **kwargs):
+    def __init__(self, name, value='', multi=False, height=45, *args, **kwargs):
         super(MayaNodeField, self).__init__(name, value, *args, **kwargs)
         self._widget = None
+        self._multi = multi
+        self._height = height
+        if multi and isinstance(self._value, basestring):
+            self._value = [self._value, ]
 
     def widget(self):
         """Get the QWidget of the Field."""
@@ -247,7 +301,12 @@ class MayaNodeField(Field):
         label = QtGui.QLabel(self.name)
         label.setToolTip(self.help_text)
         hbox.addWidget(label)
-        self._widget = QtGui.QLineEdit(self._value)
+        if self._multi:
+            self._widget = QtGui.QListWidget()
+            self._widget.addItems(self._value)
+            self._widget.setMaximumHeight(self._height)
+        else:
+            self._widget = QtGui.QLineEdit(self._value)
         self._widget.setToolTip(self.help_text)
         hbox.addWidget(self._widget)
         button = QtGui.QPushButton('Set')
@@ -258,21 +317,36 @@ class MayaNodeField(Field):
 
     def set_from_selected(self):
         """Populate the QLineEdit from the first selected node."""
-        sel = cmds.ls(sl=True)
-        if sel:
-            self._widget.setText(sel[0])
+        sel = cmds.ls(sl=True) or []
+        self.set_value(sel)
 
     def value(self):
-        return self._widget.text() if self._widget else self._value
+        if self._multi:
+            if self._widget:
+                count = self._widget.count()
+                return [self._widget.item(x).text() for x in range(count)]
+            else:
+                return self._value
+        else:
+            return self._widget.text() if self._widget else self._value
 
     def set_value(self, value):
+        if self._multi and isinstance(value, basestring):
+            value = [value, ]
+        elif not self._multi and not isinstance(value, basestring):
+            value = value[0]
         super(MayaNodeField, self).set_value(value)
         if self._widget:
-            self._widget.setText(value)
+            if self._multi:
+                self._widget.clear()
+                self._widget.addItems(self._value)
+            else:
+                self._widget.setText(value)
 
     def copy(self):
         """Returns a copy of the Field"""
-        return MayaNodeField(name=self.name, value=self.value(), help_text=self.help_text)
+        return MayaNodeField(name=self.name, value=self.value(), multi=self._multi, height=self._height,
+                             help_text=self.help_text)
 
 
 class ContainerField(Field):
