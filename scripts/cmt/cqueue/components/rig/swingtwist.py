@@ -44,10 +44,12 @@ class Component(core.Component):
         # The fields will be arranged in two row containers
         # [[driver, driven], [name, twist, swing, invertTwist, invertSwing, twistAxis]]
         for swingtwist in swing_twists:
-            container = fields.ContainerField(name='Swing Twist', orientation=fields.ContainerField.vertical)
+            container = fields.ContainerField(name='Swing Twist',
+                                              orientation=fields.ContainerField.vertical,
+                                              stretch=True)
             self.swingtwists.add_field(container)
 
-            row_container = fields.ContainerField(name='Row', border=False)
+            row_container = fields.ContainerField(name='', border=False)
             container.add_field(row_container)
             row_container.add_field(fields.MayaNodeField(name='Driver',
                                                          value=swingtwist.get('driver', ''),
@@ -56,7 +58,7 @@ class Component(core.Component):
                                                          value=swingtwist.get('driven', ''),
                                                          help_text='The node to be driven'))
 
-            row_container = fields.ContainerField(name='Row', border=False)
+            row_container = fields.ContainerField(name='', border=False)
             container.add_field(row_container)
             row_container.add_field(fields.CharField(
                 name='Name', value=swingtwist.get('name', 'swingTwist#'),
@@ -91,10 +93,6 @@ class Component(core.Component):
             swing = container[1][2].value()
             twist_axis = 'XYZ'.index(container[1][3].value())
             cmds.swingTwist(driver, driven, name=name, twist=twist, swing=swing, twistAxis=twist_axis)
-
-    def draw(self, layout):
-        """Renders the component PySide widgets into the given layout."""
-        layout.addWidget(self.swingtwists.widget())
 
     def component_data(self):
         """Override data to export with customized format

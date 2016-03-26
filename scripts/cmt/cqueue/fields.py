@@ -24,6 +24,13 @@ class Field(object):
         """Get the QWidget of the Field."""
         raise NotImplementedError('No widget implemented for Field.')
 
+    def name_label(self):
+        """Get a QLabel of the Field name."""
+        label = QtGui.QLabel(self.name)
+        label.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
+        label.setToolTip(self.help_text)
+        return label
+
     def value(self):
         return self._value
 
@@ -51,7 +58,7 @@ class BooleanField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        self._widget = QtGui.QCheckBox(self.name)
+        self._widget = QtGui.QCheckBox()
         self._widget.setChecked(self._value)
         self._widget.setToolTip(self.help_text)
         return self._widget
@@ -78,17 +85,9 @@ class CharField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        hbox = QtGui.QHBoxLayout(widget)
-        hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(self.name)
-        label.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
-        label.setToolTip(self.help_text)
-        hbox.addWidget(label)
         self._widget = QtGui.QLineEdit(self._value)
         self._widget.setToolTip(self.help_text)
-        hbox.addWidget(self._widget)
-        return widget
+        return self._widget
 
     def value(self):
         return self._widget.text() if self._widget else self._value
@@ -117,20 +116,13 @@ class FloatField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        hbox = QtGui.QHBoxLayout(widget)
-        hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(self.name)
-        label.setToolTip(self.help_text)
-        hbox.addWidget(label)
         self._widget = QtGui.QDoubleSpinBox()
         self._widget.setRange(self.min_value, self.max_value)
         self._widget.setValue(self._value)
         self._widget.setDecimals(self.precision)
         self._widget.setSingleStep(self.single_step)
         self._widget.setToolTip(self.help_text)
-        hbox.addWidget(self._widget)
-        return widget
+        return self._widget
 
     def value(self):
         return self._widget.value() if self._widget else self._value
@@ -162,9 +154,6 @@ class VectorField(Field):
         widget = QtGui.QWidget()
         hbox = QtGui.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(self.name)
-        label.setToolTip(self.help_text)
-        hbox.addWidget(label)
         validator = QtGui.QDoubleValidator(-999999.0, 999999.0, self.precision)
         self._widget_x = QtGui.QLineEdit(str(self._value[0]))
         self._widget_x.setToolTip(self.help_text)
@@ -209,19 +198,11 @@ class ChoiceField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        hbox = QtGui.QHBoxLayout(widget)
-        hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(self.name)
-        label.setToolTip(self.help_text)
-        label.setSizePolicy(QtGui.QSizePolicy.Maximum, QtGui.QSizePolicy.Fixed)
-        hbox.addWidget(label)
         self._widget = QtGui.QComboBox()
         self._widget.setToolTip(self.help_text)
         self._widget.addItems(self.choices)
         self._widget.setCurrentIndex(self._widget.findText(self._value))
-        hbox.addWidget(self._widget)
-        return widget
+        return self._widget
 
     def value(self):
         return self._widget.currentText() if self._widget else self._value
@@ -250,9 +231,6 @@ class FilePathField(Field):
         widget = QtGui.QWidget()
         hbox = QtGui.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(self.name)
-        label.setToolTip(self.help_text)
-        hbox.addWidget(label)
         self._widget = QtGui.QLineEdit(self._value)
         self._widget.setToolTip(self.help_text)
         hbox.addWidget(self._widget)
@@ -298,9 +276,6 @@ class MayaNodeField(Field):
         widget = QtGui.QWidget()
         hbox = QtGui.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(self.name)
-        label.setToolTip(self.help_text)
-        hbox.addWidget(label)
         if self._multi:
             self._widget = QtGui.QListWidget()
             self._widget.addItems(self._value)
@@ -356,15 +331,18 @@ class ContainerField(Field):
     """
     horizontal = 0
     vertical = 1
+    form = 2
 
-    def __init__(self, name, orientation=horizontal, border=True):
+    def __init__(self, name, orientation=horizontal, border=True, stretch=False):
         """Constructor
         :param orientation: ContainerField.horizontal or ContainerField.vertical.
         :param border: True to display a border around the container.
+        :param stretch: True to add a stretch at the end of the fields.
         """
         super(ContainerField, self).__init__(name)
         self.orientation = orientation
         self.border = border
+        self.stretch = stretch
         self.fields = []
 
     def __getitem__(self, index):
@@ -389,22 +367,30 @@ class ContainerField(Field):
             widget.setFrameStyle(QtGui.QFrame.StyledPanel)
         else:
             widget.setFrameStyle(QtGui.QFrame.NoFrame)
-        if self.orientation == ContainerField.horizontal:
-            layout = QtGui.QHBoxLayout(widget)
+        if self.orientation == ContainerField.form:
+            layout = QtGui.QFormLayout(widget)
+            if not self.border:
+                layout.setContentsMargins(0, 0, 0, 0)
+            for field in self.fields:
+                layout.addRow(field.name, field.widget())
         else:
-            layout = QtGui.QVBoxLayout(widget)
-        if not self.border:
-            layout.setContentsMargins(0, 0, 0, 0)
-        for field in self.fields:
-            layout.addWidget(field.widget())
-        if self.orientation == ContainerField.vertical:
-            # Only add a stretch to vertical layouts because horizontal layout will get too squished
-            layout.addStretch()
+            if self.orientation == ContainerField.horizontal:
+                layout = QtGui.QHBoxLayout(widget)
+            else:
+                layout = QtGui.QVBoxLayout(widget)
+            if not self.border:
+                layout.setContentsMargins(0, 0, 0, 0)
+            for field in self.fields:
+                if field.name:
+                    layout.addWidget(field.name_label())
+                layout.addWidget(field.widget())
+            if self.stretch:
+                layout.addStretch()
         return widget
 
     def copy(self):
         """Returns a copy of the Field"""
-        container = ContainerField(self.name, orientation=self.orientation, border=self.border)
+        container = ContainerField(self.name, orientation=self.orientation, border=self.border, stretch=self.stretch)
         for field in self.fields:
             container.add_field(field.copy())
         return container
@@ -481,7 +467,7 @@ class ArrayField(Field):
         action = QtGui.QAction('Remove', layout)
         action.triggered.connect(partial(self.remove_element, layout, element_widget))
 
-        icon = QtGui.QIcon(QtGui.QPixmap(':/trash.png'))
+        icon = QtGui.QIcon(QtGui.QPixmap(':/smallTrash.png'))
         action.setIcon(icon)
         action.setToolTip('Remove')
         action.setStatusTip('Remove')

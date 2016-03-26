@@ -48,11 +48,16 @@ class Component(core.Component):
 
         cmds.file(file_path, **kwargs)
 
-    def draw(self, layout):
-        """Renders the component PySide widgets into the given layout."""
-        hbox = QtGui.QHBoxLayout()
-        hbox.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(hbox)
-        hbox.addWidget(self.operation.widget())
-        hbox.addWidget(self.file_path.widget())
-        hbox.addWidget(self.namespace.widget())
+    def widget(self):
+        """Get a the QWidget displaying the Component data.
+
+        Users can override this method if they wish to customize the layout of the component.
+        :return: A QWidget containing all the Component fields.
+        """
+        widget = QtGui.QWidget()
+        layout = QtGui.QHBoxLayout(widget)
+        for field in self.fields:
+            layout.addWidget(field.name_label())
+            layout.addWidget(field.widget())
+        return widget
+

@@ -39,10 +39,12 @@ class Component(core.Component):
         # The fields will be arranged in two row containers
         # [[driver, driven], [name, twist, swing, invertTwist, invertSwing, twistAxis]]
         for constraint in constraints:
-            container = fields.ContainerField(name='Constraint', orientation=fields.ContainerField.vertical)
+            container = fields.ContainerField(name='Constraint',
+                                              orientation=fields.ContainerField.vertical,
+                                              stretch=True)
             self.constraints.add_field(container)
 
-            row_container = fields.ContainerField(name='Row', border=False)
+            row_container = fields.ContainerField(name='', border=False)
             container.add_field(row_container)
             row_container.add_field(fields.MayaNodeField(name='Drivers',
                                                          value=constraint.get('drivers', []),
@@ -54,14 +56,14 @@ class Component(core.Component):
             row_container.add_field(fields.BooleanField(name='Maintain offset',
                                                         value=constraint.get('maintainOffset', True)))
 
-            row_container = fields.ContainerField(name='Row', border=False)
+            row_container = fields.ContainerField(name='', border=False)
             container.add_field(row_container)
             row_container.add_field(fields.VectorField(name='Aim vector',
                                                        value=constraint.get('aimVector', (1.0, 0.0, 0.0))))
             row_container.add_field(fields.VectorField(name='Up vector',
                                                        value=constraint.get('upVector', (0.0, 1.0, 0.0))))
 
-            row_container = fields.ContainerField(name='Row', border=False)
+            row_container = fields.ContainerField(name='', border=False)
             container.add_field(row_container)
             choices = ['scene', 'object', 'objectrotation', 'vector', 'none']
             row_container.add_field(fields.ChoiceField(name='World up type',
@@ -72,7 +74,7 @@ class Component(core.Component):
             row_container.add_field(fields.MayaNodeField(name='World up object',
                                                          value=constraint.get('worldUpObject', '')))
 
-            row_container = fields.ContainerField(name='Skip', border=False)
+            row_container = fields.ContainerField(name='', border=False, stretch=True)
             container.add_field(row_container)
             skip = constraint.get('skip', [])
             row_container.add_field(fields.BooleanField(name='Skip x', value='x' in skip))
@@ -87,10 +89,6 @@ class Component(core.Component):
             driven = constraint['driven']
             del constraint['driven']
             cmds.aimConstraint(drivers, driven, **constraint)
-
-    def draw(self, layout):
-        """Renders the component PySide widgets into the given layout."""
-        layout.addWidget(self.constraints.widget())
 
     def component_data(self):
         """Override data to export with customized format

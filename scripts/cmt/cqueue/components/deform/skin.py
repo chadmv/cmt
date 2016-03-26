@@ -30,7 +30,3 @@ class Component(core.Component):
             file_path = file_field.value()
             skinio.import_skin(file_path)
 
-    def draw(self, layout):
-        """Renders the component PySide widgets into the given layout."""
-        layout.addWidget(self.array_field.widget())
-

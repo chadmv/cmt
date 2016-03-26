@@ -11,9 +11,6 @@ class Component(core.Component):
 
     def execute(self):
         cmds.polySphere(name=self.sphere_name.value())
-
-    def draw(self, layout):
-        layout.addWidget(self.sphere_name.widget())
 """
 
 from PySide import QtGui
@@ -29,8 +26,7 @@ logger = logging.getLogger(__name__)
 
 class Component(object):
     """A Component is an independent operation that will be executed in the ComponentQueue.  New components deriving
-    from this class must implement the execute method.  For UI support, derived components must override the draw
-    method.
+    from this class must implement the execute method.
     """
     @classmethod
     def image(cls, size=32):
@@ -144,14 +140,17 @@ class Component(object):
         """
         self.fields.append(field)
 
-    def draw(self, layout):
-        """Renders the component PySide widgets into the given layout.
+    def widget(self):
+        """Get a the QWidget displaying the Component data.
 
-        Derived classes should implement this method to render the component in the UI.
-
-        :param layout: The parent layout to add the Component widgets to.
+        Users can override this method if they wish to customize the layout of the component.
+        :return: A QWidget containing all the Component fields.
         """
-        layout.addWidget(QtGui.QLabel('No arguments required.'))
+        widget = QtGui.QWidget()
+        layout = QtGui.QFormLayout(widget)
+        for field in self.fields:
+            layout.addRow(field.name, field.widget())
+        return widget
 
     def help_url(self):
         """Get the url of help documentation for the Component.

@@ -21,12 +21,21 @@ class Component(core.Component):
         file_path = self.file_path.value()
         skeleton.load(file_path)
 
-    def draw(self, layout):
-        """Renders the component PySide widgets into the given layout."""
-        layout.addWidget(self.file_path.widget())
+    def widget(self):
+        """Get a the QWidget displaying the Component data.
+
+        Users can override this method if they wish to customize the layout of the component.
+        :return: A QWidget containing all the Component fields.
+        """
+        widget = QtGui.QWidget()
+        layout = QtGui.QHBoxLayout(widget)
+        for field in self.fields:
+            layout.addWidget(field.name_label())
+            layout.addWidget(field.widget())
         button = QtGui.QPushButton('Export Selected')
         button.released.connect(self.export_skeleton)
         layout.addWidget(button)
+        return widget
 
     def export_skeleton(self):
         data = skeleton.dump()
