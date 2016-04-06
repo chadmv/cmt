@@ -19,6 +19,7 @@ def create_menu():
                   label='CQueue',
                   command='import cmt.cqueue.window; cmt.cqueue.window.show()',
                   imageOverlayLabel='cqueue')
+    cmds.menuItem(parent=rig_menu, divider=True, dividerLabel='Skeleton')
     cmds.menuItem(parent=rig_menu,
                   label='Orient Joints',
                   command='import cmt.rig.orientjoints as oj; oj.OrientJointsWindow()',
@@ -36,6 +37,11 @@ def create_menu():
                   label='Import Skeleton',
                   command='import cmt.rig.skeleton as skeleton; skeleton.load()',
                   image='kinJoint.png')
+    cmds.menuItem(parent=rig_menu, divider=True, dividerLabel='Animation Rig')
+    cmds.menuItem(parent=rig_menu,
+                  label='Create Control',
+                  command='import cmt.rig.control as control; control.ui()',
+                  image='orientJoint.png')
 
     # Deform
     deform_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Deform')
