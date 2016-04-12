@@ -28,6 +28,9 @@ import cmt.shortcuts as shortcuts
 logger = logging.getLogger(__name__)
 CONTROLS_DIRECTORY = os.path.join(os.path.dirname(__file__), 'controls')
 
+# The message attribute specifying which nodes are part of a transform stack.
+STACK_ATTRIBUTE = 'cmt_transformStack'
+
 
 def ui():
     """Display the control creator ui."""
@@ -50,6 +53,22 @@ def rotate_components(rx, ry, rz, nodes=None):
         cmds.rotate(rx, ry, rz, '{0}.cv[*]'.format(node), r=True, p=pivot, os=True, fo=True)
 
 
+def create_curves(curves):
+    for curve in curves:
+        create_curve(curve)
+
+    # Now parent the curves
+    for curve in curves:
+        if curve.get('parent'):
+            parent = curve['parent']
+            if cmds.objExists(parent):
+                cmds.parent(curve['name'], parent)
+
+    # Then create the stacks
+    for curve in curves:
+        if curve.get('stack'):
+            create_transform_stack(curve['name'], curve['stack'])
+
 def create_curve(control):
     """Create a curve.
 
@@ -61,7 +80,7 @@ def create_curve(control):
     points = control['cvs']
     points = points + points[:degree] if periodic else points
     curve = cmds.curve(degree=degree, p=points, n=control['name'], per=periodic, k=control['knots'])
-    cmds.xform(curve, matrix=control['xform'])
+    cmds.xform(curve, ws=True, matrix=control['xform'])
     cmds.xform(curve, piv=control['pivot'])
     cmds.delete(curve, constructionHistory=True)
     cmds.setAttr('{0}.overrideEnabled'.format(curve), control['overrideEnabled'])
@@ -71,7 +90,7 @@ def create_curve(control):
     return curve
 
 
-def dump(curves=None):
+def dump(curves=None, stack=False):
     """Get a data dictionary representing all the given curves.
 
     :param curves: Optional list of curves.
@@ -88,7 +107,7 @@ def dump(curves=None):
                 'cvs': cmds.getAttr('{0}.cv[*]'.format(node)),
                 'degree': cmds.getAttr('{0}.degree'.format(node)),
                 'form': cmds.getAttr('{0}.form'.format(node)),
-                'xform': cmds.xform(node, q=True, matrix=True),
+                'xform': cmds.xform(node, q=True, ws=True, matrix=True),
                 'knots': get_knots(node),
                 'pivot': cmds.xform(node, q=True, rp=True),
                 'overrideEnabled': cmds.getAttr('{0}.overrideEnabled'.format(node)),
@@ -96,6 +115,9 @@ def dump(curves=None):
                 'overrideColorRGB': cmds.getAttr('{0}.overrideColorRGB'.format(node))[0],
                 'overrideColor': cmds.getAttr('{0}.overrideColor'.format(node)),
             }
+            if stack:
+                control['stack'] = get_stack_count(node)
+                control['parent'] = get_stack_parent(node)
             data.append(control)
     if curves:
         cmds.select(curves)
@@ -213,6 +235,17 @@ class ControlWindow(MayaQWidgetDockableMixin, QtGui.QDialog):
         b.released.connect(self.remove_selected)
         hbox.addWidget(b)
 
+        hbox = QtGui.QHBoxLayout()
+        vbox.addLayout(hbox)
+        self.stack_count = QtGui.QSpinBox()
+        self.stack_count.setValue(2)
+        hbox.addWidget(self.stack_count)
+
+        b = QtGui.QPushButton('Create Transform Stack')
+        b.released.connect(self.create_transform_stack)
+        b.setToolTip('Creates a transform stack above each selected node.')
+        hbox.addWidget(b)
+
         self.control_list = QtGui.QListWidget()
         self.control_list.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         vbox.addWidget(self.control_list)
@@ -272,13 +305,18 @@ class ControlWindow(MayaQWidgetDockableMixin, QtGui.QDialog):
     def create_selected(self):
         """Create the curves selected in the curve list."""
         curves = []
+        sel = cmds.ls(sl=True)
+        target = sel[0] if sel else None
         for item in self.control_list.selectedItems():
             text = item.text()
             control_file = os.path.join(CONTROLS_DIRECTORY, '{0}.json'.format(text))
             fh = open(control_file, 'r')
             data = json.load(fh)
             fh.close()
-            curves.append(create_curve(data))
+            curve = create_curve(data)
+            if target:
+                cmds.delete(cmds.parentConstraint(target, curve))
+            curves.append(curve)
         if curves:
             cmds.select(curves)
 
@@ -296,3 +334,78 @@ class ControlWindow(MayaQWidgetDockableMixin, QtGui.QDialog):
                     os.remove(control_file)
                 self.populate_controls()
 
+    def create_transform_stack(self):
+        count = self.stack_count.value()
+        for node in (cmds.ls(sl=True) or []):
+            create_transform_stack(node, count)
+
+
+def create_transform_stack(node, count=2):
+    """Creates a transform stack above the given node.
+
+    Any previous transform stack will be deleted.
+
+    :param node: Node to parent into a transform stack.
+    :param count: Number of transforms to add in the stack.
+    :return: A list of the transform nodes created starting from top to bottom.
+    """
+    previous_parent = cmds.listRelatives(node, parent=True, path=True)
+    if previous_parent:
+        previous_parent = previous_parent[0]
+        while previous_parent and STACK_ATTRIBUTE in (cmds.listAttr(previous_parent, ud=True) or []):
+            parent = cmds.listRelatives(previous_parent, parent=True, path=True)
+            if parent:
+                cmds.parent(node, parent)
+                parent = parent[0]
+            else:
+                cmds.parent(node, world=True)
+            cmds.delete(previous_parent)
+            previous_parent = parent
+
+    nulls = []
+    for i in reversed(range(count)):
+        name = '_'.join(node.split('_')[:-1])
+        name = '{0}_{1}nul'.format(name, i+1)
+        null = cmds.createNode('transform', name=name)
+        nulls.append(null)
+        cmds.addAttr(null, ln=STACK_ATTRIBUTE, at='message')
+        cmds.connectAttr('{0}.message'.format(node), '{0}.{1}'.format(null, STACK_ATTRIBUTE))
+        cmds.delete(cmds.parentConstraint(node, null))
+        if previous_parent:
+            cmds.parent(null, previous_parent)
+        previous_parent = null
+    cmds.parent(node, previous_parent)
+    return nulls
+
+
+def get_stack_count(node):
+    """Get the number of transforms in the stack.
+
+    :param node: Node to query.
+    :return: The number of transforms in the stack.
+    """
+    connections = cmds.listConnections('{0}.message'.format(node), plugs=True) or []
+    count = 0
+    for connection in connections:
+        connected_node, attribute = connection.split('.')
+        if attribute == STACK_ATTRIBUTE:
+            count += 1
+    return count
+
+
+def get_stack_parent(node):
+    """Get the parent of the transform stack belonging to the given node.
+
+    :param node: Node to query.
+    :return: The parent node or None if there is no parent.
+    """
+    previous_parent = cmds.listRelatives(node, parent=True, path=True)
+    if not previous_parent:
+        return None
+    previous_parent = previous_parent[0]
+    while previous_parent and STACK_ATTRIBUTE in (cmds.listAttr(previous_parent, ud=True) or []):
+        parent = cmds.listRelatives(previous_parent, parent=True, path=True)
+        if parent:
+            parent = parent[0]
+        previous_parent = parent
+    return previous_parent
