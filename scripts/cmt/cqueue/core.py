@@ -109,7 +109,7 @@ class Component(object):
         :return: A dictionary containing all the data required to rebuild the component.
         """
         data = {
-            'name': self.name(),
+            'component_name': self.name(),
             'enabled': self.enabled,
             'break_point': self.break_point,
             'uuid': self.uuid,
@@ -289,7 +289,7 @@ def load_component_data(data):
     :param data: A Component data dictionary generated from Component.data
     :return: The instantiated Component.
     """
-    component_name = data.get('name')
+    component_name = data.get('component_name')
     if not component_name:
         logger.warning('Component missing name.')
         return None
@@ -364,14 +364,14 @@ def get_component_class(name):
         return None
 
 
-def load_component_class(name, *args, **kwargs):
+def load_component_class(component_name, *args, **kwargs):
     """Given a component name, returns the Component class instance.
 
-    :param name: Name of the component module path.
+    :param component_name: Name of the component module path.
     :param args: Any positional arguments to pass into  the Component constructor.
     :param kwargs: Any keyword arguments to pass into the Component constructor.
     """
-    component_class = get_component_class(name)
+    component_class = get_component_class(component_name)
     return component_class(*args, **kwargs)
 
 

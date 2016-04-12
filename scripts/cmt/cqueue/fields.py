@@ -218,6 +218,40 @@ class ChoiceField(Field):
                            help_text=self.help_text)
 
 
+class ListField(Field):
+    def __init__(self, name, value=None, maximum_height=60, *args, **kwargs):
+        super(ListField, self).__init__(name, value, *args, **kwargs)
+        self._widget = None
+        self._maximum_height = maximum_height
+        if not self._value:
+            self._value = []
+
+    def widget(self):
+        """Get the QWidget of the Field."""
+        self._widget = QtGui.QListWidget()
+        self._widget.setToolTip(self.help_text)
+        self._widget.setMaximumHeight(self._maximum_height)
+        if self._value:
+            self._widget.addItems(self._value)
+        return self._widget
+
+    def value(self):
+        return [self._widget.item(x).text() for x in range(self._widget.count())]
+
+    def set_value(self, value):
+        super(ListField, self).set_value(value)
+        if self._widget:
+            self._widget.clear()
+            self._widget.addItems(value)
+
+    def copy(self):
+        """Returns a copy of the Field"""
+        return ListField(name=self.name, value=self.value(), maximum_height=self._maximum_height,
+                         help_text=self.help_text)
+
+
+
+
 class FilePathField(Field):
     """A Field that holds a file path and presents a Browse file dialog."""
 
@@ -407,6 +441,8 @@ class ArrayField(Field):
         self.fields = []
         self.add_label_text = add_label_text
         self.__current = 0  # For iterator
+        self.button_layout = None
+        self.field_layout = None
 
     def __iter__(self):
         return self
@@ -429,13 +465,16 @@ class ArrayField(Field):
     def widget(self):
         """Get the QWidget of the Field."""
         widget = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        self.field_layout = QtGui.QVBoxLayout(widget)
+        self.field_layout.setContentsMargins(0, 0, 0, 0)
+        self.button_layout = QtGui.QHBoxLayout()
+        self.button_layout.setContentsMargins(0, 0, 0, 0)
+        self.field_layout.addLayout(self.button_layout)
         button = QtGui.QPushButton(self.add_label_text)
-        button.released.connect(partial(self._add_element, layout))
-        layout.addWidget(button)
+        button.released.connect(self.add_element)
+        self.button_layout.addWidget(button)
         for field in self.fields:
-            self._add_element(layout, field)
+            self.add_element(field)
         return widget
 
     def copy(self):
@@ -445,10 +484,9 @@ class ArrayField(Field):
             array_field.add_field(field.copy())
         return array_field
 
-    def _add_element(self, layout, field=None):
+    def add_element(self, field=None):
         """Adds a new field to the Array.
 
-        :param layout: The layout to add the new field to.
         :param field: Optional field to add. If omitted, a copy of the last element will be added.
         """
         if field is None:
@@ -457,15 +495,15 @@ class ArrayField(Field):
             field = self.fields[-1].copy()
             self.fields.append(field)
         element_widget = QtGui.QWidget()
-        layout.addWidget(element_widget)
+        self.field_layout.addWidget(element_widget)
         hbox = QtGui.QHBoxLayout(element_widget)
         hbox.setContentsMargins(0, 0, 0, 0)
 
         field_widget = field.widget()
         hbox.addWidget(field_widget)
 
-        action = QtGui.QAction('Remove', layout)
-        action.triggered.connect(partial(self.remove_element, layout, element_widget))
+        action = QtGui.QAction('Remove', self.field_layout)
+        action.triggered.connect(partial(self.remove_element, self.field_layout, element_widget))
 
         icon = QtGui.QIcon(QtGui.QPixmap(':/smallTrash.png'))
         action.setIcon(icon)

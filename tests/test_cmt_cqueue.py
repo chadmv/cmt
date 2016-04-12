@@ -57,7 +57,7 @@ class CQueueTests(TestCase):
         comp = core.Component()
         data = comp.data()
         expected = {
-            'name': 'cmt.cqueue.core',
+            'component_name': 'cmt.cqueue.core',
             'enabled': True,
             'break_point': False,
             'uuid': comp.uuid,
@@ -72,7 +72,7 @@ class CQueueTests(TestCase):
         comp = ContainerComponent(spheres)
         data = comp.data()
         expected = {
-            'name': 'test_cmt_cqueue',
+            'component_name': 'test_cmt_cqueue',
             'enabled': True,
             'break_point': False,
             'uuid': comp.uuid,
@@ -149,14 +149,14 @@ class CQueueTests(TestCase):
         data = queue.data()
         expected = [
             {
-                'name': 'test_cmt_cqueue',
+                'component_name': 'test_cmt_cqueue',
                 'enabled': True,
                 'break_point': False,
                 'uuid': comp1.uuid,
                 'sphere_name': 'sphere1',
             },
             {
-                'name': 'test_cmt_cqueue',
+                'component_name': 'test_cmt_cqueue',
                 'enabled': True,
                 'break_point': False,
                 'uuid': comp2.uuid,
