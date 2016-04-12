@@ -202,3 +202,35 @@ def get_icon_path(name):
             if os.path.exists(full_path):
                 return os.path.normpath(full_path)
     return None
+
+
+def duplicate_chain(start, end, prefix='', suffix='', search_for='', replace_with=''):
+    """ Duplicates the transform chain starting at start and ending at end.
+
+    :param start: The start transform.
+    :param end: The end transform.
+    :return: A list of the duplicated joints, a list of the original joints that were duplicated
+    """
+    joint = end
+    joints = []
+    original_joints = []
+    while joint:
+        name = '{0}{1}{2}'.format(prefix, joint, suffix)
+        if search_for or replace_with:
+            name = name.replace(search_for, replace_with)
+        original_joints.append(joint)
+        duplicate_joint = cmds.duplicate(joint, name=name, parentOnly=True)[0]
+        if joints:
+            cmds.parent(joints[-1], duplicate_joint)
+        joints.append(duplicate_joint)
+        if joint == start:
+            break
+        joint = cmds.listRelatives(joint, parent=True, path=True)
+        if joint:
+            joint = joint[0]
+        else:
+            raise RuntimeError('{0} is not a descendant of {1}'.format(end, start))
+    joints.reverse()
+    original_joints.reverse()
+    return joints, original_joints
+
