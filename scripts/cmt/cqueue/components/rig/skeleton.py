@@ -13,12 +13,14 @@ class Component(core.Component):
 
     def __init__(self, file_path='', **kwargs):
         super(Component, self).__init__(**kwargs)
-        self.file_path = fields.FilePathField(name='File Path', value=file_path,
-                                              filter='Skeleton Files (*.json)', help_text='The Skeleton file path.')
-        self.add_field(self.file_path)
+        self.file_path = fields.FilePathField(name='File Path',
+                                              value=file_path,
+                                              filter='Skeleton Files (*.json)',
+                                              help_text='The Skeleton file path.',
+                                              parent=self)
 
     def execute(self):
-        file_path = self.file_path.value()
+        file_path = self.file_path.get_path()
         skeleton.load(file_path)
 
     def widget(self):
@@ -29,15 +31,15 @@ class Component(core.Component):
         """
         widget = QtGui.QWidget()
         layout = QtGui.QHBoxLayout(widget)
-        for field in self.fields:
-            layout.addWidget(field.name_label())
-            layout.addWidget(field.widget())
+        layout.addWidget(QtGui.QLabel(self.file_path.verbose_name))
+        layout.addWidget(self.file_path.widget())
         button = QtGui.QPushButton('Export Selected')
         button.released.connect(self.export_skeleton)
         layout.addWidget(button)
         return widget
 
     def export_skeleton(self):
-        data = skeleton.dump()
+        file_path = self.file_path.get_path() or None
+        data = skeleton.dump(file_path=file_path)
         if data:
             self.file_path.set_value(data[1])

@@ -34,8 +34,10 @@ class Component(core.Component):
         """
         super(Component, self).__init__(**kwargs)
         self.controls = controls or []
-        self.control_list = fields.ListField(name='', value=[control['name'] for control in self.controls],
-                                             help_text='Controls that will be created.')
+        self.control_list = fields.ListField(name='controls',
+                                             value=[control['name'] for control in self.controls],
+                                             help_text='Controls that will be created.',
+                                             parent=self)
 
     def execute(self):
         cmt.rig.control.create_curves(self.controls)
@@ -49,14 +51,12 @@ class Component(core.Component):
         widget = QtGui.QWidget()
         layout = QtGui.QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.control_list.widget())
+        self.list_widget = self.control_list.widget()
+        layout.addWidget(self.list_widget)
 
         vbox = QtGui.QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(vbox)
-        button = QtGui.QPushButton('Create Controls')
-        button.released.connect(self.execute)
-        vbox.addWidget(button)
         button = QtGui.QPushButton('Store Controls')
         button.released.connect(self.store_controls)
         vbox.addWidget(button)
@@ -68,7 +68,8 @@ class Component(core.Component):
         self.controls = cmt.rig.control.dump(selected, stack=True)
         if selected:
             cmds.select(selected)
-        self.control_list.set_value([control['name'] for control in self.controls])
+            self.list_widget.clear()
+            self.list_widget.addItems([control['name'] for control in self.controls])
 
     def component_data(self):
         """Override data to export with customized format

@@ -15,6 +15,8 @@ data = skeleton.load_data(json_file)
 """
 import maya.cmds as cmds
 import json
+import logging
+logger = logging.getLogger(__name__)
 
 
 def truncate(value, places=6):
@@ -36,7 +38,6 @@ def get_data(root):
     :return: A dictionary containing all data required to rebuild the hierarchy in Maya.
     """
     node_type = cmds.nodeType(root)
-
     shapes = cmds.listRelatives(root, children=True, shapes=True)
     if node_type not in ['joint', 'transform'] or (shapes and node_type == 'transform'):
         # Skip nodes that are not joints or transforms or if there are shapes below.
@@ -121,6 +122,7 @@ def dump(root=None, file_path=None):
     fh = open(file_path, 'w')
     json.dump(data, fh, indent=4)
     fh.close()
+    logger.info('Exported skeleton to %s', file_path)
     return data, file_path
 
 

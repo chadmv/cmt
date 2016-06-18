@@ -92,7 +92,7 @@ class Component(object):
         :return: True if the component successfully ran.
         """
         comp_data = pprint.pformat(self.data(), indent=4)
-        logger.info('Executing {0} with data:\n{1}'.format(self.name(), comp_data))
+        logger.debug('Executing {0} with data:\n{1}'.format(self.name(), comp_data))
         try:
             self.execute()
         except:
@@ -149,7 +149,10 @@ class Component(object):
         widget = QtGui.QWidget()
         layout = QtGui.QFormLayout(widget)
         for field in self.fields:
-            layout.addRow(field.name, field.widget())
+            if field.display_name:
+                layout.addRow(field.verbose_name, field.widget())
+            else:
+                layout.addWidget(field.widget())
         return widget
 
     def help_url(self):

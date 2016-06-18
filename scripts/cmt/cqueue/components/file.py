@@ -1,3 +1,4 @@
+import os
 import maya.cmds as cmds
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
@@ -16,48 +17,80 @@ class Component(core.Component):
     def help_url(self):
         return 'https://github.com/chadmv/cmt/wiki/File-Component'
 
-    def __init__(self, file_path='', namespace='', operation=import_operation, **kwargs):
+    def __init__(self, files=None, **kwargs):
+        """
+
+        :param files: [
+            {
+                'operation': Component.import_operation,
+                'file_path': [FilePathField.project_root, 'scenes/file.ma'],
+                'namespace': 'GEOM'
+        ]
+        :param kwargs:
+        """
         super(Component, self).__init__(**kwargs)
-        self.operation = fields.ChoiceField(name='Operation',
-                                            choices=[Component.import_operation, Component.reference_operation],
-                                            value=operation,
-                                            help_text='Whether to import or reference the file.')
-        self.add_field(self.operation)
-        self.file_path = fields.FilePathField(name='File Path', value=file_path,
-                                              filter='Maya Files (*.ma *.mb)', help_text='The Maya file path.')
-        self.add_field(self.file_path)
-        self.namespace = fields.CharField(name='Namespace', value=namespace,
-                                          help_text='The import or reference namespace.')
-        self.add_field(self.namespace)
+        self.files = fields.ArrayField(name='files', add_label_text='Add File', display_name=False, parent=self)
+        if not files:
+            # Create default entries if none specified
+            files = [
+                {'operation': Component.import_operation}
+            ]
+        for f in files:
+            container = fields.ContainerField(name='file', parent=self.files,
+                                              container_view=FileView())
+
+            fields.CharField(name='operation',
+                             choices=[Component.import_operation, Component.reference_operation],
+                             value=f.get('operation', Component.import_operation),
+                             help_text='Whether to import or reference the file.',
+                             parent=container)
+            fields.FilePathField(name='file_path',
+                                 value=f.get('file_path', ''),
+                                 filter='Maya Files (*.ma *.mb)',
+                                 help_text='The Maya file path.',
+                                 parent=container)
+            fields.CharField(name='namespace',
+                             value=f.get('namespace', ''),
+                             help_text='The import or reference namespace.',
+                             parent=container)
 
     def execute(self):
-        operation = self.operation.value()
-        file_path = self.file_path.value()
-        namespace = self.namespace.value()
+        for container in self.files:
+            operation = container['operation'].value()
+            file_path = container['file_path'].get_path()
+            namespace = container['namespace'].value()
 
-        kwargs = {}
-        if operation == Component.import_operation:
-            kwargs['i'] = True
-        else:
-            kwargs['r'] = True
+            flag = 'i' if operation == Component.import_operation else 'r'
+            kwargs = {
+                flag: True,
+                'type': {
+                    '.ma': 'mayaAscii',
+                    '.mb': 'mayaBinary',
+                    '.fbx': 'FBX',
+                }[os.path.splitext(file_path.lower())[-1]]
+            }
+            if namespace:
+                kwargs['namespace'] = namespace
 
-        if namespace:
-            kwargs['namespace'] = namespace
+            cmds.file(file_path, **kwargs)
 
-        kwargs['type'] = 'mayaAscii' if file_path.lower().endswith('.ma') else 'mayaBinary'
 
-        cmds.file(file_path, **kwargs)
-
-    def widget(self):
-        """Get a the QWidget displaying the Component data.
-
-        Users can override this method if they wish to customize the layout of the component.
-        :return: A QWidget containing all the Component fields.
-        """
-        widget = QtGui.QWidget()
+class FileView(fields.ContainerView):
+    """Customize the view of the container."""
+    def widget(self, container):
+        widget = QtGui.QFrame()
+        widget.setFrameStyle(QtGui.QFrame.NoFrame)
         layout = QtGui.QHBoxLayout(widget)
-        for field in self.fields:
-            layout.addWidget(field.name_label())
-            layout.addWidget(field.widget())
-        return widget
+        layout.addWidget(container['operation'].widget())
 
+        file_path_widget = container['file_path'].widget()
+        file_path_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
+        layout.addWidget(file_path_widget)
+
+        layout.addWidget(QtGui.QLabel(container['namespace'].verbose_name))
+        namespace_widget = container['namespace'].widget()
+        namespace_widget.setMaximumWidth(150)
+        namespace_widget.setSizePolicy(QtGui.QSizePolicy.Maximum, QtGui.QSizePolicy.Fixed)
+        layout.addWidget(namespace_widget)
+
+        return widget

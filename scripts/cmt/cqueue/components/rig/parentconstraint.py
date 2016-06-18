@@ -1,9 +1,98 @@
+from functools import partial
+import logging
 import maya.cmds as cmds
 from PySide import QtGui
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
-import logging
 logger = logging.getLogger(__name__)
+
+
+class Component(core.Component):
+    """A Component that creates parentConstraints."""
+
+    @classmethod
+    def image(cls, size=32):
+        return QtGui.QPixmap(':/parentConstraint.png').scaled(size, size)
+
+    def __init__(self, constraints=None, **kwargs):
+        """Constructor
+        :param constraints: A list of dictionaries describing the aimConstraints that need to be created:
+            {
+                'drivers': nodes,
+                'driven': node,
+                'maintainOffset': True,
+                'skipTranslate': ['x', 'y', 'z']
+                'skipRotate': ['x', 'y', 'z']
+            }
+        """
+        super(Component, self).__init__(**kwargs)
+        self.constraints = fields.ArrayField(name='constraints', add_label_text='Add Parent Constraint', parent=self)
+        if not constraints:
+            # Create default entries if none specified
+            constraints = [
+                {'driven': 'node'}
+            ]
+        # The fields will be arranged in two row containers
+        # [[driver, driven], [name, twist, swing, invertTwist, invertSwing, twistAxis]]
+        for constraint in constraints:
+            self.add_constraint_data(constraint)
+
+    def add_constraint_data(self, constraint):
+        container = fields.ContainerField(name='constraint', parent=self.constraints,
+                                          container_view=ParentConstraintView())
+        fields.MayaNodeField(name='drivers',
+                             value=constraint.get('drivers', []),
+                             multi=True,
+                             help_text='The nodes to constrain to.',
+                             parent=container)
+        fields.MayaNodeField(name='driven',
+                             value=constraint.get('driven', ''),
+                             help_text='The node to constrain.',
+                             parent=container)
+        fields.BooleanField(name='maintain_offset',
+                            value=constraint.get('maintainOffset', True),
+                            parent=container)
+        skip = constraint.get('skipTranslate', [])
+        fields.BooleanField(name='skip_tx', verbose_name='Skip tx', value='x' in skip, parent=container)
+        fields.BooleanField(name='skip_ty', verbose_name='Skip ty', value='y' in skip, parent=container)
+        fields.BooleanField(name='skip_tz', verbose_name='Skip tz', value='z' in skip, parent=container)
+        skip = constraint.get('skipRotate', [])
+        fields.BooleanField(name='skip_rx', verbose_name='Skip rx', value='x' in skip, parent=container)
+        fields.BooleanField(name='skip_ry', verbose_name='Skip ry', value='y' in skip, parent=container)
+        fields.BooleanField(name='skip_rz', verbose_name='Skip rz', value='z' in skip, parent=container)
+        return container
+
+    def widget(self):
+        widget = self.constraints.widget()
+        # Add a new button to the widget button_layout to add selected constraints to the UI.
+        button = QtGui.QPushButton('Add from Selected')
+        button.released.connect(partial(self.add_from_selected, field_layout=widget.field_layout))
+        widget.button_layout.addWidget(button)
+        return widget
+
+    def add_from_selected(self, field_layout):
+        # Get parentConstraints from the selected nodes
+        sel = cmds.ls(sl=True) or []
+        constraints = [x for x in sel if cmds.nodeType(x) == 'parentConstraint']
+        transforms = [x for x in sel if cmds.nodeType(x) in ['transform', 'joint']]
+        for transform in transforms:
+            constraints += (cmds.listConnections(transform, type='parentConstraint') or [])
+        constraints = list(set(constraints))
+        for constraint in constraints:
+            data = constraint_data(constraint)
+            field = self.add_constraint_data(data)
+            self.constraints.add_element(field, field_layout)  # Update the UI with the added constraint
+
+    def execute(self):
+        for container in self.constraints:
+            drivers = container['drivers'].value()
+            driven = container['driven'].value()
+            skip_translate = [x for x in 'xyz' if container['skip_t{0}'.format(x)].value()]
+            skip_rotate = [x for x in 'xyz' if container['skip_r{0}'.format(x)].value()]
+            cmds.parentConstraint(drivers, driven,
+                                  maintainOffset=container['maintain_offset'].value(),
+                                  skipTranslate=skip_translate,
+                                  skipRotate=skip_rotate)
 
 
 def constraint_data(constraint):
@@ -41,117 +130,44 @@ def constraint_data(constraint):
     }
 
 
-class Component(core.Component):
-    """A Component that creates parentConstraints."""
+class ParentConstraintView(fields.ContainerView):
+    """Customize the view of the container."""
+    def widget(self, container):
+        widget = QtGui.QFrame()
+        widget.setFrameStyle(QtGui.QFrame.StyledPanel)
 
-    @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(':/parentConstraint.png').scaled(size, size)
+        hbox = QtGui.QHBoxLayout(widget)
+        hbox.setContentsMargins(0, 0, 0, 0)
+        label = QtGui.QLabel(container['drivers'].verbose_name)
+        hbox.addWidget(label)
+        drivers_widget = container['drivers'].widget()
+        drivers_widget.setMaximumHeight(65)
+        hbox.addWidget(drivers_widget)
 
-    def __init__(self, constraints=None, **kwargs):
-        """Constructor
-        :param constraints: A list of dictionaries describing the aimConstraints that need to be created:
-            {
-                'drivers': nodes,
-                'driven': node,
-                'maintainOffset': True,
-                'skipTranslate': ['x', 'y', 'z']
-                'skipRotate': ['x', 'y', 'z']
-            }
-        """
-        super(Component, self).__init__(**kwargs)
-        self.constraints = fields.ArrayField(name='Parent Constraints', add_label_text='Add Parent Constraint')
-        self.add_field(self.constraints)
-        if not constraints:
-            # Create default entries if none specified
-            constraints = [
-                {'driven': 'node'}
-            ]
-        # The fields will be arranged in two row containers
-        # [[driver, driven], [name, twist, swing, invertTwist, invertSwing, twistAxis]]
-        for constraint in constraints:
-            self.add_constraint_data(constraint)
+        vbox = QtGui.QVBoxLayout()
+        hbox.addLayout(vbox)
 
-    def add_constraint_data(self, constraint):
-        container = fields.ContainerField(name='Constraint',
-                                          orientation=fields.ContainerField.vertical,
-                                          stretch=True)
-        self.constraints.add_field(container)
-        row_container = fields.ContainerField(name='', border=False)
-        container.add_field(row_container)
-        row_container.add_field(fields.MayaNodeField(name='Drivers',
-                                                     value=constraint.get('drivers', []),
-                                                     multi=True,
-                                                     help_text='The nodes to constrain to.'))
-        row_container.add_field(fields.MayaNodeField(name='Driven',
-                                                     value=constraint.get('driven', ''),
-                                                     help_text='The node to constrain.'))
-        row_container.add_field(fields.BooleanField(name='Maintain offset',
-                                                    value=constraint.get('maintainOffset', True)))
-        skip = constraint.get('skipTranslate', [])
-        row_container = fields.ContainerField(name='', border=False, stretch=True)
-        container.add_field(row_container)
-        row_container.add_field(fields.BooleanField(name='Skip tx', value='x' in skip))
-        row_container.add_field(fields.BooleanField(name='Skip ty', value='y' in skip))
-        row_container.add_field(fields.BooleanField(name='Skip tz', value='z' in skip))
-        skip = constraint.get('skipRotate', [])
-        row_container.add_field(fields.BooleanField(name='Skip rx', value='x' in skip))
-        row_container.add_field(fields.BooleanField(name='Skip ry', value='y' in skip))
-        row_container.add_field(fields.BooleanField(name='Skip rz', value='z' in skip))
+        hbox1 = QtGui.QHBoxLayout()
+        vbox.addLayout(hbox1)
+        label = QtGui.QLabel(container['driven'].verbose_name)
+        hbox1.addWidget(label)
+        hbox1.addWidget(container['driven'].widget())
+        hbox1.addWidget(container['maintain_offset'].widget())
 
-    def execute(self):
-        data = self.component_data()
-        for constraint in data['constraints']:
-            drivers = constraint['drivers']
-            del constraint['drivers']
-            driven = constraint['driven']
-            del constraint['driven']
-            cmds.parentConstraint(drivers, driven, **constraint)
+        hbox2 = QtGui.QHBoxLayout()
+        vbox.addLayout(hbox2)
+        hbox2.setContentsMargins(0, 0, 0, 0)
+        hbox2.addWidget(container['skip_tx'].widget())
+        hbox2.addWidget(container['skip_ty'].widget())
+        hbox2.addWidget(container['skip_tz'].widget())
+        hbox2.addStretch()
 
-    def widget(self):
-        widget = QtGui.QWidget()
-        layout = QtGui.QFormLayout(widget)
-        layout.addRow(self.constraints.name, self.constraints.widget())
-        button = QtGui.QPushButton('Add from Selected')
-        button.released.connect(self.add_from_selected)
-        self.constraints.button_layout.addWidget(button)
+        hbox3 = QtGui.QHBoxLayout()
+        vbox.addLayout(hbox3)
+        hbox3.setContentsMargins(0, 0, 0, 0)
+        hbox3.addWidget(container['skip_rx'].widget())
+        hbox3.addWidget(container['skip_ry'].widget())
+        hbox3.addWidget(container['skip_rz'].widget())
+        hbox3.addStretch()
+
         return widget
-
-    def add_from_selected(self):
-        # Get parentConstraints from the selected nodes
-        sel = cmds.ls(sl=True) or []
-        constraints = [x for x in sel if cmds.nodeType(x) == 'parentConstraint']
-        transforms = [x for x in sel if cmds.nodeType(x) in ['transform', 'joint']]
-        for transform in transforms:
-            constraints += (cmds.listConnections(transform, type='parentConstraint') or [])
-        constraints = list(set(constraints))
-        for constraint in constraints:
-            data = constraint_data(constraint)
-            self.add_constraint_data(data)
-            self.constraints.add_element()
-
-    def component_data(self):
-        """Override data to export with customized format
-
-        :return: A list of the component data in the queue.
-        """
-        constraints = []
-        for container in self.constraints:
-            skipTranslate = []
-            skipRotate = []
-            for i, x in enumerate('xyz'):
-                if container[1][i].value():
-                    skipTranslate.append(x)
-                if container[1][i+3].value():
-                    skipRotate.append(x)
-            constraints.append({
-                'drivers': container[0][0].value(),
-                'driven': container[0][1].value(),
-                'maintainOffset': container[0][2].value(),
-                'skipTranslate': skipTranslate,
-                'skipRotate': skipRotate,
-            })
-        data = {
-            'constraints': constraints
-        }
-        return data

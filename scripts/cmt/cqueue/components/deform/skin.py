@@ -13,17 +13,19 @@ class Component(core.Component):
 
     def __init__(self, file_paths=None, **kwargs):
         super(Component, self).__init__(**kwargs)
-        self.array_field = fields.ArrayField(name='File Paths', add_label_text='Add Skin File')
-        self.add_field(self.array_field)
+        self.array_field = fields.ArrayField(name='File Paths', add_label_text='Add Skin File', display_name=False,
+                                             parent=self)
         if file_paths is None:
             file_paths = ['']
         if isinstance(file_paths, basestring):
             file_paths = [file_paths]
         for file_path in file_paths:
-            self.array_field.add_field(fields.FilePathField(
-                name='File Path', value=file_path,
+            fields.FilePathField(
+                name='File Path',
+                value=file_path,
                 filter='Skin Files (*.skin)',
-                help_text='The Skeleton file path.'))
+                help_text='The Skeleton file path.',
+                parent=self.array_field)
 
     def execute(self):
         for file_field in self.array_field:

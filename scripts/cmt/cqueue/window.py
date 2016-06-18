@@ -228,7 +228,7 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtGui.QMainWindow):
         """Display a dialog to save a queue to disk."""
         file_path = QtGui.QFileDialog.getSaveFileName(self,
                                                       'Save Component Queue',
-                                                      '',
+                                                      cmds.workspace(q=True, rd=True) or '',
                                                       'json files (*.json)',
                                                       '',
                                                       QtGui.QFileDialog.DontUseNativeDialog)[0]
