@@ -400,7 +400,7 @@ class RollbackImporter(object):
     """Used to remove imported modules from the module list.
 
     This allows tests to be rerun after code updates without doing any reloads.
-    From: http://pyunit.sourceforge.net/notes/reloading.html
+    Original idea from: http://pyunit.sourceforge.net/notes/reloading.html
 
     Usage:
     def run_tests(self):
@@ -411,19 +411,10 @@ class RollbackImporter(object):
     """
     def __init__(self):
         """Creates an instance and installs as the global importer."""
-        self.previous_modules = sys.modules.copy()
-        self.real_import = __builtin__.__import__
-        __builtin__.__import__ = self._import
-        self.new_modules = {}
-
-    def _import(self, name, globals=None, locals=None, fromlist=[]):
-        result = apply(self.real_import, (name, globals, locals, fromlist))
-        self.new_modules[name] = 1
-        return result
+        self.previous_modules = set(sys.modules.keys())
 
     def uninstall(self):
-        for modname in self.new_modules.keys():
-            if modname not in self.previous_modules.keys():
+        for modname in sys.modules.keys():
+            if modname not in self.previous_modules:
                 # Force reload when modname next imported
                 del(sys.modules[modname])
-        __builtin__.__import__ = self.real_import
