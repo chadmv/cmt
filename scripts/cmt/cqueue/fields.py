@@ -1,11 +1,12 @@
 """Contains the attribute Field types.  The Fields are pre-made classes that the Components should use
-in order to facilitate in the rendering of the available arguments in the taskassembler ui.
+in order to facilitate in the rendering of the available arguments in the cqueue ui.
 """
 
 import copy
 import os
 import re
-from PySide import QtGui
+from cmt.qt import QtWidgets
+from cmt.qt import QtGui
 from functools import partial
 import maya.cmds as cmds
 
@@ -56,7 +57,7 @@ class BooleanField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QCheckBox(self.verbose_name)
+        widget = QtWidgets.QCheckBox(self.verbose_name)
         widget.setChecked(self._value)
         widget.setToolTip(self.help_text)
         widget.toggled.connect(self.set_value)
@@ -73,7 +74,7 @@ class CharField(Field):
     def widget(self):
         """Get the QWidget of the Field."""
         if self.choices:
-            widget = QtGui.QComboBox()
+            widget = QtWidgets.QComboBox()
             widget.setEditable(self.editable)
             for choice in self.choices:
                 widget.addItem(choice, choice)
@@ -86,7 +87,7 @@ class CharField(Field):
 
             widget.currentIndexChanged.connect(self.set_value)
         else:
-            widget = QtGui.QLineEdit(self._value)
+            widget = QtWidgets.QLineEdit(self._value)
             widget.textChanged.connect(self.set_value)
         widget.setToolTip(self.help_text)
         return widget
@@ -110,7 +111,7 @@ class FloatField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QDoubleSpinBox()
+        widget = QtWidgets.QDoubleSpinBox()
         widget.setRange(self.min_value, self.max_value)
         widget.setValue(self._value)
         widget.setDecimals(self.precision)
@@ -130,23 +131,23 @@ class VectorField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        hbox = QtGui.QHBoxLayout(widget)
+        widget = QtWidgets.QWidget()
+        hbox = QtWidgets.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
         validator = QtGui.QDoubleValidator(-999999.0, 999999.0, self.precision)
-        widget_x = QtGui.QLineEdit(str(self._value[0]))
+        widget_x = QtWidgets.QLineEdit(str(self._value[0]))
         widget_x.setToolTip(self.help_text)
         widget_x.setValidator(validator)
         widget_x.textChanged.connect(self.set_value_x)
         hbox.addWidget(widget_x)
 
-        widget_y = QtGui.QLineEdit(str(self._value[1]))
+        widget_y = QtWidgets.QLineEdit(str(self._value[1]))
         widget_y.setToolTip(self.help_text)
         widget_y.setValidator(validator)
         widget_y.textChanged.connect(self.set_value_y)
         hbox.addWidget(widget_y)
 
-        widget_z = QtGui.QLineEdit(str(self._value[2]))
+        widget_z = QtWidgets.QLineEdit(str(self._value[2]))
         widget_z.setToolTip(self.help_text)
         widget_z.setValidator(validator)
         widget_z.textChanged.connect(self.set_value_z)
@@ -170,7 +171,7 @@ class ListField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QListWidget()
+        widget = QtWidgets.QListWidget()
         widget.setToolTip(self.help_text)
         if self._value:
             widget.addItems(self._value)
@@ -205,13 +206,13 @@ class FilePathField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        hbox = QtGui.QHBoxLayout(widget)
+        widget = QtWidgets.QWidget()
+        hbox = QtWidgets.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel('Relative to')
-        label.setSizePolicy(QtGui.QSizePolicy.Maximum, QtGui.QSizePolicy.Fixed)
+        label = QtWidgets.QLabel('Relative to')
+        label.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
         hbox.addWidget(label)
-        relative_combobox = QtGui.QComboBox()
+        relative_combobox = QtWidgets.QComboBox()
         relative_combobox.addItems(FilePathField.relative_to_choices)
         index = relative_combobox.findText(self.relative_to)
         if index != -1:
@@ -219,12 +220,12 @@ class FilePathField(Field):
         relative_combobox.currentIndexChanged.connect(self.set_relative_to)
         hbox.addWidget(relative_combobox)
 
-        line_edit = QtGui.QLineEdit(self._value)
+        line_edit = QtWidgets.QLineEdit(self._value)
         line_edit.setToolTip(self.help_text)
-        line_edit.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
+        line_edit.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         line_edit.textChanged.connect(self.set_value)
         hbox.addWidget(line_edit)
-        button = QtGui.QPushButton('Browse')
+        button = QtWidgets.QPushButton('Browse')
         button.released.connect(partial(self.browse, line_edit, relative_combobox))
         hbox.addWidget(button)
         return widget
@@ -286,11 +287,11 @@ class MayaNodeField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        hbox = QtGui.QHBoxLayout(widget)
+        widget = QtWidgets.QWidget()
+        hbox = QtWidgets.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
         if self._multi:
-            node_widget = QtGui.QListWidget()
+            node_widget = QtWidgets.QListWidget()
             node_widget.addItems(self._value)
 
             def on_rows_changed(*args, **kwargs):
@@ -303,11 +304,11 @@ class MayaNodeField(Field):
             model.rowsInserted.connect(partial(on_rows_changed, field=self, node_widget=node_widget))
             model.rowsRemoved.connect(partial(on_rows_changed, field=self, node_widget=node_widget))
         else:
-            node_widget = QtGui.QLineEdit(self._value)
+            node_widget = QtWidgets.QLineEdit(self._value)
             node_widget.textChanged.connect(self.set_value)
         node_widget.setToolTip(self.help_text)
         hbox.addWidget(node_widget)
-        button = QtGui.QPushButton('Set')
+        button = QtWidgets.QPushButton('Set')
         button.setToolTip('Populate the field with the selected node.')
         button.released.connect(partial(self.set_from_selected, node_widget))
         hbox.addWidget(button)
@@ -327,15 +328,11 @@ class MayaNodeField(Field):
 
 class ContainerField(Field):
     """A field that can contain many other fields.  This is usually used with ArrayField to add
-    multiple groups of Fields.  It can also be use to orient groups of Fields horizontally or
-    vertically.
+    multiple groups of Fields.
     """
 
     def __init__(self, container_view=None, *args, **kwargs):
         """Constructor
-        :param orientation: ContainerField.horizontal or ContainerField.vertical.
-        :param border: True to display a border around the container.
-        :param stretch: True to add a stretch at the end of the fields.
         """
         super(ContainerField, self).__init__(*args, **kwargs)
         if container_view is None:
@@ -378,16 +375,17 @@ class ContainerField(Field):
 
 
 class ContainerView(object):
-    """Class that can be subclassed to customize the ContainerField."""
+    """Users can derive from ContainerView and pass an instance into a ContainerField to customize the
+    the display of a ContainerField."""
 
     def widget(self, container):
         """Get a widget containing all the fields of the given container.
 
         :param container: ContainerField instance.
         """
-        widget = QtGui.QFrame()
+        widget = QtWidgets.QFrame()
         widget.setFrameStyle(QtGui.QFrame.StyledPanel)
-        layout = QtGui.QFormLayout(widget)
+        layout = QtWidgets.QFormLayout(widget)
         for field in container.fields:
             layout.addRow(field.name, field.widget())
         return widget
@@ -422,15 +420,15 @@ class ArrayField(Field):
 
     def widget(self):
         """Get the QWidget of the Field."""
-        widget = QtGui.QWidget()
-        field_layout = QtGui.QVBoxLayout(widget)
+        widget = QtWidgets.QWidget()
+        field_layout = QtWidgets.QVBoxLayout(widget)
         field_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout = QtGui.QHBoxLayout()
+        button_layout = QtWidgets.QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
         # Monkey path the button_layout onto the widget in case Components want to add more buttons to it.
         widget.field_layout = field_layout
         widget.button_layout = button_layout
-        button = QtGui.QPushButton(self.add_label_text)
+        button = QtWidgets.QPushButton(self.add_label_text)
         button.released.connect(partial(self.add_element, field_layout=field_layout))
         button.setToolTip('Add a new element to list.')
         button_layout.addWidget(button)
@@ -450,22 +448,22 @@ class ArrayField(Field):
             field = copy.deepcopy(self.fields[-1])
             self.fields.append(field)
         if field_layout:
-            element_widget = QtGui.QWidget()
+            element_widget = QtWidgets.QWidget()
             field_layout.insertWidget(field_layout.count()-1, element_widget)
-            hbox = QtGui.QHBoxLayout(element_widget)
+            hbox = QtWidgets.QHBoxLayout(element_widget)
             hbox.setContentsMargins(0, 0, 0, 0)
 
             field_widget = field.widget()
             hbox.addWidget(field_widget)
 
-            action = QtGui.QAction('Remove', field_layout)
+            action = QtWidgets.QAction('Remove', field_layout)
             action.triggered.connect(partial(self.remove_element, field_layout, element_widget))
 
             icon = QtGui.QIcon(QtGui.QPixmap(':/smallTrash.png'))
             action.setIcon(icon)
             action.setToolTip('Remove')
             action.setStatusTip('Remove')
-            delete_button = QtGui.QToolButton()
+            delete_button = QtWidgets.QToolButton()
             delete_button.setDefaultAction(action)
             hbox.addWidget(delete_button)
 

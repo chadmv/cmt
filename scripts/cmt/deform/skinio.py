@@ -14,7 +14,7 @@ import cPickle as pickle
 import logging
 from functools import partial
 
-from PySide import QtGui
+from cmt.qt import QtWidgets
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 
 import maya.cmds as cmds
@@ -317,7 +317,7 @@ class SkinCluster(object):
         self.fn.setBlendWeights(dag_path, components, blend_weights)
 
 
-class WeightRemapDialog(MayaQWidgetBaseMixin, QtGui.QDialog):
+class WeightRemapDialog(MayaQWidgetBaseMixin, QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super(WeightRemapDialog, self).__init__(parent)
@@ -327,34 +327,34 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QtGui.QDialog):
         self.resize(600, 400)
         self.mapping = {}
 
-        mainvbox = QtGui.QVBoxLayout(self)
+        mainvbox = QtWidgets.QVBoxLayout(self)
 
-        label = QtGui.QLabel('The following influences have no corresponding influence from the ' \
+        label = QtWidgets.QLabel('The following influences have no corresponding influence from the ' \
                              'imported file.  You can either remap the influences or skip them.')
         label.setWordWrap(True)
         mainvbox.addWidget(label)
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         mainvbox.addLayout(hbox)
 
         # The existing influences that didn't have weight imported
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         hbox.addLayout(vbox)
-        vbox.addWidget(QtGui.QLabel('Unmapped influences'))
-        self.existing_influences = QtGui.QListWidget()
+        vbox.addWidget(QtWidgets.QLabel('Unmapped influences'))
+        self.existing_influences = QtWidgets.QListWidget()
         vbox.addWidget(self.existing_influences)
 
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         hbox.addLayout(vbox)
-        vbox.addWidget(QtGui.QLabel('Available imported influences'))
-        widget = QtGui.QScrollArea()
-        self.imported_influence_layout = QtGui.QVBoxLayout(widget)
+        vbox.addWidget(QtWidgets.QLabel('Available imported influences'))
+        widget = QtWidgets.QScrollArea()
+        self.imported_influence_layout = QtWidgets.QVBoxLayout(widget)
         vbox.addWidget(widget)
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         mainvbox.addLayout(hbox)
         hbox.addStretch()
-        btn = QtGui.QPushButton('Ok')
+        btn = QtWidgets.QPushButton('Ok')
         btn.released.connect(self.accept)
         hbox.addWidget(btn)
 
@@ -364,16 +364,16 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QtGui.QDialog):
         self.existing_influences.addItems(infs)
         width = 200
         for inf in imported_influences:
-            row = QtGui.QHBoxLayout()
+            row = QtWidgets.QHBoxLayout()
             self.imported_influence_layout.addLayout(row)
-            label = QtGui.QLabel(inf)
+            label = QtWidgets.QLabel(inf)
             row.addWidget(label)
-            toggle_btn = QtGui.QPushButton('>')
+            toggle_btn = QtWidgets.QPushButton('>')
             toggle_btn.setMaximumWidth(30)
             row.addWidget(toggle_btn)
-            label = QtGui.QLabel('')
+            label = QtWidgets.QLabel('')
             label.setMaximumWidth(width)
-            label.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+            label.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
             row.addWidget(label)
             toggle_btn.released.connect(partial(self.set_influence_mapping, src=inf, label=label))
         self.imported_influence_layout.addStretch()

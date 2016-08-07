@@ -19,8 +19,9 @@ from functools import partial
 import json
 import os
 import logging
-from PySide import QtGui
-from PySide import QtCore
+from cmt.qt import QtWidgets
+from cmt.qt import QtGui
+from cmt.qt import QtCore
 import maya.cmds as cmds
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 import cmt.shortcuts as shortcuts
@@ -155,99 +156,99 @@ def dump_controls(curves=None):
         fh.close()
 
 
-class ControlWindow(MayaQWidgetDockableMixin, QtGui.QDialog):
+class ControlWindow(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     """The UI used to create and manipulate curves from the curve library."""
 
     def __init__(self, parent=None):
         super(ControlWindow, self).__init__(parent)
         self.setWindowTitle('CMT Control Creator')
         self.resize(300, 500)
-        vbox = QtGui.QVBoxLayout(self)
+        vbox = QtWidgets.QVBoxLayout(self)
 
         size = 20
         label_width = 60
         icon_left = QtGui.QIcon(QtGui.QPixmap(':/nudgeLeft.png').scaled(size, size))
         icon_right = QtGui.QIcon(QtGui.QPixmap(':/nudgeRight.png').scaled(size, size))
         validator = QtGui.QDoubleValidator(-180.0, 180.0, 2)
-        grid = QtGui.QGridLayout()
+        grid = QtWidgets.QGridLayout()
         vbox.addLayout(grid)
 
         # Rotate X
-        label = QtGui.QLabel('Rotate X')
+        label = QtWidgets.QLabel('Rotate X')
         label.setMaximumWidth(label_width)
         grid.addWidget(label, 0, 0, QtCore.Qt.AlignRight)
-        b = QtGui.QPushButton(icon_left, '')
+        b = QtWidgets.QPushButton(icon_left, '')
         b.released.connect(partial(self.rotate_x, direction=-1))
         grid.addWidget(b, 0, 1)
-        self.offset_x = QtGui.QLineEdit('45.0')
+        self.offset_x = QtWidgets.QLineEdit('45.0')
         self.offset_x.setValidator(validator)
         grid.addWidget(self.offset_x, 0, 2)
-        b = QtGui.QPushButton(icon_right, '')
+        b = QtWidgets.QPushButton(icon_right, '')
         b.released.connect(partial(self.rotate_x, direction=1))
         grid.addWidget(b, 0, 3)
 
         # Rotate Y
-        label = QtGui.QLabel('Rotate Y')
+        label = QtWidgets.QLabel('Rotate Y')
         label.setMaximumWidth(label_width)
         grid.addWidget(label, 1, 0, QtCore.Qt.AlignRight)
-        b = QtGui.QPushButton(icon_left, '')
+        b = QtWidgets.QPushButton(icon_left, '')
         b.released.connect(partial(self.rotate_y, direction=-1))
         grid.addWidget(b, 1, 1)
-        self.offset_y = QtGui.QLineEdit('45.0')
+        self.offset_y = QtWidgets.QLineEdit('45.0')
         self.offset_y.setValidator(validator)
         grid.addWidget(self.offset_y, 1, 2)
-        b = QtGui.QPushButton(icon_right, '')
+        b = QtWidgets.QPushButton(icon_right, '')
         b.released.connect(partial(self.rotate_y, direction=1))
         grid.addWidget(b, 1, 3)
 
         # Rotate Z
-        label = QtGui.QLabel('Rotate Z')
+        label = QtWidgets.QLabel('Rotate Z')
         label.setMaximumWidth(label_width)
         grid.addWidget(label, 2, 0, QtCore.Qt.AlignRight)
-        b = QtGui.QPushButton(icon_left, '')
+        b = QtWidgets.QPushButton(icon_left, '')
         b.released.connect(partial(self.rotate_z, direction=-1))
         grid.addWidget(b, 2, 1)
-        self.offset_z = QtGui.QLineEdit('45.0')
+        self.offset_z = QtWidgets.QLineEdit('45.0')
         self.offset_z.setValidator(validator)
         grid.addWidget(self.offset_z, 2, 2)
-        b = QtGui.QPushButton(icon_right, '')
+        b = QtWidgets.QPushButton(icon_right, '')
         b.released.connect(partial(self.rotate_z, direction=1))
         grid.addWidget(b, 2, 3)
         grid.setColumnStretch(2, 2)
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox)
-        b = QtGui.QPushButton('Export Selected')
+        b = QtWidgets.QPushButton('Export Selected')
         b.released.connect(self.dump_controls)
         hbox.addWidget(b)
 
-        b = QtGui.QPushButton('Set Color')
+        b = QtWidgets.QPushButton('Set Color')
         b.released.connect(self.set_color)
         hbox.addWidget(b)
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox)
-        b = QtGui.QPushButton('Create Selected')
+        b = QtWidgets.QPushButton('Create Selected')
         b.released.connect(self.create_selected)
         hbox.addWidget(b)
 
-        b = QtGui.QPushButton('Remove Selected')
+        b = QtWidgets.QPushButton('Remove Selected')
         b.released.connect(self.remove_selected)
         hbox.addWidget(b)
 
-        hbox = QtGui.QHBoxLayout()
+        hbox = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox)
-        self.stack_count = QtGui.QSpinBox()
+        self.stack_count = QtWidgets.QSpinBox()
         self.stack_count.setValue(2)
         hbox.addWidget(self.stack_count)
 
-        b = QtGui.QPushButton('Create Transform Stack')
+        b = QtWidgets.QPushButton('Create Transform Stack')
         b.released.connect(self.create_transform_stack)
         b.setToolTip('Creates a transform stack above each selected node.')
         hbox.addWidget(b)
 
-        self.control_list = QtGui.QListWidget()
-        self.control_list.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.control_list = QtWidgets.QListWidget()
+        self.control_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         vbox.addWidget(self.control_list)
 
         self.populate_controls()
@@ -294,7 +295,7 @@ class ControlWindow(MayaQWidgetDockableMixin, QtGui.QDialog):
         if nodes:
             color = cmds.getAttr('{0}.overrideColorRGB'.format(nodes[0]))[0]
             color = QtGui.QColor(color[0]*255, color[1]*255, color[2]*255)
-            color = QtGui.QColorDialog.getColor(color, self, 'Set Curve Color')
+            color = QtWidgets.QColorDialog.getColor(color, self, 'Set Curve Color')
             if color.isValid():
                 color = [color.redF(), color.greenF(), color.blueF()]
                 for node in nodes:
@@ -324,10 +325,10 @@ class ControlWindow(MayaQWidgetDockableMixin, QtGui.QDialog):
         """Remove the curves selected in the curve list from the curve library."""
         items = self.control_list.selectedItems()
         if items:
-            button = QtGui.QMessageBox.question(self, 'Remove Controls',
+            button = QtWidgets.QMessageBox.question(self, 'Remove Controls',
                                                 'Are you sure you want to remove the selected controls?',
-                                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-            if button == QtGui.QMessageBox.Yes:
+                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if button == QtWidgets.QMessageBox.Yes:
                 for item in items:
                     text = item.text()
                     control_file = os.path.join(CONTROLS_DIRECTORY, '{0}.json'.format(text))

@@ -9,13 +9,14 @@ To open the dialog run the menu item: CMT > Utility > Unit Test Runner.
 
 See https://github.com/chadmv/cmt/wiki/Unit-Test-Runner-Dialog
 """
-import __builtin__
 import os
 import sys
 import unittest
 import webbrowser
-from PySide import QtCore
-from PySide import QtGui
+from cmt.qt import QtCore
+from cmt.qt import QtGui
+from cmt.qt import QtWidgets
+import cmt.qt
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 
 import cmt.test.mayaunittest as mayaunittest
@@ -39,7 +40,7 @@ def documentation():
     webbrowser.open('https://github.com/chadmv/cmt/wiki/Unit-Test-Runner-Dialog')
 
 
-class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QtGui.QMainWindow):
+class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs):
         super(MayaTestRunnerDialog, self).__init__(*args, **kwargs)
@@ -80,15 +81,15 @@ class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QtGui.QMainWindow):
         action.setToolTip('Run all failed tests.')
         action.triggered.connect(self.run_failed_tests)
 
-        widget = QtGui.QWidget()
+        widget = QtWidgets.QWidget()
         self.setCentralWidget(widget)
-        vbox = QtGui.QVBoxLayout(widget)
+        vbox = QtWidgets.QVBoxLayout(widget)
 
-        splitter = QtGui.QSplitter(orientation=QtCore.Qt.Horizontal)
-        self.test_view = QtGui.QTreeView()
-        self.test_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        splitter = QtWidgets.QSplitter(orientation=QtCore.Qt.Horizontal)
+        self.test_view = QtWidgets.QTreeView()
+        self.test_view.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         splitter.addWidget(self.test_view)
-        self.output_console = QtGui.QTextEdit()
+        self.output_console = QtWidgets.QTextEdit()
         self.output_console.setReadOnly(True)
         splitter.addWidget(self.output_console)
         vbox.addWidget(splitter)
@@ -322,16 +323,17 @@ class TestTreeModel(QtCore.QAbstractItemModel):
 
     def setData(self, index, value, role=QtCore.Qt.EditRole):
         node = index.internalPointer()
+        data_changed_kwargs = [index, index] if cmt.qt.__binding__ == 'PySide' else [index, index, []]
         if role == QtCore.Qt.EditRole:
-            self.dataChanged.emit(index, index)
+            self.dataChanged.emit(*data_changed_kwargs)
         if role == QtCore.Qt.DecorationRole:
             node.status = value
-            self.dataChanged.emit(index, index)
+            self.dataChanged.emit(*data_changed_kwargs)
             if node.parent() is not self._root_node:
                 self.setData(self.parent(index), value, role)
         elif role == QtCore.Qt.ToolTipRole:
             node.tool_tip = value
-            self.dataChanged.emit(index, index)
+            self.dataChanged.emit(*data_changed_kwargs)
 
     def headerData(self, section, orientation, role):
         return "Tests"

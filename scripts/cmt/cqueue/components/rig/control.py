@@ -1,5 +1,5 @@
 import maya.cmds as cmds
-from PySide import QtGui
+from cmt.qt import QtWidgets
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 import cmt.rig.control
@@ -11,8 +11,8 @@ class Component(core.Component):
     """A Component that creates animation controls nodes."""
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(':/circle.png').scaled(size, size)
+    def image_path(cls):
+        return ':/circle.png'
 
     def __init__(self, controls=None, **kwargs):
         """Constructor
@@ -48,16 +48,16 @@ class Component(core.Component):
         Users can override this method if they wish to customize the layout of the component.
         :return: A QWidget containing all the Component fields.
         """
-        widget = QtGui.QWidget()
-        layout = QtGui.QHBoxLayout(widget)
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         self.list_widget = self.control_list.widget()
         layout.addWidget(self.list_widget)
 
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(vbox)
-        button = QtGui.QPushButton('Store Controls')
+        button = QtWidgets.QPushButton('Store Controls')
         button.released.connect(self.store_controls)
         vbox.addWidget(button)
         vbox.addStretch()

@@ -1,7 +1,7 @@
 from functools import partial
 import logging
 import maya.cmds as cmds
-from PySide import QtGui
+from cmt.qt import QtWidgets
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 logger = logging.getLogger(__name__)
@@ -11,8 +11,8 @@ class Component(core.Component):
     """A Component that creates parentConstraints."""
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(':/parentConstraint.png').scaled(size, size)
+    def image_path(cls):
+        return ':/parentConstraint.png'
 
     def __init__(self, constraints=None, **kwargs):
         """Constructor
@@ -65,7 +65,7 @@ class Component(core.Component):
     def widget(self):
         widget = self.constraints.widget()
         # Add a new button to the widget button_layout to add selected constraints to the UI.
-        button = QtGui.QPushButton('Add from Selected')
+        button = QtWidgets.QPushButton('Add from Selected')
         button.released.connect(partial(self.add_from_selected, field_layout=widget.field_layout))
         widget.button_layout.addWidget(button)
         return widget
@@ -133,28 +133,28 @@ def constraint_data(constraint):
 class ParentConstraintView(fields.ContainerView):
     """Customize the view of the container."""
     def widget(self, container):
-        widget = QtGui.QFrame()
-        widget.setFrameStyle(QtGui.QFrame.StyledPanel)
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
 
-        hbox = QtGui.QHBoxLayout(widget)
+        hbox = QtWidgets.QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(container['drivers'].verbose_name)
+        label = QtWidgets.QLabel(container['drivers'].verbose_name)
         hbox.addWidget(label)
         drivers_widget = container['drivers'].widget()
         drivers_widget.setMaximumHeight(65)
         hbox.addWidget(drivers_widget)
 
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         hbox.addLayout(vbox)
 
-        hbox1 = QtGui.QHBoxLayout()
+        hbox1 = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox1)
-        label = QtGui.QLabel(container['driven'].verbose_name)
+        label = QtWidgets.QLabel(container['driven'].verbose_name)
         hbox1.addWidget(label)
         hbox1.addWidget(container['driven'].widget())
         hbox1.addWidget(container['maintain_offset'].widget())
 
-        hbox2 = QtGui.QHBoxLayout()
+        hbox2 = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox2)
         hbox2.setContentsMargins(0, 0, 0, 0)
         hbox2.addWidget(container['skip_tx'].widget())
@@ -162,7 +162,7 @@ class ParentConstraintView(fields.ContainerView):
         hbox2.addWidget(container['skip_tz'].widget())
         hbox2.addStretch()
 
-        hbox3 = QtGui.QHBoxLayout()
+        hbox3 = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox3)
         hbox3.setContentsMargins(0, 0, 0, 0)
         hbox3.addWidget(container['skip_rx'].widget())

@@ -2,7 +2,7 @@ import os
 import maya.cmds as cmds
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
-from PySide import QtGui
+from cmt.qt import QtWidgets
 
 
 class Component(core.Component):
@@ -11,8 +11,8 @@ class Component(core.Component):
     reference_operation = 'Reference'
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(':/fileOpen.png').scaled(size, size)
+    def image_path(cls):
+        return ':/fileOpen.png'
 
     def help_url(self):
         return 'https://github.com/chadmv/cmt/wiki/File-Component'
@@ -78,19 +78,19 @@ class Component(core.Component):
 class FileView(fields.ContainerView):
     """Customize the view of the container."""
     def widget(self, container):
-        widget = QtGui.QFrame()
-        widget.setFrameStyle(QtGui.QFrame.NoFrame)
-        layout = QtGui.QHBoxLayout(widget)
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.NoFrame)
+        layout = QtWidgets.QHBoxLayout(widget)
         layout.addWidget(container['operation'].widget())
 
         file_path_widget = container['file_path'].widget()
-        file_path_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
+        file_path_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         layout.addWidget(file_path_widget)
 
-        layout.addWidget(QtGui.QLabel(container['namespace'].verbose_name))
+        layout.addWidget(QtWidgets.QLabel(container['namespace'].verbose_name))
         namespace_widget = container['namespace'].widget()
         namespace_widget.setMaximumWidth(150)
-        namespace_widget.setSizePolicy(QtGui.QSizePolicy.Maximum, QtGui.QSizePolicy.Fixed)
+        namespace_widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
         layout.addWidget(namespace_widget)
 
         return widget
