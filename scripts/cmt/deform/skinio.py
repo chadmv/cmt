@@ -11,6 +11,7 @@ Usage:
     skinio.import_skin(file_path='/path/to/data.skin')
 """
 import cPickle as pickle
+import json
 import logging
 from functools import partial
 
@@ -41,7 +42,10 @@ def import_skin(file_path=None, shapes=None, to_selected_shapes=False):
 
     # Read in the file
     fh = open(file_path, 'rb')
-    data = pickle.load(fh)
+    try:
+        data = json.load(fh)
+    except RuntimeError:
+        data = pickle.load(fh)
     fh.close()
 
     if shapes and not isinstance(shapes, basestring):
@@ -148,10 +152,10 @@ def export_skin(file_path=None, shapes=None):
         skin = SkinCluster(skin)
         data = skin.gather_data()
         all_data.append(data)
-        logging.info('Exporting skinCluster %s (%d influences, %d vertices)',
-                     skin.node, len(data['weights'].keys()), len(data['blendWeights']))
+        logging.info('Exporting skinCluster %s on %s (%d influences, %d vertices)',
+                     skin.node, skin.shape, len(data['weights'].keys()), len(data['blendWeights']))
     fh = open(file_path, 'wb')
-    pickle.dump(all_data, fh, pickle.HIGHEST_PROTOCOL)
+    json.dump(all_data, fh)
     fh.close()
 
 

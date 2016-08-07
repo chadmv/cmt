@@ -193,7 +193,7 @@ class FilePathField(Field):
     relative_to_choices = [project_root, full_path] +\
                           [x for x in os.environ.get('CMT_CQUEUE_FILEPATH_RELATIVE_TO', '').split(os.pathsep) if x]
 
-    def __init__(self, filter='Any File (*)', relative_to=full_path, *args, **kwargs):
+    def __init__(self, filter='Any File (*)', relative_to=project_root, *args, **kwargs):
         super(FilePathField, self).__init__(*args, **kwargs)
         self.filter = filter
 

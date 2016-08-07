@@ -29,6 +29,6 @@ class Component(core.Component):
 
     def execute(self):
         for file_field in self.array_field:
-            file_path = file_field.value()
+            file_path = file_field.get_path()
             skinio.import_skin(file_path)
 
