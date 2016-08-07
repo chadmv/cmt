@@ -2,15 +2,14 @@ import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 import cmt.rig.splineik as splineik
 import cmt.shortcuts as shortcuts
-from PySide import QtGui
 
 
 class Component(core.Component):
     """A Component that generations a skeleton using the cmt.rig.skeleton serializer."""
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(shortcuts.get_icon_path('spine')).scaled(size, size)
+    def image_path(cls):
+        return shortcuts.get_icon_path('spine')
 
     def __init__(self, start_joint='', end_joint='', start_control='', end_control='', name='spine', **kwargs):
         super(Component, self).__init__(**kwargs)

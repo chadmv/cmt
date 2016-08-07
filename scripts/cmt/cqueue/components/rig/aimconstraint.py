@@ -1,5 +1,5 @@
 import maya.cmds as cmds
-from PySide import QtGui
+from cmt.qt import QtWidgets
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 import logging
@@ -10,8 +10,8 @@ class Component(core.Component):
     """A Component that creates aimConstraints."""
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(':/aimConstraint.png').scaled(size, size)
+    def image_path(cls):
+        return ':/aimConstraint.png'
 
     def __init__(self, constraints=None, **kwargs):
         """Constructor
@@ -91,30 +91,30 @@ class Component(core.Component):
 class AimConstraintView(fields.ContainerView):
     """Customize the view of the container."""
     def widget(self, container):
-        widget = QtGui.QFrame()
-        widget.setFrameStyle(QtGui.QFrame.StyledPanel)
-        main_vbox = QtGui.QVBoxLayout(widget)
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+        main_vbox = QtWidgets.QVBoxLayout(widget)
 
-        hbox = QtGui.QHBoxLayout(widget)
+        hbox = QtWidgets.QHBoxLayout(widget)
         main_vbox.addLayout(hbox)
         hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtGui.QLabel(container['drivers'].verbose_name)
+        label = QtWidgets.QLabel(container['drivers'].verbose_name)
         hbox.addWidget(label)
         drivers_widget = container['drivers'].widget()
         drivers_widget.setMaximumHeight(65)
         hbox.addWidget(drivers_widget)
 
-        vbox = QtGui.QVBoxLayout()
+        vbox = QtWidgets.QVBoxLayout()
         hbox.addLayout(vbox)
 
-        hbox1 = QtGui.QHBoxLayout()
+        hbox1 = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox1)
-        label = QtGui.QLabel(container['driven'].verbose_name)
+        label = QtWidgets.QLabel(container['driven'].verbose_name)
         hbox1.addWidget(label)
         hbox1.addWidget(container['driven'].widget())
         hbox1.addWidget(container['maintain_offset'].widget())
 
-        hbox2 = QtGui.QHBoxLayout()
+        hbox2 = QtWidgets.QHBoxLayout()
         vbox.addLayout(hbox2)
         hbox2.setContentsMargins(0, 0, 0, 0)
         hbox2.addWidget(container['skip_x'].widget())
@@ -122,22 +122,22 @@ class AimConstraintView(fields.ContainerView):
         hbox2.addWidget(container['skip_z'].widget())
         hbox2.addStretch()
 
-        hbox = QtGui.QHBoxLayout(widget)
+        hbox = QtWidgets.QHBoxLayout(widget)
         main_vbox.addLayout(hbox)
         hbox.setContentsMargins(0, 0, 0, 0)
-        hbox.addWidget(QtGui.QLabel(container['aim_vector'].verbose_name))
+        hbox.addWidget(QtWidgets.QLabel(container['aim_vector'].verbose_name))
         hbox.addWidget(container['aim_vector'].widget())
-        hbox.addWidget(QtGui.QLabel(container['up_vector'].verbose_name))
+        hbox.addWidget(QtWidgets.QLabel(container['up_vector'].verbose_name))
         hbox.addWidget(container['up_vector'].widget())
 
-        hbox = QtGui.QHBoxLayout(widget)
+        hbox = QtWidgets.QHBoxLayout(widget)
         main_vbox.addLayout(hbox)
         hbox.setContentsMargins(0, 0, 0, 0)
-        hbox.addWidget(QtGui.QLabel(container['world_up_type'].verbose_name))
+        hbox.addWidget(QtWidgets.QLabel(container['world_up_type'].verbose_name))
         hbox.addWidget(container['world_up_type'].widget())
-        hbox.addWidget(QtGui.QLabel(container['world_up_object'].verbose_name))
+        hbox.addWidget(QtWidgets.QLabel(container['world_up_object'].verbose_name))
         hbox.addWidget(container['world_up_object'].widget())
-        hbox.addWidget(QtGui.QLabel(container['world_up_vector'].verbose_name))
+        hbox.addWidget(QtWidgets.QLabel(container['world_up_vector'].verbose_name))
         hbox.addWidget(container['world_up_vector'].widget())
 
         return widget

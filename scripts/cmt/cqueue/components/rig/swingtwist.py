@@ -1,5 +1,4 @@
 import maya.cmds as cmds
-from PySide import QtGui
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 import cmt.shortcuts as shortcuts
@@ -16,8 +15,8 @@ class Component(core.Component):
     }
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(shortcuts.get_icon_path('swingTwist')).scaled(size, size)
+    def image_path(cls):
+        return shortcuts.get_icon_path('swingTwist')
 
     def __init__(self, swing_twists=None, **kwargs):
         """Constructor
@@ -96,19 +95,19 @@ class SwingTwistView(fields.ContainerView):
     def widget(self, container):
         # The fields will be arranged in two row containers
         # [[driver, driven], [name, twist, swing, twistAxis]]
-        widget = QtGui.QFrame()
-        widget.setFrameStyle(QtGui.QFrame.StyledPanel)
-        vbox = QtGui.QVBoxLayout(widget)
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+        vbox = QtWidgets.QVBoxLayout(widget)
 
         for attrs in [
             ['driver', 'driven'],
             ['name', 'twist', 'swing', 'twist_axis'],
         ]:
-            hbox = QtGui.QHBoxLayout(widget)
+            hbox = QtWidgets.QHBoxLayout(widget)
             vbox.addLayout(hbox)
             hbox.setContentsMargins(0, 0, 0, 0)
             for attr in attrs:
-                hbox.addWidget(QtGui.QLabel(container[attr].verbose_name))
+                hbox.addWidget(QtWidgets.QLabel(container[attr].verbose_name))
                 hbox.addWidget(container[attr].widget())
 
         return widget

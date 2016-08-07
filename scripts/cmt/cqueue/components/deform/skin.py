@@ -1,4 +1,3 @@
-from PySide import QtGui
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
 import cmt.deform.skinio as skinio
@@ -8,8 +7,8 @@ class Component(core.Component):
     """A Component that imports skin weights using skinio."""
 
     @classmethod
-    def image(cls, size=32):
-        return QtGui.QPixmap(':/importSmoothSkin.png').scaled(size, size)
+    def image_path(cls):
+        return ':/importSmoothSkin.png'
 
     def __init__(self, file_paths=None, **kwargs):
         super(Component, self).__init__(**kwargs)

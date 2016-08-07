@@ -6,14 +6,12 @@ To create a new Component, inherit from the core.Component class and implement t
 class Component(core.Component):
     def __init__(self, sphere_name='', **kwargs):
         super(Component, self).__init__(**kwargs)
-        self.sphere_name = fields.CharField(name='Sphere Name', value=sphere_name)
-        self.add_field(self.sphere_name)
+        self.sphere_name = fields.CharField(name='Sphere Name', value=sphere_name, parent=self)
 
     def execute(self):
         cmds.polySphere(name=self.sphere_name.value())
 """
 
-from PySide import QtGui
 import importlib
 import json
 import os
@@ -21,6 +19,9 @@ import pprint
 import traceback
 import uuid
 import logging
+from cmt.qt import QtWidgets
+from cmt.qt import QtGui
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,12 +31,21 @@ class Component(object):
     """
     @classmethod
     def image(cls, size=32):
-        """Get the icon path of the Component.
-
-        To create an icon for a Component, create a png, jpg or svg with the same name as the
-        Component in the same directory.
+        """Get the image QPixmap of the Component.
 
         :param size: Desired dimension of the image.
+        :return: The QPixmap of the icon image.
+        """
+        return QtGui.QPixmap(cls.image_path()).scaled(size, size)
+
+    @classmethod
+    def image_path(cls):
+        """Get the image path of the Component.
+
+        To create an icon for a Component, create a png, jpg or svg with the same name as the
+        Component in the same directory or override image_path in derived
+        Components and return the image path.
+
         :return: The path of the icon image.
         """
         module = importlib.import_module(cls.__module__)
@@ -48,7 +58,7 @@ class Component(object):
                 break
         else:
             path = ':/hsNothing.png'
-        return QtGui.QPixmap(path).scaled(size, size)
+        return path
 
     @classmethod
     def name(cls):
@@ -146,8 +156,8 @@ class Component(object):
         Users can override this method if they wish to customize the layout of the component.
         :return: A QWidget containing all the Component fields.
         """
-        widget = QtGui.QWidget()
-        layout = QtGui.QFormLayout(widget)
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QFormLayout(widget)
         for field in self.fields:
             if field.display_name:
                 layout.addRow(field.verbose_name, field.widget())
