@@ -10,49 +10,27 @@ class Component(core.Component):
     import_operation = 'Import'
     reference_operation = 'Reference'
 
+    files = fields.ArrayField('files', add_label_text='Add File', display_name=False)
+    container = fields.ContainerField('file', parent=files, container_view=FileView())
+    operation = fields.CharField('operation',
+                                 choices=[import_operation, reference_operation],
+                                 default=import_operation,
+                                 help_text='Whether to import or reference the file.',
+                                 parent=container)
+    file_path = fields.FilePathField('file_path',
+                                     filter='Maya Files (*.ma *.mb)',
+                                     help_text='The Maya file path.',
+                                     parent=container)
+    namespace = fields.CharField('namespace',
+                                 help_text='The import or reference namespace.',
+                                 parent=container)
+
     @classmethod
     def image_path(cls):
         return ':/fileOpen.png'
 
     def help_url(self):
         return 'https://github.com/chadmv/cmt/wiki/File-Component'
-
-    def __init__(self, files=None, **kwargs):
-        """
-
-        :param files: [
-            {
-                'operation': Component.import_operation,
-                'file_path': [FilePathField.project_root, 'scenes/file.ma'],
-                'namespace': 'GEOM'
-        ]
-        :param kwargs:
-        """
-        super(Component, self).__init__(**kwargs)
-        self.files = fields.ArrayField(name='files', add_label_text='Add File', display_name=False, parent=self)
-        if not files:
-            # Create default entries if none specified
-            files = [
-                {'operation': Component.import_operation}
-            ]
-        for f in files:
-            container = fields.ContainerField(name='file', parent=self.files,
-                                              container_view=FileView())
-
-            fields.CharField(name='operation',
-                             choices=[Component.import_operation, Component.reference_operation],
-                             value=f.get('operation', Component.import_operation),
-                             help_text='Whether to import or reference the file.',
-                             parent=container)
-            fields.FilePathField(name='file_path',
-                                 value=f.get('file_path', ''),
-                                 filter='Maya Files (*.ma *.mb)',
-                                 help_text='The Maya file path.',
-                                 parent=container)
-            fields.CharField(name='namespace',
-                             value=f.get('namespace', ''),
-                             help_text='The import or reference namespace.',
-                             parent=container)
 
     def execute(self):
         for container in self.files:

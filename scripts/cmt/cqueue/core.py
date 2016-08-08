@@ -12,15 +12,18 @@ class Component(core.Component):
         cmds.polySphere(name=self.sphere_name.value())
 """
 
+import copy
 import importlib
 import json
+import inspect
 import os
 import pprint
 import traceback
-import uuid
+import uuid as _uuid
 import logging
 from cmt.qt import QtWidgets
 from cmt.qt import QtGui
+import cmt.cqueue.fields as fields
 
 logger = logging.getLogger(__name__)
 
@@ -65,15 +68,38 @@ class Component(object):
         """Get the module path to this Component.  It will be the Python package path used to import the Component."""
         return cls.__module__
 
-    def __init__(self, **kwargs):
+    def __init__(self, enabled=True, break_point=False, uuid=None, **kwargs):
         # True or False to skip execution of this component
-        self.enabled = kwargs.get('enabled', True)
+        self.enabled = enabled
         # True or False to pause the queue execution after this component runs
-        self.break_point = kwargs.get('break_point', False)
+        self.break_point = break_point
         # The unique id of this component
-        self.uuid = str(kwargs.get('uuid', uuid.uuid4()))
+        self.uuid = uuid if uuid is not None else str(_uuid.uuid4())
         # The list of fields
         self.fields = []
+        self._initialize_fields()
+        self.set_data(kwargs)
+
+    def _initialize_fields(self):
+        members = inspect.getmembers(self.__class__, lambda a:not(inspect.isroutine(a)))
+        for member in members:
+            if isinstance(member[1], fields.Field) and not member[1].parent:
+                # Only add root level fields to the component
+                instance_field = copy.deepcopy(member[1])
+                self.fields.append(instance_field)
+                setattr(self, member[0], instance_field)
+
+    def set_data(self, data):
+        for key, value in data.iteritems():
+            field = getattr(self, key)
+            if field:
+                if isinstance(field, fields.Field):
+                    field.set_value(value)
+                else:
+                    setattr(self, key, value)
+            else:
+                logger.warning('Invalid data for {0}: {1}: {2}'.format(self, key, value))
+
 
     def set_enabled(self, value):
         """Set whether this Component is enabled or not.

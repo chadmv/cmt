@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 class Component(core.Component):
     """A Component that creates animation controls nodes."""
+    control_list = fields.ListField('controls', help_text='Controls that will be created.')
 
     @classmethod
     def image_path(cls):

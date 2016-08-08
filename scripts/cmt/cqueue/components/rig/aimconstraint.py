@@ -8,70 +8,26 @@ logger = logging.getLogger(__name__)
 
 class Component(core.Component):
     """A Component that creates aimConstraints."""
+    constraints = fields.ArrayField('constraints', add_label_text='Add Aim Constraint')
+    container = fields.ContainerField('constraint', parent=constraints, container_view=AimConstraintView())
+    drivers = fields.MayaNodeField('drivers', multi=True, help_text='The nodes to aim at.', parent=container)
+    driven = fields.MayaNodeField('driven', help_text='The node to aim', parent=container)
+    maintain_offset = fields.BooleanField('maintain_offset', default=True, parent=container)
+    aim_vector = fields.VectorField('aim_vector', default=(1.0, 0.0, 0.0), parent=container)
+    up_vector = fields.VectorField('up_vector', default=(0.0, 1.0, 0.0), parent=container)
+    world_up_type = fields.CharField('world_up_type',
+                                     choices=['scene', 'object', 'objectrotation', 'vector', 'none'],
+                                     default='object',
+                                     parent=container)
+    world_up_vector = fields.VectorField('world_up_vector', default=(0.0, 1.0, 0.0), parent=container)
+    world_up_object = fields.MayaNodeField('world_up_object', parent=container)
+    skip_x = fields.BooleanField('skip_x', parent=container)
+    skip_y = fields.BooleanField('skip_y', parent=container)
+    skip_z = fields.BooleanField('skip_z', parent=container)
 
     @classmethod
     def image_path(cls):
         return ':/aimConstraint.png'
-
-    def __init__(self, constraints=None, **kwargs):
-        """Constructor
-        :param constraints: A list of dictionaries describing the aimConstraints that need to be created:
-            {
-                'drivers': nodes,
-                'driven': node,
-                'maintainOffset': True,
-                'aimVector': (1.0, 0.0, 0.0),
-                'upVector': (0.0, 1.0, 0.0),
-                'worldUpType': "scene", "object", "objectrotation", "vector", or "none"
-                'worldUpVector': node,
-                'worldUpObject': node,
-                'skip': ['x', 'y', 'z']
-            }
-        """
-        super(Component, self).__init__(**kwargs)
-        self.constraints = fields.ArrayField(name='constraints', add_label_text='Add Aim Constraint', parent=self)
-        if not constraints:
-            # Create default entries if none specified
-            constraints = [
-                {'driven': 'node'}
-            ]
-        for constraint in constraints:
-            container = fields.ContainerField(name='constraint', parent=self.constraints,
-                                              container_view=AimConstraintView())
-
-            fields.MayaNodeField(name='drivers',
-                                 value=constraint.get('drivers', []),
-                                 multi=True,
-                                 help_text='The nodes to aim at.',
-                                 parent=container)
-            fields.MayaNodeField(name='driven',
-                                 value=constraint.get('driven', ''),
-                                 help_text='The node to aim',
-                                 parent=container)
-            fields.BooleanField(name='maintain_offset',
-                                value=constraint.get('maintainOffset', True),
-                                parent=container)
-            fields.VectorField(name='aim_vector',
-                               value=constraint.get('aimVector', (1.0, 0.0, 0.0)),
-                               parent=container)
-            fields.VectorField(name='up_vector',
-                               value=constraint.get('upVector', (0.0, 1.0, 0.0)),
-                               parent=container)
-            fields.CharField(name='world_up_type',
-                             choices=['scene', 'object', 'objectrotation', 'vector', 'none'],
-                             value=constraint.get('worldUpType', 'object'),
-                             default='object',
-                             parent=container)
-            fields.VectorField(name='world_up_vector',
-                               value=constraint.get('worldUpVector', (0.0, 1.0, 0.0)),
-                               parent=container)
-            fields.MayaNodeField(name='world_up_object',
-                                 value=constraint.get('worldUpObject', ''),
-                                 parent=container)
-            skip = constraint.get('skip', [])
-            fields.BooleanField(name='skip_x', value='x' in skip, parent=container)
-            fields.BooleanField(name='skip_y', value='y' in skip, parent=container)
-            fields.BooleanField(name='skip_z', value='z' in skip, parent=container)
 
     def execute(self):
         for container in self.constraints:

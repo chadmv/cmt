@@ -9,33 +9,21 @@ logger = logging.getLogger(__name__)
 
 class Component(core.Component):
     """A Component that creates parentConstraints."""
+    constraints = fields.ArrayField('constraints', add_label_text='Add Parent Constraint')
+    container = fields.ContainerField('constraint', parent=constraints, container_view=ParentConstraintView())
+    drivers = fields.MayaNodeField('drivers', multi=True, help_text='The nodes to constrain to.', parent=container)
+    driven = fields.MayaNodeField('driven', help_text='The node to constrain.', parent=container)
+    maintain_offset = fields.BooleanField('maintain_offset', default=True, parent=container)
+    skip_tx = fields.BooleanField('skip_tx', verbose_name='Skip tx', parent=container)
+    skip_ty = fields.BooleanField('skip_ty', verbose_name='Skip ty', parent=container)
+    skip_tz = fields.BooleanField('skip_tz', verbose_name='Skip tz', parent=container)
+    skip_rx = fields.BooleanField('skip_rx', verbose_name='Skip rx', parent=container)
+    skip_ry = fields.BooleanField('skip_ry', verbose_name='Skip ry', parent=container)
+    skip_rz = fields.BooleanField('skip_rz', verbose_name='Skip rz', parent=container)
 
     @classmethod
     def image_path(cls):
         return ':/parentConstraint.png'
-
-    def __init__(self, constraints=None, **kwargs):
-        """Constructor
-        :param constraints: A list of dictionaries describing the aimConstraints that need to be created:
-            {
-                'drivers': nodes,
-                'driven': node,
-                'maintainOffset': True,
-                'skipTranslate': ['x', 'y', 'z']
-                'skipRotate': ['x', 'y', 'z']
-            }
-        """
-        super(Component, self).__init__(**kwargs)
-        self.constraints = fields.ArrayField(name='constraints', add_label_text='Add Parent Constraint', parent=self)
-        if not constraints:
-            # Create default entries if none specified
-            constraints = [
-                {'driven': 'node'}
-            ]
-        # The fields will be arranged in two row containers
-        # [[driver, driven], [name, twist, swing, invertTwist, invertSwing, twistAxis]]
-        for constraint in constraints:
-            self.add_constraint_data(constraint)
 
     def add_constraint_data(self, constraint):
         container = fields.ContainerField(name='constraint', parent=self.constraints,

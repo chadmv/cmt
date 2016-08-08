@@ -1,6 +1,7 @@
 import maya.cmds as cmds
 import cmt.cqueue.core as core
 import cmt.cqueue.fields as fields
+from cmt.qt import QtWidgets
 import cmt.shortcuts as shortcuts
 import logging
 logger = logging.getLogger(__name__)
@@ -14,65 +15,35 @@ class Component(core.Component):
         2: 'Z',
     }
 
-    @classmethod
-    def image_path(cls):
-        return shortcuts.get_icon_path('swingTwist')
-
-    def __init__(self, swing_twists=None, **kwargs):
-        """Constructor
-        :param swing_twists: A list of dictionaries describing the swingTwist nodes that need to be
-                           created:
-            {
-                'driven': node,
-                'driver': nodes,
-                'name': name,
-                'twist': 1.0,
-                'swing': 0.2,
-            }
-        """
-        super(Component, self).__init__(**kwargs)
-        self.swingtwists = fields.ArrayField(name='Swing Twists', add_label_text='Add SwingTwist', display_name=False,
-                                             parent=self)
-        if not swing_twists:
-            # Create default entries if none specified
-            swing_twists = [
-                {'name': 'swingTwist#'}
-            ]
-        twist_axes = self.twist_axis.values()
-        twist_axes.sort()
-        for swingtwist in swing_twists:
-            container = fields.ContainerField(name='Swing Twist',
-                                              parent=self.swingtwists,
-                                              container_view=SwingTwistView())
-            fields.MayaNodeField(name='driver',
-                                 value=swingtwist.get('driver', ''),
-                                 help_text='The node to drive the swingtwist',
-                                 parent=container)
-            fields.MayaNodeField(name='driven',
-                                 value=swingtwist.get('driven', ''),
-                                 help_text='The node to be driven',
-                                 parent=container)
-            fields.CharField(name='name',
-                             value=swingtwist.get('name', 'swingTwist#'),
-                             help_text='The name of the created swingTwist node.',
-                             parent=container)
-            fields.FloatField(name='twist',
-                              value=swingtwist.get('twist', 1.0),
+    swingtwists = fields.ArrayField('swing_twists', add_label_text='Add SwingTwist', display_name=False)
+    container = fields.ContainerField('swing_twist', parent=swingtwists, container_view=SwingTwistView())
+    driver = fields.MayaNodeField('driver', help_text='The node to drive the swingtwist', parent=container)
+    driven = fields.MayaNodeField('driven', help_text='The node to be driven', parent=container)
+    name = fields.CharField('name',
+                            default='swingTwist#',
+                            help_text='The name of the created swingTwist node.',
+                            parent=container)
+    twist = fields.FloatField('twist',
+                              default=1.0,
                               help_text='The twist amount',
                               min_value=-1.0,
                               max_value=1.0,
                               parent=container)
-            fields.FloatField(name='swing',
-                              value=swingtwist.get('swing', 1.0),
+    swing = fields.FloatField('swing',
+                              default=1.0,
                               help_text='The swing amount',
                               min_value=-1.0,
                               max_value=1.0,
                               parent=container)
-            fields.CharField(name='twist_axis',
-                             value=swingtwist.get('twistAxis', 'X'),
-                             choices=['X', 'Y', 'Z'],
-                             help_text='The twist axis',
-                             parent=container)
+    twist_axis = fields.CharField('twist_axis',
+                                  default='X',
+                                  choices=['X', 'Y', 'Z'],
+                                  help_text='The twist axis',
+                                  parent=container)
+
+    @classmethod
+    def image_path(cls):
+        return shortcuts.get_icon_path('swingTwist')
 
     def execute(self):
         cmds.loadPlugin('cmt_py', qt=True)

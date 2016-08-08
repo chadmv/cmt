@@ -5,10 +5,13 @@ in order to facilitate in the rendering of the available arguments in the cqueue
 import copy
 import os
 import re
+import logging
 from cmt.qt import QtWidgets
 from cmt.qt import QtGui
 from functools import partial
 import maya.cmds as cmds
+
+logger = logging.getLogger(__name__)
 
 
 class Field(object):
@@ -16,16 +19,17 @@ class Field(object):
 
     Derived classes should implement the widget, value
     """
-    def __init__(self, name=None, verbose_name=None, value=None, default=None, parent=None, display_name=True,
+    def __init__(self, name, default=None, verbose_name=None, parent=None, display_name=True,
                  help_text=''):
         """Constructor.  No QWidgets should be created in the constructor or else Maya will crash
         in batch/testing mode."""
         self.name = name
         self.verbose_name = verbose_name if verbose_name else self.name.replace('_', ' ').title()
-        self.default = default if default is not None else value
-        self._value = value
+        self.default = default
+        self._value = default
         self.help_text = help_text
         self.display_name = display_name
+        self.parent = parent
         if parent:
             parent.add_field(self)
 
@@ -54,6 +58,11 @@ class Field(object):
 
 class BooleanField(Field):
     """A checkbox field that holds True or False."""
+    def __init__(self, name, default=False, *args, **kwargs):
+        super(BooleanField, self).__init__(name, default, *args, **kwargs)
+
+    def set_value(self, value):
+        self._value = bool(value)
 
     def widget(self):
         """Get the QWidget of the Field."""
@@ -66,8 +75,8 @@ class BooleanField(Field):
 
 class CharField(Field):
     """A Field that holds a string value."""
-    def __init__(self, choices=None, editable=False, *args, **kwargs):
-        super(CharField, self).__init__(*args, **kwargs)
+    def __init__(self, name, default='', choices=None, editable=False, *args, **kwargs):
+        super(CharField, self).__init__(name, default, *args, **kwargs)
         self.choices = choices
         self.editable = editable
 
@@ -95,19 +104,24 @@ class CharField(Field):
     def set_value(self, value):
         if self.choices and isinstance(value, int):
             value = self.choices[value]
+        else:
+            value = str(value)
         super(CharField, self).set_value(value)
 
 
 class FloatField(Field):
     """A Field that holds a float value."""
 
-    def __init__(self, min_value=0.0, max_value=100.0, precision=2, single_step=0.1, *args, **kwargs):
-        super(FloatField, self).__init__(*args, **kwargs)
+    def __init__(self, name, default=0.0, min_value=0.0, max_value=100.0, precision=2, single_step=0.1, *args, **kwargs):
+        super(FloatField, self).__init__(name, default, *args, **kwargs)
         self._value = self._value or 0.0
         self.min_value = min_value
         self.max_value = max_value
         self.precision = precision
         self.single_step = single_step
+
+    def set_value(self, value):
+        self._value = float(value)
 
     def widget(self):
         """Get the QWidget of the Field."""
@@ -124,10 +138,18 @@ class FloatField(Field):
 class VectorField(Field):
     """A Field that holds 3 floats."""
 
-    def __init__(self, precision=4, *args, **kwargs):
-        super(VectorField, self).__init__(*args, **kwargs)
+    def __init__(self, name, default=None, precision=4, *args, **kwargs):
+        default = default or [0.0, 0.0, 0.0]
+        super(VectorField, self).__init__(name, default, *args, **kwargs)
         self._value = self._value or [0.0, 0.0, 0.0]
         self.precision = precision
+
+    def set_value(self, value):
+        if not isinstance(value, list) and not isinstance(value, tuple):
+            raise TypeError('Invalid value for VectorField: {0}'.format(value))
+        if len(value) != 3:
+            raise ValueError('Vector must be of length 3: {0}'.format(value))
+        self._value = value[:]
 
     def widget(self):
         """Get the QWidget of the Field."""
@@ -165,8 +187,9 @@ class VectorField(Field):
 
 
 class ListField(Field):
-    def __init__(self, *args, **kwargs):
-        super(ListField, self).__init__(*args, **kwargs)
+    def __init__(self, name, default=None, *args, **kwargs):
+        default = default or []
+        super(ListField, self).__init__(name, default, *args, **kwargs)
         self._value = self._value or []
 
     def widget(self):
@@ -194,8 +217,8 @@ class FilePathField(Field):
     relative_to_choices = [project_root, full_path] +\
                           [x for x in os.environ.get('CMT_CQUEUE_FILEPATH_RELATIVE_TO', '').split(os.pathsep) if x]
 
-    def __init__(self, filter='Any File (*)', relative_to=project_root, *args, **kwargs):
-        super(FilePathField, self).__init__(*args, **kwargs)
+    def __init__(self, name, default='', filter='Any File (*)', relative_to=project_root, *args, **kwargs):
+        super(FilePathField, self).__init__(name, default, *args, **kwargs)
         self.filter = filter
 
         if isinstance(self._value, list):
@@ -278,8 +301,10 @@ class FilePathField(Field):
 class MayaNodeField(Field):
     """A Field that holds the name of a Maya node and presents a set from selected button."""
 
-    def __init__(self, multi=False, *args, **kwargs):
-        super(MayaNodeField, self).__init__(*args, **kwargs)
+    def __init__(self, name, default='', multi=False, *args, **kwargs):
+        if multi:
+            default = default or []
+        super(MayaNodeField, self).__init__(name, default, *args, **kwargs)
         self._multi = multi
         self._value = self._value or ''
         if multi and isinstance(self._value, basestring):
@@ -331,10 +356,10 @@ class ContainerField(Field):
     multiple groups of Fields.
     """
 
-    def __init__(self, container_view=None, *args, **kwargs):
+    def __init__(self, name, container_view=None, *args, **kwargs):
         """Constructor
         """
-        super(ContainerField, self).__init__(*args, **kwargs)
+        super(ContainerField, self).__init__(name, *args, **kwargs)
         if container_view is None:
             container_view = ContainerView()
         if not isinstance(container_view, ContainerView):
@@ -366,6 +391,19 @@ class ContainerField(Field):
         self.fields.append(field)
         self._field_look_up[field.name] = field
 
+    def set_value(self, value):
+        """Override set_value to set Container Field values from a dictionary.
+
+        :param value: Dictionary of data where the keys are Field names in the container and the values are the
+        individual Field values.
+        """
+        for key, v in value.iteritems():
+            field = self._field_look_up.get(key)
+            if field:
+                field.set_value(v)
+            else:
+                logger.warning('Invalid container data {0}: {1}'.format(key, v))
+
     def widget(self):
         """Get the QWidget of the Field."""
         return self.container_view.widget(self)
@@ -394,8 +432,8 @@ class ContainerView(object):
 class ArrayField(Field):
     """A field that can dynamically add or remove fields."""
 
-    def __init__(self, add_label_text='Add New Element', *args, **kwargs):
-        super(ArrayField, self).__init__(*args, **kwargs)
+    def __init__(self, name, add_label_text='Add New Element', *args, **kwargs):
+        super(ArrayField, self).__init__(name, *args, **kwargs)
         self.fields = []
         self.add_label_text = add_label_text
         self.__current = 0  # For iterator
@@ -410,6 +448,11 @@ class ArrayField(Field):
         else:
             self.__current += 1
             return self.fields[self.__current - 1]
+
+    def set_value(self, value):
+        self.fields = [copy.deepcopy(self.fields[-1]) for v in value]
+        for field, v in zip(self.fields, value):
+            field.set_value(v)
 
     def add_field(self, field):
         """Add a new Field to dynamic list.
