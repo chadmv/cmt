@@ -7,6 +7,29 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class SwingTwistView(fields.ContainerView):
+    """Customize the view of the container."""
+    def widget(self, container):
+        # The fields will be arranged in two row containers
+        # [[driver, driven], [name, twist, swing, twistAxis]]
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+        vbox = QtWidgets.QVBoxLayout(widget)
+
+        for attrs in [
+            ['driver', 'driven'],
+            ['name', 'twist', 'swing', 'twist_axis'],
+        ]:
+            hbox = QtWidgets.QHBoxLayout(widget)
+            vbox.addLayout(hbox)
+            hbox.setContentsMargins(0, 0, 0, 0)
+            for attr in attrs:
+                hbox.addWidget(QtWidgets.QLabel(container[attr].verbose_name))
+                hbox.addWidget(container[attr].widget())
+
+        return widget
+
+
 class Component(core.Component):
     """A Component that creates swingTwist nodes."""
     twist_axis = {
@@ -61,24 +84,3 @@ class Component(core.Component):
             cmds.swingTwist(driver, driven, name=name, twist=twist, swing=swing, twistAxis=twist_axis)
 
 
-class SwingTwistView(fields.ContainerView):
-    """Customize the view of the container."""
-    def widget(self, container):
-        # The fields will be arranged in two row containers
-        # [[driver, driven], [name, twist, swing, twistAxis]]
-        widget = QtWidgets.QFrame()
-        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
-        vbox = QtWidgets.QVBoxLayout(widget)
-
-        for attrs in [
-            ['driver', 'driven'],
-            ['name', 'twist', 'swing', 'twist_axis'],
-        ]:
-            hbox = QtWidgets.QHBoxLayout(widget)
-            vbox.addLayout(hbox)
-            hbox.setContentsMargins(0, 0, 0, 0)
-            for attr in attrs:
-                hbox.addWidget(QtWidgets.QLabel(container[attr].verbose_name))
-                hbox.addWidget(container[attr].widget())
-
-        return widget

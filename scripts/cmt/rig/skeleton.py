@@ -154,6 +154,23 @@ def load(file_path=None):
     return data
 
 
+def mirror(joint, search_for, replace_with):
+    joints = [joint, ] + (cmds.listRelatives(joint, ad=True, path=True) or [])
+    for joint in joints:
+        mirrored_joint = joint.replace(search_for, replace_with)
+        if cmds.objExists(mirrored_joint):
+            translate = list(cmds.getAttr('{0}.t'.format(joint))[0])
+            parent = cmds.listRelatives(joint, parent=True, path=True)
+            if parent and search_for not in parent[0]:
+                translate[2] *= -1.0
+            else:
+                translate = [x * -1.0 for x in translate]
+            cmds.setAttr('{0}.t'.format(mirrored_joint), *translate)
 
+            rotate = cmds.getAttr('{0}.r'.format(joint))[0]
+            cmds.setAttr('{0}.r'.format(mirrored_joint), *rotate)
+
+            scale = cmds.getAttr('{0}.s'.format(joint))[0]
+            cmds.setAttr('{0}.s'.format(mirrored_joint), *scale)
 
 

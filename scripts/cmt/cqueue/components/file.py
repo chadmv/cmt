@@ -5,6 +5,27 @@ import cmt.cqueue.fields as fields
 from cmt.qt import QtWidgets
 
 
+class FileView(fields.ContainerView):
+    """Customize the view of the container."""
+    def widget(self, container):
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.NoFrame)
+        layout = QtWidgets.QHBoxLayout(widget)
+        layout.addWidget(container['operation'].widget())
+
+        file_path_widget = container['file_path'].widget()
+        file_path_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        layout.addWidget(file_path_widget)
+
+        layout.addWidget(QtWidgets.QLabel(container['namespace'].verbose_name))
+        namespace_widget = container['namespace'].widget()
+        namespace_widget.setMaximumWidth(150)
+        namespace_widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
+        layout.addWidget(namespace_widget)
+
+        return widget
+
+
 class Component(core.Component):
     """A Component that imports or references in a Maya file."""
     import_operation = 'Import'
@@ -53,22 +74,3 @@ class Component(core.Component):
             cmds.file(file_path, **kwargs)
 
 
-class FileView(fields.ContainerView):
-    """Customize the view of the container."""
-    def widget(self, container):
-        widget = QtWidgets.QFrame()
-        widget.setFrameStyle(QtWidgets.QFrame.NoFrame)
-        layout = QtWidgets.QHBoxLayout(widget)
-        layout.addWidget(container['operation'].widget())
-
-        file_path_widget = container['file_path'].widget()
-        file_path_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        layout.addWidget(file_path_widget)
-
-        layout.addWidget(QtWidgets.QLabel(container['namespace'].verbose_name))
-        namespace_widget = container['namespace'].widget()
-        namespace_widget.setMaximumWidth(150)
-        namespace_widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Fixed)
-        layout.addWidget(namespace_widget)
-
-        return widget

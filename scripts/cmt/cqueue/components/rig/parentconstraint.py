@@ -7,6 +7,49 @@ import cmt.cqueue.fields as fields
 logger = logging.getLogger(__name__)
 
 
+class ParentConstraintView(fields.ContainerView):
+    """Customize the view of the container."""
+    def widget(self, container):
+        widget = QtWidgets.QFrame()
+        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+
+        hbox = QtWidgets.QHBoxLayout(widget)
+        hbox.setContentsMargins(0, 0, 0, 0)
+        label = QtWidgets.QLabel(container['drivers'].verbose_name)
+        hbox.addWidget(label)
+        drivers_widget = container['drivers'].widget()
+        drivers_widget.setMaximumHeight(65)
+        hbox.addWidget(drivers_widget)
+
+        vbox = QtWidgets.QVBoxLayout()
+        hbox.addLayout(vbox)
+
+        hbox1 = QtWidgets.QHBoxLayout()
+        vbox.addLayout(hbox1)
+        label = QtWidgets.QLabel(container['driven'].verbose_name)
+        hbox1.addWidget(label)
+        hbox1.addWidget(container['driven'].widget())
+        hbox1.addWidget(container['maintain_offset'].widget())
+
+        hbox2 = QtWidgets.QHBoxLayout()
+        vbox.addLayout(hbox2)
+        hbox2.setContentsMargins(0, 0, 0, 0)
+        hbox2.addWidget(container['skip_tx'].widget())
+        hbox2.addWidget(container['skip_ty'].widget())
+        hbox2.addWidget(container['skip_tz'].widget())
+        hbox2.addStretch()
+
+        hbox3 = QtWidgets.QHBoxLayout()
+        vbox.addLayout(hbox3)
+        hbox3.setContentsMargins(0, 0, 0, 0)
+        hbox3.addWidget(container['skip_rx'].widget())
+        hbox3.addWidget(container['skip_ry'].widget())
+        hbox3.addWidget(container['skip_rz'].widget())
+        hbox3.addStretch()
+
+        return widget
+
+
 class Component(core.Component):
     """A Component that creates parentConstraints."""
     constraints = fields.ArrayField('constraints', add_label_text='Add Parent Constraint')
@@ -118,44 +161,3 @@ def constraint_data(constraint):
     }
 
 
-class ParentConstraintView(fields.ContainerView):
-    """Customize the view of the container."""
-    def widget(self, container):
-        widget = QtWidgets.QFrame()
-        widget.setFrameStyle(QtWidgets.QFrame.StyledPanel)
-
-        hbox = QtWidgets.QHBoxLayout(widget)
-        hbox.setContentsMargins(0, 0, 0, 0)
-        label = QtWidgets.QLabel(container['drivers'].verbose_name)
-        hbox.addWidget(label)
-        drivers_widget = container['drivers'].widget()
-        drivers_widget.setMaximumHeight(65)
-        hbox.addWidget(drivers_widget)
-
-        vbox = QtWidgets.QVBoxLayout()
-        hbox.addLayout(vbox)
-
-        hbox1 = QtWidgets.QHBoxLayout()
-        vbox.addLayout(hbox1)
-        label = QtWidgets.QLabel(container['driven'].verbose_name)
-        hbox1.addWidget(label)
-        hbox1.addWidget(container['driven'].widget())
-        hbox1.addWidget(container['maintain_offset'].widget())
-
-        hbox2 = QtWidgets.QHBoxLayout()
-        vbox.addLayout(hbox2)
-        hbox2.setContentsMargins(0, 0, 0, 0)
-        hbox2.addWidget(container['skip_tx'].widget())
-        hbox2.addWidget(container['skip_ty'].widget())
-        hbox2.addWidget(container['skip_tz'].widget())
-        hbox2.addStretch()
-
-        hbox3 = QtWidgets.QHBoxLayout()
-        vbox.addLayout(hbox3)
-        hbox3.setContentsMargins(0, 0, 0, 0)
-        hbox3.addWidget(container['skip_rx'].widget())
-        hbox3.addWidget(container['skip_ry'].widget())
-        hbox3.addWidget(container['skip_rz'].widget())
-        hbox3.addStretch()
-
-        return widget

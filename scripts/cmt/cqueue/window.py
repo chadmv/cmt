@@ -74,10 +74,8 @@ _win = None
 def show():
     """Shows the CQueue window."""
     global _win
-    if _win:
-        _win.parent().close()
-        _win.parent().deleteLater()
-    _win = CQueueWindow()
+    if _win is None:
+        _win = CQueueWindow()
     _win.show(dockable=True)
     _win.parent().setAcceptDrops(True)
 
@@ -245,6 +243,11 @@ class CQueueWindow(MayaQWidgetDockableMixin, QtWidgets.QMainWindow):
                 # Only leaf nodes are Components.
                 continue
             self.queue_widget.add_component_to_queue(node.component_path)
+
+    def dockCloseEventTriggered(self):
+        global _win
+        self.deleteLater()
+        _win = None
 
 
 class ComponentNode(shortcuts.BaseTreeNode):
