@@ -139,4 +139,3 @@ def constraint_data(constraint):
             data['skip_r{0}'.format(x)] = True
     return data
 
-

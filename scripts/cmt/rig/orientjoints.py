@@ -306,18 +306,21 @@ def create_orient_manipulator(joint, material):
         p2 = cmds.xform(children[0], q=True, ws=True, t=True)
         p2 = OpenMaya.MPoint(*p2)
         radius = p1.distanceTo(p2)
-    sphere = cmds.sphere(n='{0}_forward'.format(joint), p=(0, 0, 0), ax=(0, 0, -1), ssw=0, esw=180, r=radius, d=3, ut=0, tol=0.01, s=8, nsp=4, ch=0)[0]
-    group = cmds.createNode('transform', name='{0}_grp'.format(sphere))
-    cmds.parent(sphere, group)
-    cmds.setAttr('{0}.sz'.format(sphere), 0)
-    cmds.makeIdentity(sphere, apply=True)
-    cmds.addAttr(sphere, longName=MESSAGE_ATTRIBUTE, attributeType='message')
-    cmds.connectAttr('{0}.message'.format(joint), '{0}.{1}'.format(sphere, MESSAGE_ATTRIBUTE))
-    cmds.select(sphere)
-    cmds.hyperShade(assign=material)
+    arrow_cvs = [[-1, 0, 0], [-1, 2, 0], [-2, 2, 0], [0, 4, 0], [2, 2, 0], [1, 2, 0], [1, 0, 0], [-1, 0, 0]]
+    arrow_cvs = [[x[0]*radius, x[1]*radius, x[2]*radius] for x in arrow_cvs]
+    shape = cmds.curve(name='{0}_zForward'.format(joint), degree=1, point=arrow_cvs)
+    # shape = cmds.sphere(n='{0}_zForward'.format(joint), p=(0, 0, 0), ax=(0, 0, -1), ssw=0, esw=180, r=radius, d=3, ut=0, tol=0.01, s=8, nsp=4, ch=0)[0]
+    # cmds.setAttr('{0}.sz'.format(shape), 0)
+    # cmds.select(shape)
+    # cmds.hyperShade(assign=material)
+    group = cmds.createNode('transform', name='{0}_grp'.format(shape))
+    cmds.parent(shape, group)
+    cmds.makeIdentity(shape, apply=True)
+    cmds.addAttr(shape, longName=MESSAGE_ATTRIBUTE, attributeType='message')
+    cmds.connectAttr('{0}.message'.format(joint), '{0}.{1}'.format(shape, MESSAGE_ATTRIBUTE))
     for attr in ['tx', 'ty', 'tz', 'ry', 'rz', 'v']:
-        cmds.setAttr('{0}.{1}'.format(sphere, attr), lock=True, keyable=False)
-    return group, sphere
+        cmds.setAttr('{0}.{1}'.format(shape, attr), lock=True, keyable=False)
+    return group, shape
 
 
 def get_position(node):
@@ -325,10 +328,8 @@ def get_position(node):
     return OpenMaya.MPoint(p)
 
 
-def createArrow(jointName):
+def create_arrow(jointName):
     curve = cmds.curve(name='%s_ForwardDirection' % jointName, degree=1, point=[(-1, 0, 0), (-1, 2, 0), (-2, 2, 0), (0, 4, 0), (2, 2, 0), (1, 2, 0), (1, 0, 0), (-1, 0, 0)])
-    cvtools.lockAndHide(curve, lockAndHide=['ry', 'rz', 'tx', 'ty', 'tz', 'sz', 'visibility'])
-    overrideColor.overrideColor(overrideColor.BLUE)
     group = cmds.group()
     cmds.xform(objectSpace=True, pivots=(0, 0, 0))
     jointScale = cmds.jointDisplayScale(query=True)
