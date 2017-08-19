@@ -6,44 +6,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class Component(core.Component):
-    """A Component that creates aimConstraints."""
-    constraints = fields.ArrayField('constraints', add_label_text='Add Aim Constraint')
-    container = fields.ContainerField('constraint', parent=constraints, container_view=AimConstraintView())
-    drivers = fields.MayaNodeField('drivers', multi=True, help_text='The nodes to aim at.', parent=container)
-    driven = fields.MayaNodeField('driven', help_text='The node to aim', parent=container)
-    maintain_offset = fields.BooleanField('maintain_offset', default=True, parent=container)
-    aim_vector = fields.VectorField('aim_vector', default=(1.0, 0.0, 0.0), parent=container)
-    up_vector = fields.VectorField('up_vector', default=(0.0, 1.0, 0.0), parent=container)
-    world_up_type = fields.CharField('world_up_type',
-                                     choices=['scene', 'object', 'objectrotation', 'vector', 'none'],
-                                     default='object',
-                                     parent=container)
-    world_up_vector = fields.VectorField('world_up_vector', default=(0.0, 1.0, 0.0), parent=container)
-    world_up_object = fields.MayaNodeField('world_up_object', parent=container)
-    skip_x = fields.BooleanField('skip_x', parent=container)
-    skip_y = fields.BooleanField('skip_y', parent=container)
-    skip_z = fields.BooleanField('skip_z', parent=container)
-
-    @classmethod
-    def image_path(cls):
-        return ':/aimConstraint.png'
-
-    def execute(self):
-        for container in self.constraints:
-            drivers = container['drivers'].value()
-            driven = container['driven'].value()
-            skip = [x for x in 'xyz' if container['skip_{0}'.format(x)].value()]
-            cmds.aimConstraint(drivers, driven,
-                               maintainOffset=container['maintain_offset'].value(),
-                               aimVector=container['aim_vector'].value(),
-                               upVector=container['up_vector'].value(),
-                               worldUpType=container['world_up_type'].value(),
-                               worldUpVector=container['world_up_vector'].value(),
-                               worldUpObject=container['world_up_object'].value(),
-                               skip=skip)
-
-
 class AimConstraintView(fields.ContainerView):
     """Customize the view of the container."""
     def widget(self, container):
@@ -97,4 +59,42 @@ class AimConstraintView(fields.ContainerView):
         hbox.addWidget(container['world_up_vector'].widget())
 
         return widget
+
+
+class Component(core.Component):
+    """A Component that creates aimConstraints."""
+    constraints = fields.ArrayField('constraints', add_label_text='Add Aim Constraint')
+    container = fields.ContainerField('constraint', parent=constraints, container_view=AimConstraintView())
+    drivers = fields.MayaNodeField('drivers', multi=True, help_text='The nodes to aim at.', parent=container)
+    driven = fields.MayaNodeField('driven', help_text='The node to aim', parent=container)
+    maintain_offset = fields.BooleanField('maintain_offset', default=True, parent=container)
+    aim_vector = fields.VectorField('aim_vector', default=(1.0, 0.0, 0.0), parent=container)
+    up_vector = fields.VectorField('up_vector', default=(0.0, 1.0, 0.0), parent=container)
+    world_up_type = fields.CharField('world_up_type',
+                                     choices=['scene', 'object', 'objectrotation', 'vector', 'none'],
+                                     default='object',
+                                     parent=container)
+    world_up_vector = fields.VectorField('world_up_vector', default=(0.0, 1.0, 0.0), parent=container)
+    world_up_object = fields.MayaNodeField('world_up_object', parent=container)
+    skip_x = fields.BooleanField('skip_x', parent=container)
+    skip_y = fields.BooleanField('skip_y', parent=container)
+    skip_z = fields.BooleanField('skip_z', parent=container)
+
+    @classmethod
+    def image_path(cls):
+        return ':/aimConstraint.png'
+
+    def execute(self):
+        for container in self.constraints:
+            drivers = container['drivers'].value()
+            driven = container['driven'].value()
+            skip = [x for x in 'xyz' if container['skip_{0}'.format(x)].value()]
+            cmds.aimConstraint(drivers, driven,
+                               maintainOffset=container['maintain_offset'].value(),
+                               aimVector=container['aim_vector'].value(),
+                               upVector=container['up_vector'].value(),
+                               worldUpType=container['world_up_type'].value(),
+                               worldUpVector=container['world_up_vector'].value(),
+                               worldUpObject=container['world_up_object'].value(),
+                               skip=skip)
 

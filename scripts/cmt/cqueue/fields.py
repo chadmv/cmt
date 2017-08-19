@@ -451,8 +451,8 @@ class ArrayField(Field):
 
     def set_value(self, value):
         self.fields = [copy.deepcopy(self.fields[-1]) for v in value]
-        for field, v in zip(self.fields, value):
-            field.set_value(v)
+        for field, data in zip(self.fields, value):
+            self.add_element(field=field, data=data)
 
     def add_field(self, field):
         """Add a new Field to dynamic list.
@@ -480,7 +480,7 @@ class ArrayField(Field):
         field_layout.addLayout(button_layout)
         return widget
 
-    def add_element(self, field=None, field_layout=None):
+    def add_element(self, field=None, field_layout=None, data=None):
         """Adds a new field to the Array.
 
         :param field: Optional field to add. If omitted, a copy of the last element will be added.
@@ -490,6 +490,9 @@ class ArrayField(Field):
                 raise RuntimeError('No default field set in the ArrayField.')
             field = copy.deepcopy(self.fields[-1])
             self.fields.append(field)
+        if data:
+            field.set_value(data)
+
         if field_layout:
             element_widget = QtWidgets.QWidget()
             field_layout.insertWidget(field_layout.count()-1, element_widget)
