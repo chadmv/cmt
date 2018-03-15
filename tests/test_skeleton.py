@@ -22,9 +22,9 @@ class SkeletonTests(TestCase):
         self.orients = [cmds.getAttr('{0}.jo'.format(x))[0] for x in cmds.ls(type='joint')]
 
     def test_get_and_rebuild_data(self):
-        data = skeleton.get_data(self.group)
+        data = skeleton.dumps(self.group)
         cmds.file(new=True, f=True)
-        skeleton.create_node(data)
+        skeleton.create(data)
         self.assert_hierarachies_match()
 
     def test_export_and_import_data(self):
@@ -50,7 +50,3 @@ class SkeletonTests(TestCase):
         self.assertFalse(cmds.objExists(self.cube))
         self.assertTrue(cmds.objExists(self.group))
         self.assertEqual('joint1', cmds.listRelatives(self.group, children=True)[0])
-
-    def test_truncate(self):
-        self.assertEqual(0.123456, skeleton.truncate(0.123456321312312312))
-        self.assertEqual(0.0, skeleton.truncate(-0.0000001))
