@@ -1,5 +1,8 @@
-"""Contains commonly used functions and classes shared by many modules in cmt.
-"""
+"""Contains commonly used functions and classes shared by many modules in cmt."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import re
 import maya.cmds as cmds
@@ -98,9 +101,9 @@ def get_node_in_namespace_hierarchy(node, namespace=None, shape=False):
 def get_namespace_from_name(name):
     """Gets the namespace from the given name.
 
-    >>> print get_namespace_from_name('BOB:character')
+    >>> print(get_namespace_from_name('BOB:character'))
     BOB:
-    >>> print get_namespace_from_name('YEP:BOB:character')
+    >>> print(get_namespace_from_name('YEP:BOB:character'))
     YEP:BOB:
 
     :param name: String to extract the namespace from.
@@ -117,11 +120,11 @@ def get_namespace_from_name(name):
 def remove_namespace_from_name(name):
     """Removes the namespace from the given name
 
-    >>> print remove_namespace_from_name('character')
+    >>> print(remove_namespace_from_name('character'))
     character
-    >>> print remove_namespace_from_name('BOB:character')
+    >>> print(remove_namespace_from_name('BOB:character'))
     character
-    >>> print remove_namespace_from_name('YEP:BOB:character')
+    >>> print(remove_namespace_from_name('YEP:BOB:character'))
     character
 
     :param name: The name with the namespace
@@ -233,4 +236,41 @@ def duplicate_chain(start, end, prefix='', suffix='', search_for='', replace_wit
     joints.reverse()
     original_joints.reverse()
     return joints, original_joints
+
+
+_settings = None
+
+
+def _get_settings():
+    """Get the QSettings instance"""
+    global _settings
+    try:
+        from PySide2.QtCore import QSettings
+    except ImportError:
+        from PySide.QtCore import QSettings
+    if _settings is None:
+        _settings = QSettings('Chad Vernon', 'CMT')
+    return _settings
+
+
+def get_setting(key, default_value=None):
+    """Get a value in the persistent cache.
+
+    :param key: Hash key
+    :param default_value: Value to return if key does not exist.
+    :return: Store value.
+    """
+    settings = _get_settings()
+    return settings.value(key, default_value)
+
+
+def set_setting(key, value):
+    """Set a value in the persistent cache.
+
+    :param key: Hash key
+    :param value: Value to store
+    """
+    settings = _get_settings()
+    settings.setValue(key, value)
+
 
