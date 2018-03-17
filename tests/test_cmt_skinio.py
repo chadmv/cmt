@@ -29,24 +29,24 @@ class SkinIOTests(TestCase):
             'useComponents': False,
             'weightDistribution': 0,
             'weights': {
-                u'joint1': [0.9, 0.5, 0.5, 0.0, 0.5, 0.0, 0.9, 0.5],
-                u'joint2': [0.10000000000000002,
-                            0.5,
-                            0.5,
-                            0.5,
-                            0.5,
-                            0.5,
-                            0.10000000000000002,
-                            0.5],
-                u'joint3': [0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0]}
+                'joint1': [0.9, 0.5, 0.5, 0.0, 0.5, 0.0, 0.9, 0.5],
+                'joint2': [0.10000000000000002,
+                           0.5,
+                           0.5,
+                           0.5,
+                           0.5,
+                           0.5,
+                           0.10000000000000002,
+                           0.5],
+                'joint3': [0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0]}
         }
 
     def test_skincluster_data_is_correct(self):
         skin = skinio.SkinCluster(self.skin)
         data = skin.gather_data()
-        attributes = ['skinningMethod', 'normalizeWeights', 'dropoffRate', 'maintainMaxInfluences', 'maxInfluences',
-                      'bindMethod', 'useComponents', 'normalizeWeights', 'weightDistribution', 'heatmapFalloff',
-                      'name', 'shape']
+        attributes = ['skinningMethod', 'normalizeWeights', 'dropoffRate', 'maintainMaxInfluences',
+                      'maxInfluences', 'bindMethod', 'useComponents', 'normalizeWeights',
+                      'weightDistribution', 'heatmapFalloff', 'name', 'shape']
         for attribute in attributes:
             self.assertEqual(self.expected[attribute], data[attribute])
         self.assertListAlmostEqual(self.expected['blendWeights'], data['blendWeights'])
@@ -71,6 +71,7 @@ class SkinIOTests(TestCase):
         file_path = self.get_temp_filename('temp.skin')
         skinio.export_skin(file_path, self.shape)
         cmds.skinPercent(self.skin, '{0}.vtx[0]'.format(self.shape),
-                         transformValue=[(self.joint1, 0.1), (self.joint2, 0.2), (self.joint3, 0.7)])
+                         transformValue=[(self.joint1, 0.1), (self.joint2, 0.2),
+                                         (self.joint3, 0.7)])
         skinio.import_skin(file_path)
         self.test_skincluster_data_is_correct()
