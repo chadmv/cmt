@@ -274,3 +274,13 @@ def set_setting(key, value):
     settings.setValue(key, value)
 
 
+# MScriptUtil
+def get_int_ptr():
+    util = OpenMaya.MScriptUtil()
+    util.createFromInt(0)
+    return util.asIntPtr()
+
+
+def ptr_to_int(int_ptr):
+    return OpenMaya.MScriptUtil.getInt(int_ptr)
+
