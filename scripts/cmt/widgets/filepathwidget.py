@@ -12,7 +12,7 @@ widget = FilePathWidget(label='My File',
                         file_mode=FilePathWidget.existing_file,
                         name='unique_name',
                         file_filter='Python Files (*.py)')
-widget.path_changed.connect(yup)
+widget.path_changed.connect(func)
 widget.show()
 """
 
@@ -23,6 +23,7 @@ from __future__ import print_function
 import json
 import os
 
+from PySide2.QtGui import QStringListModel
 from PySide2.QtCore import *
 from PySide2.QtWidgets import *
 
@@ -114,6 +115,14 @@ class FilePathWidget(QWidget):
         button.released.connect(self.show_dialog)
         button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self._layout.addWidget(button)
+
+    @property
+    def path(self):
+        return self._combo_box.currentText()
+
+    @path.setter
+    def path(self, value):
+        self._combo_box.setEditText(value)
 
     def edit_changed(self, text):
         """Slot called whenever the text changes in the combobox.

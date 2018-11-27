@@ -57,6 +57,9 @@ def create_menu():
 
     utility_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label='Utility')
     cmds.menuItem(parent=utility_menu,
+                  label='Run Script',
+                  command='import cmt.pipeline.runscript; cmt.pipeline.runscript.show()')
+    cmds.menuItem(parent=utility_menu,
                   label='Unit Test Runner',
                   command='import cmt.test.mayaunittestui; cmt.test.mayaunittestui.show()',
                   imageOverlayLabel='Test')
