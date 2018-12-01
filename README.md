@@ -1,7 +1,9 @@
 # cmt
-cmt is a collection of various Maya tools I have written for my personal projects.
+cmt is a collection of various Maya tools I have written for my personal projects.  Feel free to use
+the tools in your own projects or just browse the code for inspiration or to silently judge me.
 
-* Unit test runner for Maya tools.
+Full documentation can be found here: https://chadmv.github.io/cmt
+
 
 # Installation Instructions
 cmt is Maya module that can be installed like all other Maya modules.  You can do one of the following:
