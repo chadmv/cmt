@@ -26,6 +26,7 @@ from __future__ import print_function
 import logging
 
 import maya.cmds as cmds
+import maya.mel as mel
 import maya.OpenMaya as OpenMaya
 
 import cmt.shortcuts as shortcuts
@@ -37,6 +38,11 @@ REST_MATRIX = 'restMatrix'
 TWIST_WEIGHT = 'twistWeight'
 TWIST_OUTPUT = 'twistOutput'
 INVERTED_TWIST_OUTPUT = 'invertedTwistOutput'
+
+INVERT_WIDGET = 'cmt_twist_invert'
+TWIST_WEIGHT_WIDGET = 'cmt_twist_weight'
+TWIST_AXIS_ENABLE_WIDGET = 'cmt_twist_auto_axis'
+TWIST_AXIS_WIDGET = 'cmt_twist_axis'
 
 
 def create_twist_decomposition(driver, driven, invert, twist_weight=1.0,
@@ -52,8 +58,9 @@ def create_twist_decomposition(driver, driven, invert, twist_weight=1.0,
     """
     if not _twist_network_exists(driver):
         _create_twist_decomposition_network(driver, twist_axis)
-    cmds.addAttr(driven, ln=TWIST_WEIGHT, keyable=True, minValue=0, maxValue=1,
-                 defaultValue=twist_weight)
+    if not cmds.objExists('{}.{}'.format(driven, TWIST_WEIGHT)):
+        cmds.addAttr(driven, ln=TWIST_WEIGHT, keyable=True, minValue=0, maxValue=1,
+                     defaultValue=twist_weight)
 
     twist_attribute = _get_decomposed_twist_attribute(driver, invert, twist_axis)
 
@@ -69,6 +76,8 @@ def create_twist_decomposition(driver, driven, invert, twist_weight=1.0,
     cmds.connectAttr('{}.rotateOrder'.format(driven),
                      '{}.inputRotateOrder'.format(twist_euler))
     cmds.connectAttr('{}.outputRotate'.format(twist_euler), '{}.rotate'.format(driven))
+    logger.info('Created twist decomposition network to drive {} from {}'.format(
+        driven, driver))
 
 
 def _twist_network_exists(driver):
@@ -202,3 +211,122 @@ def _get_local_twist_axis(driver):
     path = shortcuts.get_dag_path(driver)
     local_vector = world_vector * path.inclusiveMatrixInverse()
     return local_vector.x, local_vector.y, local_vector.z
+
+
+def create_from_menu(*args, **kwargs):
+    sel = cmds.ls(sl=True)
+    if len(sel) != 2:
+        raise RuntimeError('Select driver transform then driven transform.')
+    driver, driven = sel
+    kwargs = get_create_command_kwargs()
+    create_twist_decomposition(driver, driven, **kwargs)
+
+
+def get_create_command_kwargs():
+    """Gets the function arguments either from the option box widgets or the saved
+    option vars.  If the widgets exist, their values will be saved to the option vars.
+
+    :return: A dictionary of the kwargs to the create_twist_decomposition function."""
+    kwargs = {}
+    if cmds.floatSliderGrp(TWIST_WEIGHT_WIDGET, exists=True):
+        kwargs['twist_weight'] = cmds.floatSliderGrp(TWIST_WEIGHT_WIDGET, q=True,
+                                                     value=True)
+        cmds.optionVar(fv=(TWIST_WEIGHT_WIDGET, kwargs['twist_weight']))
+    else:
+        kwargs['twist_weight'] = cmds.optionVar(q=TWIST_WEIGHT_WIDGET)
+
+    if cmds.checkBoxGrp(INVERT_WIDGET, exists=True):
+        value = cmds.checkBoxGrp(INVERT_WIDGET, q=True, v1=True)
+        kwargs['invert'] = value
+        cmds.optionVar(iv=(INVERT_WIDGET, value))
+    else:
+        value = cmds.optionVar(q=INVERT_WIDGET)
+        kwargs['invert'] = value
+
+    if cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, exists=True):
+        value = cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, q=True, v1=True)
+        if value:
+            x = cmds.floatFieldGrp(TWIST_AXIS_WIDGET, q=True, v1=True)
+            y = cmds.floatFieldGrp(TWIST_AXIS_WIDGET, q=True, v2=True)
+            z = cmds.floatFieldGrp(TWIST_AXIS_WIDGET, q=True, v3=True)
+            kwargs['twist_axis'] = (x, y, z)
+        else:
+            kwargs['twist_axis'] = None
+        cmds.optionVar(clearArray=TWIST_AXIS_WIDGET)
+        if kwargs['twist_axis']:
+            for v in kwargs['twist_axis']:
+                cmds.optionVar(floatValueAppend=[TWIST_AXIS_WIDGET, v])
+    else:
+        kwargs['twist_axis'] = cmds.optionVar(q=TWIST_AXIS_WIDGET)
+
+    return kwargs
+
+
+def display_menu_options(*args, **kwargs):
+    layout = mel.eval('getOptionBox')
+    cmds.setParent(layout)
+    cmds.columnLayout(adj=True)
+
+    for widget in [INVERT_WIDGET, TWIST_WEIGHT_WIDGET, TWIST_AXIS_ENABLE_WIDGET,
+                   TWIST_AXIS_WIDGET]:
+        # Delete the widgets so we don't create multiple controls with the same name
+        try:
+            cmds.deleteUI(widget, control=True)
+        except RuntimeError:
+            pass
+    invert_twist = cmds.optionVar(q=INVERT_WIDGET)
+    cmds.checkBoxGrp(INVERT_WIDGET, numberOfCheckBoxes=1, label='Invert twist',
+                     v1=invert_twist)
+
+    twist_weight = cmds.optionVar(q=TWIST_WEIGHT_WIDGET)
+    cmds.floatSliderGrp(TWIST_WEIGHT_WIDGET, label='Twist weight', field=True,
+                        minValue=0.0, maxValue=1.0, fieldMinValue=0.0,
+                        fieldMaxValue=1.0, value=twist_weight, step=0.1, precision=2)
+
+    specify_twist_axis = cmds.optionVar(q=TWIST_AXIS_ENABLE_WIDGET)
+    cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, numberOfCheckBoxes=1,
+                     label='Specify twist axis ', v1=specify_twist_axis)
+
+    twist_axis = cmds.optionVar(q=TWIST_AXIS_WIDGET)
+    twist_axis = twist_axis if twist_axis else (1, 0, 0)
+    cmds.floatFieldGrp(TWIST_AXIS_WIDGET, numberOfFields=3,
+                       label='Twist axis ', v1=twist_axis[0], v2=twist_axis[1],
+                       v3=twist_axis[2])
+
+    mel.eval('setOptionBoxTitle("Twist Decomposition Options");')
+    # mel.eval('setOptionBoxCommandName("");')
+    apply_close_button = mel.eval('getOptionBoxApplyAndCloseBtn;')
+    cmds.button(apply_close_button, e=True, command=apply_and_close)
+    apply_button = mel.eval('getOptionBoxApplyBtn;')
+    cmds.button(apply_button, e=True, command=create_from_menu)
+    reset_button = mel.eval('getOptionBoxResetBtn;')
+    # For some reason, the buttons in the menu only accept MEL.
+    cmds.button(reset_button, e=True,
+                command='python("import cmt.rig.twistdecomposition; '
+                        'twistdecomposition.reset_to_defaults()");')
+    close_button = mel.eval('getOptionBoxCloseBtn;')
+    cmds.button(close_button, e=True, command=close_option_box)
+    save_button = mel.eval('getOptionBoxSaveBtn;')
+    cmds.button(save_button, e=True,
+                command='python("import cmt.rig.twistdecomposition; '
+                        'twistdecomposition.get_create_command_kwargs()");')
+    mel.eval('showOptionBox')
+
+
+def apply_and_close(*args, **kwargs):
+    """Create the twist decomposition and close the option box."""
+    create_from_menu()
+    mel.eval('saveOptionBoxSize')
+    close_option_box()
+
+
+def close_option_box(*args, **kwargs):
+    mel.eval('hideOptionBox')
+
+
+def reset_to_defaults(*args, **kwargs):
+    """Reset the option box widgets to their defaults."""
+    cmds.floatSliderGrp(TWIST_WEIGHT, e=True, value=1)
+    cmds.checkBoxGrp(INVERT_WIDGET, e=True, v1=True)
+    cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, e=True, v1=False)
+    cmds.floatFieldGrp(TWIST_AXIS_WIDGET, e=True, v1=1.0, v2=0.0, v3=0.0)

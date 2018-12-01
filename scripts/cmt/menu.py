@@ -5,7 +5,7 @@ Contains the menu creation functions as wells as any other functions the menus r
 import webbrowser
 import maya.cmds as cmds
 import maya.mel as mel
-import cmt
+from cmt.settings import DOCUMENTATION_ROOT
 
 
 def create_menu():
@@ -37,6 +37,13 @@ def create_menu():
                   label='Import Skeleton',
                   command='import cmt.rig.skeleton as skeleton; skeleton.load()',
                   image='kinJoint.png')
+    item = cmds.menuItem(
+        parent=rig_menu,
+        label='Connect Twist Joint',
+        command='import cmt.rig.twistdecomposition as td; td.create_from_menu()')
+    cmds.menuItem(
+        parent=rig_menu, insertAfter=item, optionBox=True,
+        command='import cmt.rig.twistdecomposition as td; td.display_menu_options()')
     cmds.menuItem(parent=rig_menu, divider=True, dividerLabel='Animation Rig')
     cmds.menuItem(parent=rig_menu,
                   label='Create Control',
@@ -81,7 +88,7 @@ def create_menu():
 
 def documentation():
     """Opens the documentation web page."""
-    webbrowser.open('https://github.com/chadmv/cmt/wiki')
+    webbrowser.open(DOCUMENTATION_ROOT)
 
 
 def about():
