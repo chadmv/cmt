@@ -1,22 +1,39 @@
-"""Creates a node network to extract twist rotation of a transform.
+"""Creates a node network to extract twist rotation of a transform to drive another
+transform.
 
-Examples
-========
-# shoulder
-#   |- twist_joint1
-#   |- twist_joint2
-#   |- elbow
+The network calculates the local rotation twist offset around a specified twist axis
+relative to the local rest orientation.  This allows users to specify how much
+twist they want to propagate to another transform.  Uses include driving an upper arm
+twist joint from the shoulder and driving forearm twist joints from the wrist.
 
-create_twist_decomposition(shoulder, twist_joint1, invert=True)
-create_twist_decomposition(shoulder, twist_joint2, invert=True, twist_weight=0.5)
+Since the network uses quaternions, partial twist values between 0.0 and 1.0 will see a
+flip when the driver transform rotates past 180 degrees.
 
-# elbow
-#   |- twist_joint1
-#   |- twist_joint2
-#   |- wrist
+Example Usage
+=============
+The twist decomposition network can be accessed in the cmt menu::
 
-create_twist_decomposition(wrist, twist_joint1, invert=False, twist_weight=0.5)
-create_twist_decomposition(wrist, twist_joint2, invert=False)
+    CMT > Rigging > Connect Twist Joint
+
+Twist child of shoulder::
+
+    shoulder
+      |- twist_joint1
+      |- twist_joint2
+      |- elbow
+
+    create_twist_decomposition(shoulder, twist_joint1, invert=True)
+    create_twist_decomposition(shoulder, twist_joint2, invert=True, twist_weight=0.5)
+
+Twist forearm from wrist::
+
+    elbow
+      |- twist_joint1
+      |- twist_joint2
+      |- wrist
+
+    create_twist_decomposition(wrist, twist_joint1, invert=False, twist_weight=0.5)
+    create_twist_decomposition(wrist, twist_joint2, invert=False)
 """
 
 from __future__ import absolute_import
@@ -35,11 +52,13 @@ import cmt.shortcuts as shortcuts
 
 logger = logging.getLogger(__name__)
 
-
+# User defined attribute names used in the network
 REST_MATRIX = 'restMatrix'
 TWIST_WEIGHT = 'twistWeight'
 TWIST_OUTPUT = 'twistOutput'
 INVERTED_TWIST_OUTPUT = 'invertedTwistOutput'
+
+HELP_URL = '{}/rig/twistdecomposition.html'.format(DOCUMENTATION_ROOT)
 
 
 def create_twist_decomposition(driver, driven, invert, twist_weight=1.0,
@@ -51,7 +70,9 @@ def create_twist_decomposition(driver, driven, invert, twist_weight=1.0,
     :param driven: Driven transform
     :param invert: True to invert the twist
     :param twist_weight: 0-1 twist scalar
-    :param twist_axis: Local twist axis on driver
+    :param twist_axis: Local twist axis on driver such as (1.0, 0.0, 0.0).  If not
+        specified, the twist axis will be calculated as the vector to the first child.
+        If the driver has no children, the twist axis will be (1.0, 0.0, 0.0).
     """
     if not _twist_network_exists(driver):
         _create_twist_decomposition_network(driver, twist_axis)
@@ -220,7 +241,7 @@ def create_from_menu(*args, **kwargs):
 
 
 def display_menu_options(*args, **kwargs):
-    options = Options('Twist Decomposition Options', DOCUMENTATION_ROOT)
+    options = Options('Twist Decomposition Options', HELP_URL)
     options.show()
 
 

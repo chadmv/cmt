@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>cmt.rig.twistdecomposition &#8212; cmt  documentation</title>
+    <link rel="stylesheet" href="../../../_static/bootstrap-sphinx.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/js/jquery-1.11.0.min.js"></script>
+    <script type="text/javascript" src="../../../_static/js/jquery-fix.js"></script>
+    <script type="text/javascript" src="../../../_static/bootstrap-3.3.7/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="../../../_static/bootstrap-sphinx.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+  </head><body>
+
+  <div id="navbar" class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../../index.html">
+          cmt</a>
+        <span class="navbar-text navbar-version pull-left"><b></b></span>
+      </div>
+
+        <div class="collapse navbar-collapse nav-collapse">
+          <ul class="nav navbar-nav">
+            
+            
+              <li class="dropdown globaltoc-container">
+  <a role="button"
+     id="dLabelGlobalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="../../../index.html">Site <b class="caret"></b></a>
+  <ul class="dropdown-menu globaltoc"
+      role="menu"
+      aria-labelledby="dLabelGlobalToc"><ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation Instructions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../rigging.html">Rigging Tools</a></li>
+</ul>
+</ul>
+</li>
+              
+                <li class="dropdown">
+  <a role="button"
+     id="dLabelLocalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="#">Page <b class="caret"></b></a>
+  <ul class="dropdown-menu localtoc"
+      role="menu"
+      aria-labelledby="dLabelLocalToc"></ul>
+</li>
+              
+            
+            
+              
+                
+              
+            
+            
+            
+            
+              <li class="hidden-sm"></li>
+            
+          </ul>
+
+          
+            
+<form class="navbar-form navbar-right" action="../../../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+          
+        </div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12 content">
+      
+  <h1>Source code for cmt.rig.twistdecomposition</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Creates a node network to extract twist rotation of a transform to drive another</span>
+<span class="sd">transform.</span>
+
+<span class="sd">The network calculates the local rotation twist offset around a specified twist axis</span>
+<span class="sd">relative to the local rest orientation.  This allows users to specify how much</span>
+<span class="sd">twist they want to propagate to another transform.  Uses include driving an upper arm</span>
+<span class="sd">twist joint from the shoulder and driving forearm twist joints from the wrist.</span>
+
+<span class="sd">Since the network uses quaternions, partial twist values between 0.0 and 1.0 will see a</span>
+<span class="sd">flip when the driver transform rotates past 180 degrees.</span>
+
+<span class="sd">Example Usage</span>
+<span class="sd">=============</span>
+<span class="sd">The twist decomposition network can be accessed in the cmt menu::</span>
+
+<span class="sd">    CMT &gt; Rigging &gt; Connect Twist Joint</span>
+
+<span class="sd">Twist child of shoulder::</span>
+
+<span class="sd">    shoulder</span>
+<span class="sd">      |- twist_joint1</span>
+<span class="sd">      |- twist_joint2</span>
+<span class="sd">      |- elbow</span>
+
+<span class="sd">    create_twist_decomposition(shoulder, twist_joint1, invert=True)</span>
+<span class="sd">    create_twist_decomposition(shoulder, twist_joint2, invert=True, twist_weight=0.5)</span>
+
+<span class="sd">Twist forearm from wrist::</span>
+
+<span class="sd">    elbow</span>
+<span class="sd">      |- twist_joint1</span>
+<span class="sd">      |- twist_joint2</span>
+<span class="sd">      |- wrist</span>
+
+<span class="sd">    create_twist_decomposition(wrist, twist_joint1, invert=False, twist_weight=0.5)</span>
+<span class="sd">    create_twist_decomposition(wrist, twist_joint2, invert=False)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">absolute_import</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">maya.cmds</span> <span class="k">as</span> <span class="nn">cmds</span>
+<span class="kn">import</span> <span class="nn">maya.mel</span> <span class="k">as</span> <span class="nn">mel</span>
+<span class="kn">import</span> <span class="nn">maya.OpenMaya</span> <span class="k">as</span> <span class="nn">OpenMaya</span>
+
+<span class="kn">from</span> <span class="nn">cmt.ui.optionbox</span> <span class="k">import</span> <span class="n">OptionBox</span>
+<span class="kn">from</span> <span class="nn">cmt.settings</span> <span class="k">import</span> <span class="n">DOCUMENTATION_ROOT</span>
+<span class="kn">import</span> <span class="nn">cmt.shortcuts</span> <span class="k">as</span> <span class="nn">shortcuts</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># User defined attribute names used in the network</span>
+<span class="n">REST_MATRIX</span> <span class="o">=</span> <span class="s1">&#39;restMatrix&#39;</span>
+<span class="n">TWIST_WEIGHT</span> <span class="o">=</span> <span class="s1">&#39;twistWeight&#39;</span>
+<span class="n">TWIST_OUTPUT</span> <span class="o">=</span> <span class="s1">&#39;twistOutput&#39;</span>
+<span class="n">INVERTED_TWIST_OUTPUT</span> <span class="o">=</span> <span class="s1">&#39;invertedTwistOutput&#39;</span>
+
+<span class="n">HELP_URL</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/rig/twistdecomposition.html&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">DOCUMENTATION_ROOT</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="create_twist_decomposition"><a class="viewcode-back" href="../../../rig/twistdecomposition.html#cmt.rig.twistdecomposition.create_twist_decomposition">[docs]</a><span class="k">def</span> <span class="nf">create_twist_decomposition</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">driven</span><span class="p">,</span> <span class="n">invert</span><span class="p">,</span> <span class="n">twist_weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+                               <span class="n">twist_axis</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create a node network to drive a transforms rotation from the decomposed twist of</span>
+<span class="sd">    another transform.</span>
+
+<span class="sd">    :param driver: Driver transform</span>
+<span class="sd">    :param driven: Driven transform</span>
+<span class="sd">    :param invert: True to invert the twist</span>
+<span class="sd">    :param twist_weight: 0-1 twist scalar</span>
+<span class="sd">    :param twist_axis: Local twist axis on driver such as (1.0, 0.0, 0.0).  If not</span>
+<span class="sd">        specified, the twist axis will be calculated as the vector to the first child.</span>
+<span class="sd">        If the driver has no children, the twist axis will be (1.0, 0.0, 0.0).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_twist_network_exists</span><span class="p">(</span><span class="n">driver</span><span class="p">):</span>
+        <span class="n">_create_twist_decomposition_network</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">twist_axis</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driven</span><span class="p">,</span> <span class="n">TWIST_WEIGHT</span><span class="p">)):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">addAttr</span><span class="p">(</span><span class="n">driven</span><span class="p">,</span> <span class="n">ln</span><span class="o">=</span><span class="n">TWIST_WEIGHT</span><span class="p">,</span> <span class="n">keyable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">minValue</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">maxValue</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                     <span class="n">defaultValue</span><span class="o">=</span><span class="n">twist_weight</span><span class="p">)</span>
+
+    <span class="n">twist_attribute</span> <span class="o">=</span> <span class="n">_get_decomposed_twist_attribute</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">invert</span><span class="p">,</span> <span class="n">twist_axis</span><span class="p">)</span>
+
+    <span class="n">twist_slerp</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;quatSlerp&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_twist_slerp&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driven</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driven</span><span class="p">,</span> <span class="n">TWIST_WEIGHT</span><span class="p">),</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputT&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">twist_slerp</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.input1QuatW&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_slerp</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="n">twist_attribute</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.input2Quat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_slerp</span><span class="p">))</span>
+
+    <span class="n">twist_euler</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;quatToEuler&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_twist_euler&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driven</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_slerp</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_euler</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.rotateOrder&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driven</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputRotateOrder&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_euler</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputRotate&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_euler</span><span class="p">),</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.rotate&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driven</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Created twist decomposition network to drive </span><span class="si">{}</span><span class="s1"> from </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">driven</span><span class="p">,</span> <span class="n">driver</span><span class="p">))</span></div>
+
+
+<span class="k">def</span> <span class="nf">_twist_network_exists</span><span class="p">(</span><span class="n">driver</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Test whether the twist decomposition network already exists on driver.</span>
+
+<span class="sd">    :param driver: Driver transform</span>
+<span class="sd">    :return: True or False</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">has_twist_attribute</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">TWIST_OUTPUT</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">has_twist_attribute</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">twist_node</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">listConnections</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">TWIST_OUTPUT</span><span class="p">),</span> <span class="n">d</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">True</span> <span class="k">if</span> <span class="n">twist_node</span> <span class="k">else</span> <span class="kc">False</span>
+
+
+<span class="k">def</span> <span class="nf">_create_twist_decomposition_network</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">twist_axis</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create the twist decomposition network for driver.</span>
+
+<span class="sd">    :param driver: Driver transform</span>
+<span class="sd">    :param twist_axis: Local twist axis on driver</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Connect message attributes to the decomposed twist nodes so we can reuse them</span>
+    <span class="c1"># if the network is driving multiple nodes</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">TWIST_OUTPUT</span><span class="p">)):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">addAttr</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">ln</span><span class="o">=</span><span class="n">TWIST_OUTPUT</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="s1">&#39;message&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">INVERTED_TWIST_OUTPUT</span><span class="p">)):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">addAttr</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">ln</span><span class="o">=</span><span class="n">INVERTED_TWIST_OUTPUT</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="s1">&#39;message&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Store the current local matrix of driver to be used as a frame of reference</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">REST_MATRIX</span><span class="p">)):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">addAttr</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">ln</span><span class="o">=</span><span class="n">REST_MATRIX</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="s1">&#39;matrix&#39;</span><span class="p">)</span>
+    <span class="n">rest_matrix</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.m&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.restMatrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">),</span> <span class="n">rest_matrix</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;matrix&#39;</span><span class="p">)</span>
+    <span class="c1"># Get the local offset matrix which is the matrix from the world rest xform to</span>
+    <span class="c1"># the current world xform</span>
+    <span class="n">world_rest_matrix</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;multMatrix&#39;</span><span class="p">,</span>
+                                        <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_world_rest_matrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">attr</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="s1">&#39;parentMatrix[0]&#39;</span><span class="p">,</span> <span class="n">REST_MATRIX</span><span class="p">]):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">attr</span><span class="p">),</span>
+                         <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrixIn[</span><span class="si">{}</span><span class="s1">]&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">world_rest_matrix</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+    <span class="n">world_rest_inverse</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;inverseMatrix&#39;</span><span class="p">,</span>
+                                         <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_world_rest_inverse&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrixSum&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">world_rest_matrix</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputMatrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">world_rest_inverse</span><span class="p">))</span>
+    <span class="n">local_offset_matrix</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;multMatrix&#39;</span><span class="p">,</span>
+                                          <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_local_offset_matrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.worldMatrix[0]&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrixIn[0]&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_offset_matrix</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputMatrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">world_rest_inverse</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrixIn[1]&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_offset_matrix</span><span class="p">))</span>
+    <span class="c1"># Transform the twist axis by the local offset matrix</span>
+    <span class="k">if</span> <span class="n">twist_axis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">twist_axis</span> <span class="o">=</span> <span class="n">_get_local_twist_axis</span><span class="p">(</span><span class="n">driver</span><span class="p">)</span>
+    <span class="n">local_twist_axis</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;vectorProduct&#39;</span><span class="p">,</span>
+                                       <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_twist_axis&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.operation&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_twist_axis</span><span class="p">),</span> <span class="mi">3</span><span class="p">)</span>  <span class="c1"># Vector Matrix Product</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.input1&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_twist_axis</span><span class="p">),</span> <span class="o">*</span><span class="n">twist_axis</span><span class="p">)</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrixSum&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_offset_matrix</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_twist_axis</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.normalizeOutput&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_twist_axis</span><span class="p">),</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Get the angle between the rest and transformed twist axis to get the swing</span>
+    <span class="c1"># rotation</span>
+    <span class="n">swing_euler</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;angleBetween&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_swing_euler&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.input1&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_twist_axis</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.vector1&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing_euler</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.output&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_twist_axis</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.vector2&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing_euler</span><span class="p">))</span>
+    <span class="c1"># Convert the swing euler rotation to quaternion</span>
+    <span class="n">swing</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;eulerToQuat&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_swing&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.euler&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing_euler</span><span class="p">),</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputRotate&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing</span><span class="p">))</span>
+    <span class="c1"># Remove the inverse swing from the local offset to be left with the twist</span>
+    <span class="n">swing_inverse</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;quatInvert&#39;</span><span class="p">,</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_swing_inverse&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing_inverse</span><span class="p">))</span>
+    <span class="n">local_rotation</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;decomposeMatrix&#39;</span><span class="p">,</span>
+                                     <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_local_rotation&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.matrixSum&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_offset_matrix</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputMatrix&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_rotation</span><span class="p">))</span>
+    <span class="n">twist</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;quatProd&#39;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_twist&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">local_rotation</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.input1Quat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">swing_inverse</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.input2Quat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.message&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist</span><span class="p">),</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">TWIST_OUTPUT</span><span class="p">))</span>
+
+    <span class="n">twist_inverse</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s1">&#39;quatInvert&#39;</span><span class="p">,</span>
+                                    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_twist_inverse&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.inputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_inverse</span><span class="p">))</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.message&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">twist_inverse</span><span class="p">),</span>
+                     <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">INVERTED_TWIST_OUTPUT</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_get_decomposed_twist_attribute</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">invert</span><span class="p">,</span> <span class="n">twist_axis</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get the quaternion output attribute of the twist decomposition network.</span>
+
+<span class="sd">    :param driver: Driver transform</span>
+<span class="sd">    :param invert: True to get the inverted twist attribute</span>
+<span class="sd">    :param twist_axis: Local twist axis of driver</span>
+<span class="sd">    :return: The quaternion output attribute</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">attribute</span> <span class="o">=</span> <span class="n">INVERTED_TWIST_OUTPUT</span> <span class="k">if</span> <span class="n">invert</span> <span class="k">else</span> <span class="n">TWIST_OUTPUT</span>
+    <span class="n">node</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">listConnections</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">attribute</span><span class="p">),</span> <span class="n">d</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">node</span><span class="p">:</span>
+        <span class="c1"># The network isn&#39;t connected so create it</span>
+        <span class="n">_create_twist_decomposition_network</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">twist_axis</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_get_decomposed_twist_attribute</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">invert</span><span class="p">,</span> <span class="n">twist_axis</span><span class="p">)</span>
+    <span class="k">return</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.outputQuat&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+
+<span class="k">def</span> <span class="nf">_get_local_twist_axis</span><span class="p">(</span><span class="n">driver</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Procedurally calculate and return the local twist axis of driver.</span>
+
+<span class="sd">    The twist axis will be the normalized vector to the first child.</span>
+
+<span class="sd">    :param driver: Driver transform</span>
+<span class="sd">    :return: Normalized (x, y, z) vector</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">listRelatives</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">children</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">children</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span>
+
+    <span class="n">child</span> <span class="o">=</span> <span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">xform</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ws</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MPoint</span><span class="p">(</span><span class="o">*</span><span class="n">p1</span><span class="p">)</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">xform</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ws</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MPoint</span><span class="p">(</span><span class="o">*</span><span class="n">p2</span><span class="p">)</span>
+
+    <span class="n">world_vector</span> <span class="o">=</span> <span class="p">(</span><span class="n">p2</span> <span class="o">-</span> <span class="n">p1</span><span class="p">)</span><span class="o">.</span><span class="n">normal</span><span class="p">()</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_dag_path</span><span class="p">(</span><span class="n">driver</span><span class="p">)</span>
+    <span class="n">local_vector</span> <span class="o">=</span> <span class="n">world_vector</span> <span class="o">*</span> <span class="n">path</span><span class="o">.</span><span class="n">inclusiveMatrixInverse</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">local_vector</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">local_vector</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">local_vector</span><span class="o">.</span><span class="n">z</span>
+
+
+<span class="k">def</span> <span class="nf">create_from_menu</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">sel</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sel</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;Select driver transform then driven transform.&#39;</span><span class="p">)</span>
+    <span class="n">driver</span><span class="p">,</span> <span class="n">driven</span> <span class="o">=</span> <span class="n">sel</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="n">Options</span><span class="o">.</span><span class="n">get_kwargs</span><span class="p">()</span>
+    <span class="n">create_twist_decomposition</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">driven</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">display_menu_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="p">(</span><span class="s1">&#39;Twist Decomposition Options&#39;</span><span class="p">,</span> <span class="n">HELP_URL</span><span class="p">)</span>
+    <span class="n">options</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+
+<span class="k">class</span> <span class="nc">Options</span><span class="p">(</span><span class="n">OptionBox</span><span class="p">):</span>
+    <span class="n">INVERT_WIDGET</span> <span class="o">=</span> <span class="s1">&#39;cmt_twist_invert&#39;</span>
+    <span class="n">TWIST_WEIGHT_WIDGET</span> <span class="o">=</span> <span class="s1">&#39;cmt_twist_weight&#39;</span>
+    <span class="n">TWIST_AXIS_ENABLE_WIDGET</span> <span class="o">=</span> <span class="s1">&#39;cmt_twist_auto_axis&#39;</span>
+    <span class="n">TWIST_AXIS_WIDGET</span> <span class="o">=</span> <span class="s1">&#39;cmt_twist_axis&#39;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_kwargs</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Gets the function arguments either from the option box widgets or the saved</span>
+<span class="sd">        option vars.  If the widgets exist, their values will be saved to the option</span>
+<span class="sd">        vars.</span>
+
+<span class="sd">        :return: A dictionary of the arguments to the create_twist_decomposition</span>
+<span class="sd">        function.&quot;&quot;&quot;</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">cmds</span><span class="o">.</span><span class="n">floatSliderGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">,</span> <span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_weight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">floatSliderGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">,</span>
+                                                         <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">fv</span><span class="o">=</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_weight&#39;</span><span class="p">]))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_weight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">,</span> <span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;invert&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">iv</span><span class="o">=</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">)</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;invert&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+        <span class="k">if</span> <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_ENABLE_WIDGET</span><span class="p">,</span> <span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_ENABLE_WIDGET</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">floatFieldGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">floatFieldGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v2</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">z</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">floatFieldGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v3</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_axis&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_axis&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">clearArray</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_axis&#39;</span><span class="p">]:</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_axis&#39;</span><span class="p">]:</span>
+                    <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">floatValueAppend</span><span class="o">=</span><span class="p">[</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">v</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;twist_axis&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">kwargs</span>
+
+    <span class="k">def</span> <span class="nf">create_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">columnLayout</span><span class="p">(</span><span class="n">adj</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">widget</span> <span class="ow">in</span> <span class="p">[</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">,</span>
+                       <span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">,</span>
+                       <span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_ENABLE_WIDGET</span><span class="p">,</span>
+                       <span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">]:</span>
+            <span class="c1"># Delete the widgets so we don&#39;t create multiple controls with the same name</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">deleteUI</span><span class="p">(</span><span class="n">widget</span><span class="p">,</span> <span class="n">control</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="n">invert_twist</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">,</span> <span class="n">numberOfCheckBoxes</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                         <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Invert twist&#39;</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="n">invert_twist</span><span class="p">)</span>
+
+        <span class="n">twist_weight</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">floatSliderGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Twist weight&#39;</span><span class="p">,</span>
+                            <span class="n">field</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">minValue</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">maxValue</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">fieldMinValue</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+                            <span class="n">fieldMaxValue</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">twist_weight</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+                            <span class="n">precision</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">specify_twist_axis</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_ENABLE_WIDGET</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_ENABLE_WIDGET</span><span class="p">,</span> <span class="n">numberOfCheckBoxes</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                         <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Specify twist axis &#39;</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="n">specify_twist_axis</span><span class="p">,</span>
+                         <span class="n">cc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">on_axis_enable_changed</span><span class="p">)</span>
+
+        <span class="n">twist_axis</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">optionVar</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">)</span>
+        <span class="n">twist_axis</span> <span class="o">=</span> <span class="n">twist_axis</span> <span class="k">if</span> <span class="n">twist_axis</span> <span class="k">else</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">floatFieldGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">numberOfFields</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+                           <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Twist axis &#39;</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="n">twist_axis</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v2</span><span class="o">=</span><span class="n">twist_axis</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                           <span class="n">v3</span><span class="o">=</span><span class="n">twist_axis</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">enable</span><span class="o">=</span><span class="n">specify_twist_axis</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">on_axis_enable_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">floatFieldGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">enable</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">on_apply</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">create_from_menu</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">on_reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">floatSliderGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_WEIGHT_WIDGET</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">INVERT_WIDGET</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">checkBoxGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_ENABLE_WIDGET</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">floatFieldGrp</span><span class="p">(</span><span class="n">Options</span><span class="o">.</span><span class="n">TWIST_AXIS_WIDGET</span><span class="p">,</span> <span class="n">e</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">v1</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">v2</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">v3</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">on_save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Options</span><span class="o">.</span><span class="n">get_kwargs</span><span class="p">()</span>
+</pre></div>
+
+    </div>
+      
+  </div>
+</div>
+<footer class="footer">
+  <div class="container">
+    <p class="pull-right">
+      <a href="#">Back to top</a>
+      
+    </p>
+    <p>
+        &copy; Copyright 2018, Chad Vernon.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.2.<br/>
+    </p>
+  </div>
+</footer>
+  </body>
+</html>

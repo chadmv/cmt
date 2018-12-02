@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Twist Decomposition &#8212; cmt  documentation</title>
+    <link rel="stylesheet" href="../_static/bootstrap-sphinx.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/js/jquery-1.11.0.min.js"></script>
+    <script type="text/javascript" src="../_static/js/jquery-fix.js"></script>
+    <script type="text/javascript" src="../_static/bootstrap-3.3.7/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="../_static/bootstrap-sphinx.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Rigging Tools" href="../rigging.html" />
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+  </head><body>
+
+  <div id="navbar" class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../index.html">
+          cmt</a>
+        <span class="navbar-text navbar-version pull-left"><b></b></span>
+      </div>
+
+        <div class="collapse navbar-collapse nav-collapse">
+          <ul class="nav navbar-nav">
+            
+            
+              <li class="dropdown globaltoc-container">
+  <a role="button"
+     id="dLabelGlobalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="../index.html">Site <b class="caret"></b></a>
+  <ul class="dropdown-menu globaltoc"
+      role="menu"
+      aria-labelledby="dLabelGlobalToc"><ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Instructions</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../rigging.html">Rigging Tools</a></li>
+</ul>
+</ul>
+</li>
+              
+                <li class="dropdown">
+  <a role="button"
+     id="dLabelLocalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="#">Page <b class="caret"></b></a>
+  <ul class="dropdown-menu localtoc"
+      role="menu"
+      aria-labelledby="dLabelLocalToc"><ul>
+<li><a class="reference internal" href="#">Twist Decomposition</a><ul>
+<li><a class="reference internal" href="#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+</ul>
+</li>
+              
+            
+            
+              
+                
+  <li>
+    <a href="../rigging.html" title="Previous Chapter: Rigging Tools"><span class="glyphicon glyphicon-chevron-left visible-sm"></span><span class="hidden-sm hidden-tablet">&laquo; Rigging Tools</span>
+    </a>
+  </li>
+              
+            
+            
+            
+            
+              <li class="hidden-sm">
+<div id="sourcelink">
+  <a href="../_sources/rig/twistdecomposition.rst.txt"
+     rel="nofollow">Source</a>
+</div></li>
+            
+          </ul>
+
+          
+            
+<form class="navbar-form navbar-right" action="../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+          
+        </div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12 content">
+      
+  <div class="section" id="module-cmt.rig.twistdecomposition">
+<span id="twist-decomposition"></span><h1>Twist Decomposition<a class="headerlink" href="#module-cmt.rig.twistdecomposition" title="Permalink to this headline">¶</a></h1>
+<p>Creates a node network to extract twist rotation of a transform to drive another
+transform.</p>
+<p>The network calculates the local rotation twist offset around a specified twist axis
+relative to the local rest orientation.  This allows users to specify how much
+twist they want to propagate to another transform.  Uses include driving an upper arm
+twist joint from the shoulder and driving forearm twist joints from the wrist.</p>
+<p>Since the network uses quaternions, partial twist values between 0.0 and 1.0 will see a
+flip when the driver transform rotates past 180 degrees.</p>
+<div class="section" id="example-usage">
+<h2>Example Usage<a class="headerlink" href="#example-usage" title="Permalink to this headline">¶</a></h2>
+<p>The twist decomposition network can be accessed in the cmt menu:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CMT</span> <span class="o">&gt;</span> <span class="n">Rigging</span> <span class="o">&gt;</span> <span class="n">Connect</span> <span class="n">Twist</span> <span class="n">Joint</span>
+</pre></div>
+</div>
+<p>Twist child of shoulder:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">shoulder</span>
+  <span class="o">|-</span> <span class="n">twist_joint1</span>
+  <span class="o">|-</span> <span class="n">twist_joint2</span>
+  <span class="o">|-</span> <span class="n">elbow</span>
+
+<span class="n">create_twist_decomposition</span><span class="p">(</span><span class="n">shoulder</span><span class="p">,</span> <span class="n">twist_joint1</span><span class="p">,</span> <span class="n">invert</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">create_twist_decomposition</span><span class="p">(</span><span class="n">shoulder</span><span class="p">,</span> <span class="n">twist_joint2</span><span class="p">,</span> <span class="n">invert</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">twist_weight</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Twist forearm from wrist:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">elbow</span>
+  <span class="o">|-</span> <span class="n">twist_joint1</span>
+  <span class="o">|-</span> <span class="n">twist_joint2</span>
+  <span class="o">|-</span> <span class="n">wrist</span>
+
+<span class="n">create_twist_decomposition</span><span class="p">(</span><span class="n">wrist</span><span class="p">,</span> <span class="n">twist_joint1</span><span class="p">,</span> <span class="n">invert</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">twist_weight</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">create_twist_decomposition</span><span class="p">(</span><span class="n">wrist</span><span class="p">,</span> <span class="n">twist_joint2</span><span class="p">,</span> <span class="n">invert</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="cmt.rig.twistdecomposition.create_twist_decomposition">
+<code class="descclassname">cmt.rig.twistdecomposition.</code><code class="descname">create_twist_decomposition</code><span class="sig-paren">(</span><em>driver</em>, <em>driven</em>, <em>invert</em>, <em>twist_weight=1.0</em>, <em>twist_axis=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/twistdecomposition.html#create_twist_decomposition"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.twistdecomposition.create_twist_decomposition" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a node network to drive a transforms rotation from the decomposed twist of
+another transform.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>driver</strong> – Driver transform</li>
+<li><strong>driven</strong> – Driven transform</li>
+<li><strong>invert</strong> – True to invert the twist</li>
+<li><strong>twist_weight</strong> – 0-1 twist scalar</li>
+<li><strong>twist_axis</strong> – Local twist axis on driver such as (1.0, 0.0, 0.0).  If not
+specified, the twist axis will be calculated as the vector to the first child.
+If the driver has no children, the twist axis will be (1.0, 0.0, 0.0).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<img alt="../_images/twistdecomposition.png" src="../_images/twistdecomposition.png" />
+</div>
+
+
+    </div>
+      
+  </div>
+</div>
+<footer class="footer">
+  <div class="container">
+    <p class="pull-right">
+      <a href="#">Back to top</a>
+      
+    </p>
+    <p>
+        &copy; Copyright 2018, Chad Vernon.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.2.<br/>
+    </p>
+  </div>
+</footer>
+  </body>
+</html>
