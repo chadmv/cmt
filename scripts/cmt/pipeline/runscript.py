@@ -13,7 +13,7 @@ from PySide2.QtCore import *
 from PySide2.QtWidgets import *
 
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
-from cmt.widgets.filepathwidget import FilePathWidget, StringCache
+from cmt.ui.widgets.filepathwidget import FilePathWidget, StringCache
 
 logger = logging.getLogger(__name__)
 

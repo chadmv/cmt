@@ -3,12 +3,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import logging
 import os
 import re
+
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
 
-import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +57,8 @@ def get_shape(node, intermediate=False):
             shapes = []
         for shape in shapes:
             is_intermediate = cmds.getAttr('%s.intermediateObject' % shape)
-            if intermediate and is_intermediate and cmds.listConnections(shape, source=False):
+            if intermediate and is_intermediate and cmds.listConnections(shape,
+                                                                         source=False):
                 return shape
             elif not intermediate and not is_intermediate:
                 return shape
@@ -87,7 +90,7 @@ def get_node_in_namespace_hierarchy(node, namespace=None, shape=False):
 
     if node and namespace:
         # See if it exists in the namespace or any child namespaces
-        namespaces = [namespace.replace(':', ''),]
+        namespaces = [namespace.replace(':', ''), ]
         namespaces += cmds.namespaceInfo(namespace, r=True, lon=True) or []
         for namespace in namespaces:
             namespaced_node = '{0}:{1}'.format(namespace, node)
@@ -137,7 +140,8 @@ def remove_namespace_from_name(name):
 
 
 class BaseTreeNode(object):
-    """Base tree node that contains hierarchical functionality for use in a QAbstractItemModel"""
+    """Base tree node that contains hierarchical functionality for use in a
+    QAbstractItemModel"""
 
     def __init__(self, parent=None):
         self.children = []
@@ -149,7 +153,7 @@ class BaseTreeNode(object):
     def add_child(self, child):
         """Add a child to the node.
 
-        @param child: Child node to add."""
+        :param child: Child node to add."""
         if child not in self.children:
             self.children.append(child)
 
@@ -165,8 +169,10 @@ class BaseTreeNode(object):
     def child(self, row):
         """Get the child at the specified index.
 
-        @param row: The child index.
-        @return The tree node at the given index or None if the index was out of bounds."""
+        :param row: The child index.
+        :return: The tree node at the given index or None if the index was out of
+        bounds.
+        """
         try:
             return self.children[row]
         except IndexError:
@@ -208,11 +214,16 @@ def get_icon_path(name):
 
 
 def duplicate_chain(start, end, prefix='', suffix='', search_for='', replace_with=''):
-    """ Duplicates the transform chain starting at start and ending at end.
+    """Duplicates the transform chain starting at start and ending at end.
 
     :param start: The start transform.
     :param end: The end transform.
-    :return: A list of the duplicated joints, a list of the original joints that were duplicated
+    :param prefix: Prefix to add to the new chain.
+    :param suffix: Suffix to add to the new chain.
+    :param search_for: Search for token
+    :param replace_with: Replace token
+    :return: A list of the duplicated joints, a list of the original joints that were
+    duplicated.
     """
     joint = end
     joints = []
@@ -283,4 +294,3 @@ def get_int_ptr():
 
 def ptr_to_int(int_ptr):
     return OpenMaya.MScriptUtil.getInt(int_ptr)
-

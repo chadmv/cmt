@@ -29,6 +29,8 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMaya as OpenMaya
 
+from cmt.ui.optionbox import OptionBox
+from cmt.settings import DOCUMENTATION_ROOT
 import cmt.shortcuts as shortcuts
 
 logger = logging.getLogger(__name__)
@@ -38,11 +40,6 @@ REST_MATRIX = 'restMatrix'
 TWIST_WEIGHT = 'twistWeight'
 TWIST_OUTPUT = 'twistOutput'
 INVERTED_TWIST_OUTPUT = 'invertedTwistOutput'
-
-INVERT_WIDGET = 'cmt_twist_invert'
-TWIST_WEIGHT_WIDGET = 'cmt_twist_weight'
-TWIST_AXIS_ENABLE_WIDGET = 'cmt_twist_auto_axis'
-TWIST_AXIS_WIDGET = 'cmt_twist_axis'
 
 
 def create_twist_decomposition(driver, driven, invert, twist_weight=1.0,
@@ -218,115 +215,107 @@ def create_from_menu(*args, **kwargs):
     if len(sel) != 2:
         raise RuntimeError('Select driver transform then driven transform.')
     driver, driven = sel
-    kwargs = get_create_command_kwargs()
+    kwargs = Options.get_kwargs()
     create_twist_decomposition(driver, driven, **kwargs)
 
 
-def get_create_command_kwargs():
-    """Gets the function arguments either from the option box widgets or the saved
-    option vars.  If the widgets exist, their values will be saved to the option vars.
-
-    :return: A dictionary of the kwargs to the create_twist_decomposition function."""
-    kwargs = {}
-    if cmds.floatSliderGrp(TWIST_WEIGHT_WIDGET, exists=True):
-        kwargs['twist_weight'] = cmds.floatSliderGrp(TWIST_WEIGHT_WIDGET, q=True,
-                                                     value=True)
-        cmds.optionVar(fv=(TWIST_WEIGHT_WIDGET, kwargs['twist_weight']))
-    else:
-        kwargs['twist_weight'] = cmds.optionVar(q=TWIST_WEIGHT_WIDGET)
-
-    if cmds.checkBoxGrp(INVERT_WIDGET, exists=True):
-        value = cmds.checkBoxGrp(INVERT_WIDGET, q=True, v1=True)
-        kwargs['invert'] = value
-        cmds.optionVar(iv=(INVERT_WIDGET, value))
-    else:
-        value = cmds.optionVar(q=INVERT_WIDGET)
-        kwargs['invert'] = value
-
-    if cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, exists=True):
-        value = cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, q=True, v1=True)
-        if value:
-            x = cmds.floatFieldGrp(TWIST_AXIS_WIDGET, q=True, v1=True)
-            y = cmds.floatFieldGrp(TWIST_AXIS_WIDGET, q=True, v2=True)
-            z = cmds.floatFieldGrp(TWIST_AXIS_WIDGET, q=True, v3=True)
-            kwargs['twist_axis'] = (x, y, z)
-        else:
-            kwargs['twist_axis'] = None
-        cmds.optionVar(clearArray=TWIST_AXIS_WIDGET)
-        if kwargs['twist_axis']:
-            for v in kwargs['twist_axis']:
-                cmds.optionVar(floatValueAppend=[TWIST_AXIS_WIDGET, v])
-    else:
-        kwargs['twist_axis'] = cmds.optionVar(q=TWIST_AXIS_WIDGET)
-
-    return kwargs
-
-
 def display_menu_options(*args, **kwargs):
-    layout = mel.eval('getOptionBox')
-    cmds.setParent(layout)
-    cmds.columnLayout(adj=True)
-
-    for widget in [INVERT_WIDGET, TWIST_WEIGHT_WIDGET, TWIST_AXIS_ENABLE_WIDGET,
-                   TWIST_AXIS_WIDGET]:
-        # Delete the widgets so we don't create multiple controls with the same name
-        try:
-            cmds.deleteUI(widget, control=True)
-        except RuntimeError:
-            pass
-    invert_twist = cmds.optionVar(q=INVERT_WIDGET)
-    cmds.checkBoxGrp(INVERT_WIDGET, numberOfCheckBoxes=1, label='Invert twist',
-                     v1=invert_twist)
-
-    twist_weight = cmds.optionVar(q=TWIST_WEIGHT_WIDGET)
-    cmds.floatSliderGrp(TWIST_WEIGHT_WIDGET, label='Twist weight', field=True,
-                        minValue=0.0, maxValue=1.0, fieldMinValue=0.0,
-                        fieldMaxValue=1.0, value=twist_weight, step=0.1, precision=2)
-
-    specify_twist_axis = cmds.optionVar(q=TWIST_AXIS_ENABLE_WIDGET)
-    cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, numberOfCheckBoxes=1,
-                     label='Specify twist axis ', v1=specify_twist_axis)
-
-    twist_axis = cmds.optionVar(q=TWIST_AXIS_WIDGET)
-    twist_axis = twist_axis if twist_axis else (1, 0, 0)
-    cmds.floatFieldGrp(TWIST_AXIS_WIDGET, numberOfFields=3,
-                       label='Twist axis ', v1=twist_axis[0], v2=twist_axis[1],
-                       v3=twist_axis[2])
-
-    mel.eval('setOptionBoxTitle("Twist Decomposition Options");')
-    # mel.eval('setOptionBoxCommandName("");')
-    apply_close_button = mel.eval('getOptionBoxApplyAndCloseBtn;')
-    cmds.button(apply_close_button, e=True, command=apply_and_close)
-    apply_button = mel.eval('getOptionBoxApplyBtn;')
-    cmds.button(apply_button, e=True, command=create_from_menu)
-    reset_button = mel.eval('getOptionBoxResetBtn;')
-    # For some reason, the buttons in the menu only accept MEL.
-    cmds.button(reset_button, e=True,
-                command='python("import cmt.rig.twistdecomposition; '
-                        'twistdecomposition.reset_to_defaults()");')
-    close_button = mel.eval('getOptionBoxCloseBtn;')
-    cmds.button(close_button, e=True, command=close_option_box)
-    save_button = mel.eval('getOptionBoxSaveBtn;')
-    cmds.button(save_button, e=True,
-                command='python("import cmt.rig.twistdecomposition; '
-                        'twistdecomposition.get_create_command_kwargs()");')
-    mel.eval('showOptionBox')
+    options = Options('Twist Decomposition Options', DOCUMENTATION_ROOT)
+    options.show()
 
 
-def apply_and_close(*args, **kwargs):
-    """Create the twist decomposition and close the option box."""
-    create_from_menu()
-    mel.eval('saveOptionBoxSize')
-    close_option_box()
+class Options(OptionBox):
+    INVERT_WIDGET = 'cmt_twist_invert'
+    TWIST_WEIGHT_WIDGET = 'cmt_twist_weight'
+    TWIST_AXIS_ENABLE_WIDGET = 'cmt_twist_auto_axis'
+    TWIST_AXIS_WIDGET = 'cmt_twist_axis'
 
+    @classmethod
+    def get_kwargs(cls):
+        """Gets the function arguments either from the option box widgets or the saved
+        option vars.  If the widgets exist, their values will be saved to the option
+        vars.
 
-def close_option_box(*args, **kwargs):
-    mel.eval('hideOptionBox')
+        :return: A dictionary of the arguments to the create_twist_decomposition
+        function."""
+        kwargs = {}
+        if cmds.floatSliderGrp(Options.TWIST_WEIGHT_WIDGET, exists=True):
+            kwargs['twist_weight'] = cmds.floatSliderGrp(Options.TWIST_WEIGHT_WIDGET,
+                                                         q=True, value=True)
+            cmds.optionVar(fv=(Options.TWIST_WEIGHT_WIDGET, kwargs['twist_weight']))
+        else:
+            kwargs['twist_weight'] = cmds.optionVar(q=Options.TWIST_WEIGHT_WIDGET)
 
+        if cmds.checkBoxGrp(Options.INVERT_WIDGET, exists=True):
+            value = cmds.checkBoxGrp(Options.INVERT_WIDGET, q=True, v1=True)
+            kwargs['invert'] = value
+            cmds.optionVar(iv=(Options.INVERT_WIDGET, value))
+        else:
+            value = cmds.optionVar(q=Options.INVERT_WIDGET)
+            kwargs['invert'] = value
 
-def reset_to_defaults(*args, **kwargs):
-    """Reset the option box widgets to their defaults."""
-    cmds.floatSliderGrp(TWIST_WEIGHT, e=True, value=1)
-    cmds.checkBoxGrp(INVERT_WIDGET, e=True, v1=True)
-    cmds.checkBoxGrp(TWIST_AXIS_ENABLE_WIDGET, e=True, v1=False)
-    cmds.floatFieldGrp(TWIST_AXIS_WIDGET, e=True, v1=1.0, v2=0.0, v3=0.0)
+        if cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, exists=True):
+            value = cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, q=True, v1=True)
+            if value:
+                x = cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, q=True, v1=True)
+                y = cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, q=True, v2=True)
+                z = cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, q=True, v3=True)
+                kwargs['twist_axis'] = (x, y, z)
+            else:
+                kwargs['twist_axis'] = None
+            cmds.optionVar(clearArray=Options.TWIST_AXIS_WIDGET)
+            if kwargs['twist_axis']:
+                for v in kwargs['twist_axis']:
+                    cmds.optionVar(floatValueAppend=[Options.TWIST_AXIS_WIDGET, v])
+        else:
+            kwargs['twist_axis'] = cmds.optionVar(q=Options.TWIST_AXIS_WIDGET)
+
+        return kwargs
+
+    def create_ui(self):
+        cmds.columnLayout(adj=True)
+
+        for widget in [Options.INVERT_WIDGET,
+                       Options.TWIST_WEIGHT_WIDGET,
+                       Options.TWIST_AXIS_ENABLE_WIDGET,
+                       Options.TWIST_AXIS_WIDGET]:
+            # Delete the widgets so we don't create multiple controls with the same name
+            try:
+                cmds.deleteUI(widget, control=True)
+            except RuntimeError:
+                pass
+        invert_twist = cmds.optionVar(q=Options.INVERT_WIDGET)
+        cmds.checkBoxGrp(Options.INVERT_WIDGET, numberOfCheckBoxes=1,
+                         label='Invert twist', v1=invert_twist)
+
+        twist_weight = cmds.optionVar(q=Options.TWIST_WEIGHT_WIDGET)
+        cmds.floatSliderGrp(Options.TWIST_WEIGHT_WIDGET, label='Twist weight',
+                            field=True, minValue=0.0, maxValue=1.0, fieldMinValue=0.0,
+                            fieldMaxValue=1.0, value=twist_weight, step=0.1,
+                            precision=2)
+
+        specify_twist_axis = cmds.optionVar(q=Options.TWIST_AXIS_ENABLE_WIDGET)
+        cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, numberOfCheckBoxes=1,
+                         label='Specify twist axis ', v1=specify_twist_axis,
+                         cc=self.on_axis_enable_changed)
+
+        twist_axis = cmds.optionVar(q=Options.TWIST_AXIS_WIDGET)
+        twist_axis = twist_axis if twist_axis else (1, 0, 0)
+        cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, numberOfFields=3,
+                           label='Twist axis ', v1=twist_axis[0], v2=twist_axis[1],
+                           v3=twist_axis[2], enable=specify_twist_axis)
+
+    def on_axis_enable_changed(self, value):
+        cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, e=True, enable=value)
+
+    def on_apply(self):
+        create_from_menu()
+
+    def on_reset(self):
+        cmds.floatSliderGrp(Options.TWIST_WEIGHT_WIDGET, e=True, value=1)
+        cmds.checkBoxGrp(Options.INVERT_WIDGET, e=True, v1=True)
+        cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, e=True, v1=False)
+        cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, e=True, v1=1.0, v2=0.0, v3=0.0)
+
+    def on_save(self):
+        Options.get_kwargs()
