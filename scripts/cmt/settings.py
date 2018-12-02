@@ -1,1 +1,1 @@
-DOCUMENTATION_ROOT = 'https://chadmv.github.io/cmt'
+DOCUMENTATION_ROOT = 'https://chadmv.github.io/cmt/html'
