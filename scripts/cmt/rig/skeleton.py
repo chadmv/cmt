@@ -4,7 +4,7 @@ Example usage:
 See test_skeleton.py
 
 import cmt.rig.skeleton as skeleton
-skeleton.dump('skeleton_grp', json_file)
+skeleton.dump('root_joint', json_file)
 cmds.file(new=True, f=True)
 skeleton.load(json_file)
 """
@@ -152,14 +152,12 @@ def create(data_list):
             node = cmds.createNode(data["nodeType"], name=node)
         parent = data["parent"]
         if parent and cmds.objExists(parent):
-            print(parent)
             cmds.parent(node, parent)
         for attr in ATTRIBUTES:
             attribute = "{}.{}".format(node, attr)
             if not cmds.objExists(attribute):
                 continue
             value = data[attr]
-            print(attr, value)
             if isinstance(value, string_types):
                 cmds.setAttr(attribute, value, type="string")
             elif isinstance(value, list):
