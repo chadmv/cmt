@@ -27,6 +27,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 import logging
+
 log = logging.getLogger(__name__)
 
 
@@ -35,5 +36,5 @@ def initialize():
     Runs any initialization for CMT such as creating the menu.
     """
     import cmt.menu
-    cmt.menu.create_menu()
 
+    cmt.menu.create_menu()

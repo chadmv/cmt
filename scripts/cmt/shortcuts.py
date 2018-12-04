@@ -51,21 +51,24 @@ def get_shape(node, intermediate=False):
     :param intermediate:  intermediate True to get the intermediate shape
     :return: The name of the shape node.
     """
-    if cmds.nodeType(node) == 'transform':
+    if cmds.nodeType(node) == "transform":
         shapes = cmds.listRelatives(node, shapes=True, path=True)
         if not shapes:
             shapes = []
         for shape in shapes:
-            is_intermediate = cmds.getAttr('%s.intermediateObject' % shape)
-            if intermediate and is_intermediate and cmds.listConnections(shape,
-                                                                         source=False):
+            is_intermediate = cmds.getAttr("%s.intermediateObject" % shape)
+            if (
+                intermediate
+                and is_intermediate
+                and cmds.listConnections(shape, source=False)
+            ):
                 return shape
             elif not intermediate and not is_intermediate:
                 return shape
         if shapes:
             return shapes[0]
-    elif cmds.nodeType(node) in ['mesh', 'nurbsCurve', 'nurbsSurface']:
-        is_intermediate = cmds.getAttr('%s.intermediateObject' % node)
+    elif cmds.nodeType(node) in ["mesh", "nurbsCurve", "nurbsSurface"]:
+        is_intermediate = cmds.getAttr("%s.intermediateObject" % node)
         if is_intermediate and not intermediate:
             node = cmds.listRelatives(node, parent=True, path=True)[0]
             return get_shape(node)
@@ -90,10 +93,10 @@ def get_node_in_namespace_hierarchy(node, namespace=None, shape=False):
 
     if node and namespace:
         # See if it exists in the namespace or any child namespaces
-        namespaces = [namespace.replace(':', ''), ]
+        namespaces = [namespace.replace(":", "")]
         namespaces += cmds.namespaceInfo(namespace, r=True, lon=True) or []
         for namespace in namespaces:
-            namespaced_node = '{0}:{1}'.format(namespace, node)
+            namespaced_node = "{0}:{1}".format(namespace, node)
             if shape:
                 namespaced_node = get_shape(namespaced_node)
             if namespaced_node and cmds.objExists(namespaced_node):
@@ -112,11 +115,11 @@ def get_namespace_from_name(name):
     :param name: String to extract the namespace from.
     :return: The extracted namespace
     """
-    namespace = re.match('[_0-9a-zA-Z]+(?=:)(:[_0-9a-zA-Z]+(?=:))*', name)
+    namespace = re.match("[_0-9a-zA-Z]+(?=:)(:[_0-9a-zA-Z]+(?=:))*", name)
     if namespace:
-        namespace = '%s:' % str(namespace.group(0))
+        namespace = "%s:" % str(namespace.group(0))
     else:
-        namespace = ''
+        namespace = ""
     return namespace
 
 
@@ -135,7 +138,7 @@ def remove_namespace_from_name(name):
     """
     namespace = get_namespace_from_name(name)
     if namespace:
-        return re.sub('^{0}'.format(namespace), '', name)
+        return re.sub("^{0}".format(namespace), "", name)
     return name
 
 
@@ -194,7 +197,7 @@ class BaseTreeNode(object):
 
     def data(self, column):
         """Get the table display data"""
-        return ''
+        return ""
 
 
 def get_icon_path(name):
@@ -203,17 +206,17 @@ def get_icon_path(name):
     :param name: Name of an icon in the icons directory.
     :return: The full path to the icon or None if it does not exist.
     """
-    icon_directory = os.path.join(os.path.dirname(__file__), '..', '..', 'icons')
-    image_extensions = ['png', 'svg', 'jpg', 'jpeg']
+    icon_directory = os.path.join(os.path.dirname(__file__), "..", "..", "icons")
+    image_extensions = ["png", "svg", "jpg", "jpeg"]
     for root, dirs, files in os.walk(icon_directory):
         for ext in image_extensions:
-            full_path = os.path.join(root, '{0}.{1}'.format(name, ext))
+            full_path = os.path.join(root, "{0}.{1}".format(name, ext))
             if os.path.exists(full_path):
                 return os.path.normpath(full_path)
     return None
 
 
-def duplicate_chain(start, end, prefix='', suffix='', search_for='', replace_with=''):
+def duplicate_chain(start, end, prefix="", suffix="", search_for="", replace_with=""):
     """Duplicates the transform chain starting at start and ending at end.
 
     :param start: The start transform.
@@ -229,7 +232,7 @@ def duplicate_chain(start, end, prefix='', suffix='', search_for='', replace_wit
     joints = []
     original_joints = []
     while joint:
-        name = '{0}{1}{2}'.format(prefix, joint, suffix)
+        name = "{0}{1}{2}".format(prefix, joint, suffix)
         if search_for or replace_with:
             name = name.replace(search_for, replace_with)
         original_joints.append(joint)
@@ -243,7 +246,7 @@ def duplicate_chain(start, end, prefix='', suffix='', search_for='', replace_wit
         if joint:
             joint = joint[0]
         else:
-            raise RuntimeError('{0} is not a descendant of {1}'.format(end, start))
+            raise RuntimeError("{0} is not a descendant of {1}".format(end, start))
     joints.reverse()
     original_joints.reverse()
     return joints, original_joints
@@ -260,7 +263,7 @@ def _get_settings():
     except ImportError:
         from PySide.QtCore import QSettings
     if _settings is None:
-        _settings = QSettings('Chad Vernon', 'CMT')
+        _settings = QSettings("Chad Vernon", "CMT")
     return _settings
 
 

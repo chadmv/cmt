@@ -1,2 +1,3 @@
 import maya.utils
-maya.utils.executeDeferred('import cmt; cmt.initialize()')
+
+maya.utils.executeDeferred("import cmt; cmt.initialize()")

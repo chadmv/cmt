@@ -21,37 +21,41 @@ class OptionBox(object):
 
     See cmt.rig.twistdecomposition.Options for a sample implementation.
     """
+
     def __init__(self, title, help_url=None):
-        layout = mel.eval('getOptionBox')
+        layout = mel.eval("getOptionBox")
         cmds.setParent(layout)
         mel.eval('setOptionBoxTitle("{}");'.format(title))
         self.create_ui()
 
-        apply_close_button = mel.eval('getOptionBoxApplyAndCloseBtn;')
+        apply_close_button = mel.eval("getOptionBoxApplyAndCloseBtn;")
         cmds.button(apply_close_button, e=True, command=self._apply_and_close)
-        apply_button = mel.eval('getOptionBoxApplyBtn;')
+        apply_button = mel.eval("getOptionBoxApplyBtn;")
         cmds.button(apply_button, e=True, command=self._on_apply)
-        close_button = mel.eval('getOptionBoxCloseBtn;')
+        close_button = mel.eval("getOptionBoxCloseBtn;")
         cmds.button(close_button, e=True, command=self._close)
 
         if help_url:
-            help_item = mel.eval('getOptionBoxHelpItem;')
+            help_item = mel.eval("getOptionBoxHelpItem;")
             cmds.menuItem(
-                help_item, e=True, label='Help on {}'.format(title),
-                command='import webbrowser; webbrowser.open("{}")'.format(help_url))
+                help_item,
+                e=True,
+                label="Help on {}".format(title),
+                command='import webbrowser; webbrowser.open("{}")'.format(help_url),
+            )
 
     def show(self):
-        mel.eval('showOptionBox')
+        mel.eval("showOptionBox")
         # In getOptionBox.mel showOptionBox, it sets the Reset and Save menu item
         # commands in MEL so they expect MEL code.  We want Python so override the
         # commands after showing the option box in order to use Python
-        reset_item = mel.eval('$tmp = $gOptionBoxEditMenuResetItem')
+        reset_item = mel.eval("$tmp = $gOptionBoxEditMenuResetItem")
         cmds.menuItem(reset_item, e=True, command=self._on_reset)
-        save_item = mel.eval('$tmp = $gOptionBoxEditMenuSaveItem')
+        save_item = mel.eval("$tmp = $gOptionBoxEditMenuSaveItem")
         cmds.menuItem(save_item, e=True, command=self._on_save)
 
     def create_ui(self):
-        raise NotImplementedError('OptionBox.create_ui not implemented')
+        raise NotImplementedError("OptionBox.create_ui not implemented")
 
     def _on_apply(self, *args):
         """Call back called when the Apply button is pressed.
@@ -64,7 +68,7 @@ class OptionBox(object):
         self.on_apply()
 
     def on_apply(self):
-        raise NotImplementedError('OptionBox.on_apply not implemented')
+        raise NotImplementedError("OptionBox.on_apply not implemented")
 
     def _on_reset(self, *args):
         """Call back called when the Reset settings menu item is pressed.
@@ -77,7 +81,7 @@ class OptionBox(object):
         self.on_reset()
 
     def on_reset(self):
-        raise NotImplementedError('OptionBox.on_reset not implemented')
+        raise NotImplementedError("OptionBox.on_reset not implemented")
 
     def _on_save(self, *args):
         """Call back called when the Save settings menu item is pressed.
@@ -90,13 +94,13 @@ class OptionBox(object):
         self.on_save()
 
     def on_save(self):
-        raise NotImplementedError('OptionBox.on_save not implemented')
+        raise NotImplementedError("OptionBox.on_save not implemented")
 
     def _apply_and_close(self, *args, **kwargs):
         """Create the twist decomposition and close the option box."""
         self.on_apply()
-        mel.eval('saveOptionBoxSize')
+        mel.eval("saveOptionBoxSize")
         self._close()
 
     def _close(self, *args, **kwargs):
-        mel.eval('hideOptionBox')
+        mel.eval("hideOptionBox")

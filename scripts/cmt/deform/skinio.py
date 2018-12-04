@@ -32,10 +32,10 @@ import maya.OpenMayaAnim as OpenMayaAnim
 import cmt.shortcuts as shortcuts
 
 logger = logging.getLogger(__name__)
-EXTENSION = '.skin'
+EXTENSION = ".skin"
 
 # Key value for QSettings to save file browser directory
-KEY_STORE = 'skinio.start_directory'
+KEY_STORE = "skinio.start_directory"
 
 
 def import_skin(file_path=None, shape=None, to_selected_shapes=False):
@@ -44,15 +44,16 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
     """
 
     if file_path is None:
-        file_path = cmds.fileDialog2(dialogStyle=2, fileMode=1,
-                                     fileFilter='Skin Files (*{0})'.format(EXTENSION))
+        file_path = cmds.fileDialog2(
+            dialogStyle=2, fileMode=1, fileFilter="Skin Files (*{0})".format(EXTENSION)
+        )
     if not file_path:
         return
     if not isinstance(file_path, string_types):
         file_path = file_path[0]
 
     # Read in the file
-    with open(file_path, 'r') as fh:
+    with open(file_path, "r") as fh:
         data = json.load(fh)
 
     if to_selected_shapes:
@@ -60,16 +61,18 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
         if shape:
             shape = shape[0]
     if shape is None:
-        shape = data['shape']
+        shape = data["shape"]
     if not cmds.objExists(shape):
-        raise RuntimeError('Cannot import skin, {} does not exist'.format(shape))
+        raise RuntimeError("Cannot import skin, {} does not exist".format(shape))
 
     # Make sure the vertex count is the same
     mesh_vertex_count = cmds.polyEvaluate(shape, vertex=True)
-    imported_vertex_count = len(data['blendWeights'])
+    imported_vertex_count = len(data["blendWeights"])
     if mesh_vertex_count != imported_vertex_count:
-        raise RuntimeError('Vertex counts do not match. Mesh %d != File %d' %
-                           (mesh_vertex_count, imported_vertex_count))
+        raise RuntimeError(
+            "Vertex counts do not match. Mesh %d != File %d"
+            % (mesh_vertex_count, imported_vertex_count)
+        )
 
     # Check if the shape has a skinCluster
     skins = get_skin_clusters(shape)
@@ -77,11 +80,13 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
         skin_cluster = SkinCluster(skins[0])
     else:
         # Create a new skinCluster
-        joints = data['weights'].keys()
+        joints = data["weights"].keys()
 
         # Make sure all the joints exist
         unused_imports = []
-        no_match = set([shortcuts.remove_namespace_from_name(x) for x in cmds.ls(type='joint')])
+        no_match = set(
+            [shortcuts.remove_namespace_from_name(x) for x in cmds.ls(type="joint")]
+        )
         for j in joints:
             if j in no_match:
                 no_match.remove(j)
@@ -94,21 +99,23 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
             mapping_dialog.exec_()
             for src, dst in mapping_dialog.mapping.items():
                 # Swap the mapping
-                data['weights'][dst] = data['weights'][src]
-                del data['weights'][src]
+                data["weights"][dst] = data["weights"][src]
+                del data["weights"][src]
 
         # Create the skinCluster with post normalization so setting the weights does not
         # normalize all the weights
-        joints = data['weights'].keys()
+        joints = data["weights"].keys()
         kwargs = {}
-        if data['maintainMaxInfluences']:
-            kwargs['obeyMaxInfluences'] = True
-            kwargs['maximumInfluences'] = data['maxInfluences']
-        skin = cmds.skinCluster(joints, shape, tsb=True, nw=2, n=data['name'], **kwargs)[0]
+        if data["maintainMaxInfluences"]:
+            kwargs["obeyMaxInfluences"] = True
+            kwargs["maximumInfluences"] = data["maxInfluences"]
+        skin = cmds.skinCluster(
+            joints, shape, tsb=True, nw=2, n=data["name"], **kwargs
+        )[0]
         skin_cluster = SkinCluster(skin)
 
     skin_cluster.set_data(data)
-    logging.info('Imported %s', file_path)
+    logging.info("Imported %s", file_path)
 
 
 def get_skin_clusters(nodes):
@@ -118,7 +125,7 @@ def get_skin_clusters(nodes):
     @return A list of the skinClusters in the hierarchy of the specified root node.
     """
     if isinstance(nodes, string_types):
-        nodes = [nodes, ]
+        nodes = [nodes]
     all_skins = []
     for node in nodes:
         relatives = cmds.listRelatives(node, ad=True, path=True) or []
@@ -126,7 +133,7 @@ def get_skin_clusters(nodes):
         relatives = [shortcuts.get_shape(node) for node in relatives]
         for relative in relatives:
             history = cmds.listHistory(relative, pruneDagObjects=True, il=2) or []
-            skins = [x for x in history if cmds.nodeType(x) == 'skinCluster']
+            skins = [x for x in history if cmds.nodeType(x) == "skinCluster"]
             if skins:
                 all_skins.append(skins[0])
     return list(set(all_skins))
@@ -143,23 +150,25 @@ def export_skin(file_path=None, shapes=None):
         shapes = cmds.ls(sl=True) or []
 
     # If no shapes were selected, export all skins
-    skins = get_skin_clusters(shapes) if shapes else cmds.ls(type='skinCluster')
+    skins = get_skin_clusters(shapes) if shapes else cmds.ls(type="skinCluster")
     if not skins:
-        raise RuntimeError('No skins to export.')
+        raise RuntimeError("No skins to export.")
 
     if file_path is None:
         start_dir = shortcuts.get_setting(KEY_STORE, cmds.workspace(q=True, rd=True))
         if len(skins) == 1:
-            file_path = cmds.fileDialog2(dialogStyle=2,
-                                         fileMode=0,
-                                         fileFilter='Skin Files (*{0})'.format(EXTENSION),
-                                         startingDirectory=start_dir)
+            file_path = cmds.fileDialog2(
+                dialogStyle=2,
+                fileMode=0,
+                fileFilter="Skin Files (*{0})".format(EXTENSION),
+                startingDirectory=start_dir,
+            )
             if file_path and not file_path[0].endswith(EXTENSION):
                 file_path[0] += EXTENSION
         else:
-            file_path = cmds.fileDialog2(dialogStyle=2,
-                                         fileMode=3,
-                                         startingDirectory=start_dir)
+            file_path = cmds.fileDialog2(
+                dialogStyle=2, fileMode=3, startingDirectory=start_dir
+            )
         if not file_path:
             return
         file_path = file_path[0]
@@ -174,37 +183,52 @@ def export_skin(file_path=None, shapes=None):
     for skin in skins:
         skin = SkinCluster(skin)
         data = skin.gather_data()
-        logger.info('Exporting skinCluster %s on %s (%d influences, %d vertices)',
-                    skin.node, skin.shape, len(data['weights'].keys()), len(data['blendWeights']))
+        logger.info(
+            "Exporting skinCluster %s on %s (%d influences, %d vertices)",
+            skin.node,
+            skin.shape,
+            len(data["weights"].keys()),
+            len(data["blendWeights"]),
+        )
         if len(skins) > 1:
             # With multiple skinClusters, the user just chooses an export directory.  Set the
             # name to the transform name.
-            file_path = os.path.join(directory,
-                                     '{}{}'.format(skin.shape.replace('|', '!'), EXTENSION))
-        with open(file_path, 'w') as fh:
+            file_path = os.path.join(
+                directory, "{}{}".format(skin.shape.replace("|", "!"), EXTENSION)
+            )
+        with open(file_path, "w") as fh:
             json.dump(data, fh)
 
 
 class SkinCluster(object):
-    attributes = ['skinningMethod', 'normalizeWeights', 'dropoffRate', 'maintainMaxInfluences',
-                  'maxInfluences', 'bindMethod', 'useComponents', 'normalizeWeights',
-                  'weightDistribution', 'heatmapFalloff']
+    attributes = [
+        "skinningMethod",
+        "normalizeWeights",
+        "dropoffRate",
+        "maintainMaxInfluences",
+        "maxInfluences",
+        "bindMethod",
+        "useComponents",
+        "normalizeWeights",
+        "weightDistribution",
+        "heatmapFalloff",
+    ]
 
     def __init__(self, skin_cluster):
         """Constructor"""
         self.node = skin_cluster
-        self.shape = cmds.listRelatives(cmds.deformer(skin_cluster, q=True, g=True)[0],
-                                        parent=True,
-                                        path=True)[0]
+        self.shape = cmds.listRelatives(
+            cmds.deformer(skin_cluster, q=True, g=True)[0], parent=True, path=True
+        )[0]
 
         # Get the skinCluster MObject
         self.mobject = shortcuts.get_mobject(self.node)
         self.fn = OpenMayaAnim.MFnSkinCluster(self.mobject)
         self.data = {
-            'weights': {},
-            'blendWeights': [],
-            'name': self.node,
-            'shape': self.shape
+            "weights": {},
+            "blendWeights": [],
+            "name": self.node,
+            "shape": self.shape,
         }
 
     def gather_data(self):
@@ -217,7 +241,7 @@ class SkinCluster(object):
         self.gather_blend_weights(dag_path, components)
 
         for attr in SkinCluster.attributes:
-            self.data[attr] = cmds.getAttr('%s.%s' % (self.node, attr))
+            self.data[attr] = cmds.getAttr("%s.%s" % (self.node, attr))
         return self.data
 
     def __get_geometry_components(self):
@@ -249,9 +273,13 @@ class SkinCluster(object):
             influence_name = influence_paths[ii].partialPathName()
             # We want to store the weights by influence without the namespace so it is easier
             # to import if the namespace is different
-            influence_without_namespace = shortcuts.remove_namespace_from_name(influence_name)
-            self.data['weights'][influence_without_namespace] = \
-                [weights[jj * influence_count + ii] for jj in range(components_per_influence)]
+            influence_without_namespace = shortcuts.remove_namespace_from_name(
+                influence_name
+            )
+            self.data["weights"][influence_without_namespace] = [
+                weights[jj * influence_count + ii]
+                for jj in range(components_per_influence)
+            ]
 
     def gather_blend_weights(self, dag_path, components):
         """Gathers the blendWeights
@@ -261,7 +289,7 @@ class SkinCluster(object):
         """
         weights = OpenMaya.MDoubleArray()
         self.fn.getBlendWeights(dag_path, components, weights)
-        self.data['blendWeights'] = [weights[i] for i in range(weights.length())]
+        self.data["blendWeights"] = [weights[i] for i in range(weights.length())]
 
     def __get_current_weights(self, dag_path, components):
         """Get the current skin weight array.
@@ -289,7 +317,7 @@ class SkinCluster(object):
         self.set_blend_weights(dag_path, components)
 
         for attr in SkinCluster.attributes:
-            cmds.setAttr('{0}.{1}'.format(self.node, attr), self.data[attr])
+            cmds.setAttr("{0}.{1}".format(self.node, attr), self.data[attr])
 
     def set_influence_weights(self, dag_path, components):
         """Sets all the influence weights.
@@ -306,12 +334,17 @@ class SkinCluster(object):
         unused_imports = []
 
         # Keep track of which existing influences don't get anything imported
-        no_match = [influence_paths[ii].partialPathName() for ii in range(influence_paths.length())]
+        no_match = [
+            influence_paths[ii].partialPathName()
+            for ii in range(influence_paths.length())
+        ]
 
-        for imported_influence, imported_weights in self.data['weights'].items():
+        for imported_influence, imported_weights in self.data["weights"].items():
             for ii in range(influence_paths.length()):
                 influence_name = influence_paths[ii].partialPathName()
-                influence_without_namespace = shortcuts.remove_namespace_from_name(influence_name)
+                influence_without_namespace = shortcuts.remove_namespace_from_name(
+                    influence_name
+                )
                 if influence_without_namespace == imported_influence:
                     # Store the imported weights into the MDoubleArray
                     for jj in range(components_per_influence):
@@ -329,7 +362,9 @@ class SkinCluster(object):
                 for ii in range(influence_paths.length()):
                     if influence_paths[ii].partialPathName() == dst:
                         for jj in range(components_per_influence):
-                            weights.set(self.data['weights'][src][jj], jj * influence_count + ii)
+                            weights.set(
+                                self.data["weights"][src][jj], jj * influence_count + ii
+                            )
                         break
 
         influence_indices = OpenMaya.MIntArray(influence_count)
@@ -343,26 +378,27 @@ class SkinCluster(object):
         :param dag_path: MDagPath of the deformed geometry.
         :param components: Component MObject of the deformed components.
         """
-        blend_weights = OpenMaya.MDoubleArray(len(self.data['blendWeights']))
-        for i, w in enumerate(self.data['blendWeights']):
+        blend_weights = OpenMaya.MDoubleArray(len(self.data["blendWeights"]))
+        for i, w in enumerate(self.data["blendWeights"]):
             blend_weights.set(w, i)
         self.fn.setBlendWeights(dag_path, components, blend_weights)
 
 
 class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
-
     def __init__(self, parent=None):
         super(WeightRemapDialog, self).__init__(parent)
-        self.setWindowTitle('Remap Weights')
-        self.setObjectName('remapWeightsUI')
+        self.setWindowTitle("Remap Weights")
+        self.setObjectName("remapWeightsUI")
         self.setModal(True)
         self.resize(600, 400)
         self.mapping = {}
 
         mainvbox = QVBoxLayout(self)
 
-        label = QLabel('The following influences have no corresponding influence from the '
-                       'imported file.  You can either remap the influences or skip them.')
+        label = QLabel(
+            "The following influences have no corresponding influence from the "
+            "imported file.  You can either remap the influences or skip them."
+        )
         label.setWordWrap(True)
         mainvbox.addWidget(label)
 
@@ -372,13 +408,13 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
         # The existing influences that didn't have weight imported
         vbox = QVBoxLayout()
         hbox.addLayout(vbox)
-        vbox.addWidget(QLabel('Unmapped influences'))
+        vbox.addWidget(QLabel("Unmapped influences"))
         self.existing_influences = QListWidget()
         vbox.addWidget(self.existing_influences)
 
         vbox = QVBoxLayout()
         hbox.addLayout(vbox)
-        vbox.addWidget(QLabel('Available imported influences'))
+        vbox.addWidget(QLabel("Available imported influences"))
         widget = QScrollArea()
         self.imported_influence_layout = QVBoxLayout(widget)
         vbox.addWidget(widget)
@@ -386,7 +422,7 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
         hbox = QHBoxLayout()
         mainvbox.addLayout(hbox)
         hbox.addStretch()
-        btn = QPushButton('Ok')
+        btn = QPushButton("Ok")
         btn.released.connect(self.accept)
         hbox.addWidget(btn)
 
@@ -400,14 +436,16 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
             self.imported_influence_layout.addLayout(row)
             label = QLabel(inf)
             row.addWidget(label)
-            toggle_btn = QPushButton('>')
+            toggle_btn = QPushButton(">")
             toggle_btn.setMaximumWidth(30)
             row.addWidget(toggle_btn)
-            label = QLabel('')
+            label = QLabel("")
             label.setMaximumWidth(width)
             label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             row.addWidget(label)
-            toggle_btn.released.connect(partial(self.set_influence_mapping, src=inf, label=label))
+            toggle_btn.released.connect(
+                partial(self.set_influence_mapping, src=inf, label=label)
+            )
         self.imported_influence_layout.addStretch()
 
     def set_influence_mapping(self, src, label):

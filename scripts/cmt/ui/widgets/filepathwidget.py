@@ -58,7 +58,7 @@ class StringCache(QStringListModel):
             values.remove(value)
         values.insert(0, value)
         if len(values) > self.max_values:
-            values = values[:self.max_values]
+            values = values[: self.max_values]
         self.setStringList(values)
         self._save()
 
@@ -78,8 +78,9 @@ class FilePathWidget(QWidget):
     directory = 2
     path_changed = Signal(str)
 
-    def __init__(self, label=None, file_mode=any_file, file_filter=None,
-                 name=None, parent=None):
+    def __init__(
+        self, label=None, file_mode=any_file, file_filter=None, name=None, parent=None
+    ):
         """Constructor
 
         :param label: Optional label text.
@@ -92,9 +93,9 @@ class FilePathWidget(QWidget):
         super(FilePathWidget, self).__init__(parent)
         self.file_mode = file_mode
         if file_filter is None:
-            file_filter = 'Any File (*)'
+            file_filter = "Any File (*)"
         self.file_filter = file_filter
-        self.cache = StringCache('cmt.filepathwidget.{}'.format(name), parent=self)
+        self.cache = StringCache("cmt.filepathwidget.{}".format(name), parent=self)
         self._layout = QHBoxLayout(self)
         self.setLayout(self._layout)
 
@@ -111,7 +112,7 @@ class FilePathWidget(QWidget):
         self._combo_box.editTextChanged.connect(self.edit_changed)
         self._layout.addWidget(self._combo_box)
 
-        button = QPushButton('Browse', self)
+        button = QPushButton("Browse", self)
         button.released.connect(self.show_dialog)
         button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self._layout.addWidget(button)
@@ -131,9 +132,10 @@ class FilePathWidget(QWidget):
         """
         if not text:
             return
-        text = text.replace('\\', '/')
-        if ((os.path.isfile(text) and self.file_mode != FilePathWidget.directory) or
-                (os.path.isdir(text) and self.file_mode == FilePathWidget.directory)):
+        text = text.replace("\\", "/")
+        if (os.path.isfile(text) and self.file_mode != FilePathWidget.directory) or (
+            os.path.isdir(text) and self.file_mode == FilePathWidget.directory
+        ):
             self.path_changed.emit(text)
             self._combo_box.blockSignals(True)
             self._push(text)

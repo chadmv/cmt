@@ -1,3 +1,6 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+
 # cmt
 cmt is a collection of various Maya tools I have written for my personal projects.  Feel free to use
 the tools in your own projects or just browse the code for inspiration or to silently judge me.

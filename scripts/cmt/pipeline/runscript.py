@@ -30,8 +30,8 @@ def run_script(file_path, init_globals=None):
     if init_globals is None:
         init_globals = dict()
     file_path = os.path.realpath(file_path)
-    logger.info('Running {}'.format(file_path))
-    runpy.run_path(file_path, init_globals, '__main__')
+    logger.info("Running {}".format(file_path))
+    runpy.run_path(file_path, init_globals, "__main__")
 
 
 _win = None
@@ -52,15 +52,19 @@ class RunScriptWindow(MayaQWidgetBaseMixin, QMainWindow):
 
     def __init__(self, parent=None):
         super(RunScriptWindow, self).__init__(parent)
-        self.setWindowTitle('Run Script')
+        self.setWindowTitle("Run Script")
         self.resize(800, 600)
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout()
         main_widget.setLayout(main_layout)
         self.file_model = QFileSystemModel(self)
-        self.root_path = FilePathWidget('Root: ', FilePathWidget.directory,
-                                        name='cmt.runscript.rootpath', parent=self)
+        self.root_path = FilePathWidget(
+            "Root: ",
+            FilePathWidget.directory,
+            name="cmt.runscript.rootpath",
+            parent=self,
+        )
         self.root_path.path_changed.connect(self.set_root_path)
         main_layout.addWidget(self.root_path)
 
@@ -74,14 +78,15 @@ class RunScriptWindow(MayaQWidgetBaseMixin, QMainWindow):
         self.file_tree_view = QTreeView()
         self.file_model.setFilter(QDir.NoDotAndDotDot | QDir.Files | QDir.AllDirs)
         self.file_model.setReadOnly(True)
-        self.file_model.setNameFilters(['*.py'])
+        self.file_model.setNameFilters(["*.py"])
         self.file_model.setNameFilterDisables(False)
         self.file_tree_view.setModel(self.file_model)
         self.file_tree_view.setColumnHidden(1, True)
         self.file_tree_view.setColumnHidden(2, True)
         self.file_tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.file_tree_view.customContextMenuRequested.connect(
-            self.on_file_tree_context_menu)
+            self.on_file_tree_context_menu
+        )
         self.file_tree_view.doubleClicked.connect(self.on_file_tree_double_clicked)
         splitter.addWidget(self.file_tree_view)
 
@@ -94,7 +99,7 @@ class RunScriptWindow(MayaQWidgetBaseMixin, QMainWindow):
 
     def on_file_tree_double_clicked(self, index):
         path = self.file_model.fileInfo(index).absoluteFilePath()
-        if not os.path.isfile(path) or not path.endswith('.py'):
+        if not os.path.isfile(path) or not path.endswith(".py"):
             return
         self.run_script(path)
 
@@ -105,14 +110,15 @@ class RunScriptWindow(MayaQWidgetBaseMixin, QMainWindow):
             return
 
         path = self.file_model.fileInfo(index).absoluteFilePath()
-        if not os.path.isfile(path) or not path.endswith('.py'):
+        if not os.path.isfile(path) or not path.endswith(".py"):
             return
         self.create_context_menu(path, self.file_tree_view.mapToGlobal(pos))
 
     def create_context_menu(self, path, pos):
         menu = QMenu()
-        menu.addAction(QAction('Run Script', self,
-                               triggered=partial(self.run_script, path)))
+        menu.addAction(
+            QAction("Run Script", self, triggered=partial(self.run_script, path))
+        )
         menu.exec_(pos)
 
     def run_script(self, path):
@@ -125,7 +131,7 @@ class RecentList(QListView):
 
     def __init__(self, parent=None):
         super(RecentList, self).__init__(parent)
-        self.recents = StringCache('cmt.runscript.recents', max_values=20)
+        self.recents = StringCache("cmt.runscript.recents", max_values=20)
         self.setModel(self.recents)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.on_recents_context_menu)
@@ -141,7 +147,5 @@ class RecentList(QListView):
         path = self.recents.data(index, Qt.DisplayRole)
 
         menu = QMenu()
-        menu.addAction(QAction('Run Script', self,
-                               triggered=partial(run_script, path)))
+        menu.addAction(QAction("Run Script", self, triggered=partial(run_script, path)))
         menu.exec_(pos)
-

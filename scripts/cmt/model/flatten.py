@@ -18,7 +18,7 @@ def flatten(mesh=None, uvset=None):
     if mesh is None:
         mesh = cmds.ls(sl=True)
         if not mesh:
-            raise RuntimeError('No mesh selected.')
+            raise RuntimeError("No mesh selected.")
         mesh = mesh[0]
     o_mesh = shortcuts.get_mobject(shortcuts.get_shape(mesh))
     fn_mesh = OpenMaya.MFnMesh(o_mesh)
@@ -51,6 +51,13 @@ def flatten(mesh=None, uvset=None):
         it_poly.next()
 
     new_mesh = OpenMaya.MFnMesh()
-    new_mesh.create(vertex_count, polygon_count, vertex_array, polygon_counts, polygon_connects,
-                    u_array, v_array)
+    new_mesh.create(
+        vertex_count,
+        polygon_count,
+        vertex_array,
+        polygon_counts,
+        polygon_connects,
+        u_array,
+        v_array,
+    )
     new_mesh.assignUVs(polygon_counts, polygon_connects)

@@ -66,6 +66,7 @@ def _pyqt5():
 def _pyqt4():
     # Attempt to set sip API v2 (must be done prior to importing PyQt4)
     import sip
+
     try:
         sip.setapi("QString", 2)
         sip.setapi("QVariant", 2)
@@ -121,6 +122,7 @@ def _pyside2():
 def _pyside():
     import PySide
     from PySide import QtGui, QtCore
+
     QtCore, QtGui  # bypass linter warnings
 
     # Remap
@@ -157,6 +159,7 @@ def pyside_load_ui(fname):
     """
 
     from PySide import QtUiTools
+
     return QtUiTools.QUiLoader().load(fname)
 
 
@@ -169,6 +172,7 @@ def pyside2_load_ui(fname):
     """
 
     from PySide2 import QtUiTools
+
     return QtUiTools.QUiLoader().load(fname)
 
 
@@ -181,6 +185,7 @@ def pyqt4_load_ui(fname):
     """
 
     from PyQt4 import uic
+
     return uic.loadUi(fname)
 
 
@@ -193,6 +198,7 @@ def pyqt5_load_ui(fname):
     """
 
     from PyQt5 import uic
+
     return uic.loadUi(fname)
 
 
@@ -228,16 +234,13 @@ def _init():
             "PySide2": _pyside2,
             "PyQt5": _pyqt5,
             "PySide": _pyside,
-            "PyQt4": _pyqt4
+            "PyQt4": _pyqt4,
         }
 
         try:
             bindings = [available[binding] for binding in preferred]
         except KeyError:
-            raise ImportError(
-                "Available preferred Qt bindings: "
-                "\n".join(preferred)
-            )
+            raise ImportError("Available preferred Qt bindings: " "\n".join(preferred))
 
     for binding in bindings:
         _log("Trying %s" % binding.__name__[1:], verbose)
@@ -247,7 +250,7 @@ def _init():
             return
 
         except ImportError as e:
-            _log(" - ImportError(\"%s\")\n" % e, verbose)
+            _log(' - ImportError("%s")\n' % e, verbose)
 
             continue
 

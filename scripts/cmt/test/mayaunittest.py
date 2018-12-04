@@ -40,7 +40,7 @@ import logging
 import maya.cmds as cmds
 
 # The environment variable that signifies tests are being run with the custom TestResult class.
-CMT_TESTING_VAR = 'CMT_UNITTEST'
+CMT_TESTING_VAR = "CMT_UNITTEST"
 
 
 def run_tests(directories=None, test=None, test_suite=None):
@@ -99,8 +99,8 @@ def get_tests(directories=None, test=None, test_suite=None):
 
 def maya_module_tests():
     """Generator function to iterate over all the Maya module tests directories."""
-    for path in os.environ['MAYA_MODULE_PATH'].split(os.pathsep):
-        p = '{0}/tests'.format(path)
+    for path in os.environ["MAYA_MODULE_PATH"].split(os.pathsep):
+        p = "{0}/tests".format(path)
         if os.path.exists(p):
             yield p
 
@@ -111,6 +111,7 @@ def run_tests_from_commandline():
     This is called when running cmt/bin/runmayatests.py from the commandline.
     """
     import maya.standalone
+
     maya.standalone.initialize()
 
     # Make sure all paths in PYTHONPATH are also in sys.path
@@ -118,9 +119,9 @@ def run_tests_from_commandline():
     # to be added to sys.path. So we are unable to import any of the python files that are in the
     # module/scripts folder. To workaround this, we simply add the paths to sys ourselves.
     realsyspath = [os.path.realpath(p) for p in sys.path]
-    pythonpath = os.environ.get('PYTHONPATH', '')
+    pythonpath = os.environ.get("PYTHONPATH", "")
     for p in pythonpath.split(os.pathsep):
-        p = os.path.realpath(p) # Make sure symbolic links are resolved
+        p = os.path.realpath(p)  # Make sure symbolic links are resolved
         if p not in realsyspath:
             sys.path.insert(0, p)
 
@@ -133,10 +134,11 @@ def run_tests_from_commandline():
 
 class Settings(object):
     """Contains options for running tests."""
+
     # Specifies where files generated during tests should be stored
     # Use a uuid subdirectory so tests that are running concurrently such as on a build server
     # do not conflict with each other.
-    temp_dir = os.path.join(tempfile.gettempdir(), 'mayaunittest', str(uuid.uuid4()))
+    temp_dir = os.path.join(tempfile.gettempdir(), "mayaunittest", str(uuid.uuid4()))
 
     # Controls whether temp files should be deleted after running all tests in the test case
     delete_files = True
@@ -158,7 +160,7 @@ def set_temp_dir(directory):
     if os.path.exists(directory):
         Settings.temp_dir = directory
     else:
-        raise RuntimeError('{0} does not exist.'.format(directory))
+        raise RuntimeError("{0} does not exist.".format(directory))
 
 
 def set_delete_files(value):
@@ -258,12 +260,12 @@ class TestCase(unittest.TestCase):
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
         base_name, ext = os.path.splitext(file_name)
-        path = '{0}/{1}{2}'.format(temp_dir, base_name, ext)
+        path = "{0}/{1}{2}".format(temp_dir, base_name, ext)
         count = 0
         while os.path.exists(path):
             # If the file already exists, add an incrememted number
             count += 1
-            path = '{0}/{1}{2}{3}'.format(temp_dir, base_name, count, ext)
+            path = "{0}/{1}{2}{3}".format(temp_dir, base_name, count, ext)
         cls.files_created.append(path)
         return path
 
@@ -287,6 +289,7 @@ class TestResult(unittest.TextTestResult):
     """Customize the test result so we can do things like do a file new between each test and suppress script
     editor output.
     """
+
     def __init__(self, stream, descriptions, verbosity):
         super(TestResult, self).__init__(stream, descriptions, verbosity)
         self.successes = []
@@ -295,7 +298,7 @@ class TestResult(unittest.TextTestResult):
         """Called before any tests are run."""
         super(TestResult, self).startTestRun()
         # Create an environment variable that specifies tests are being run through the custom runner.
-        os.environ[CMT_TESTING_VAR] = '1'
+        os.environ[CMT_TESTING_VAR] = "1"
 
         ScriptEditorState.suppress_output()
         if Settings.buffer_output:
@@ -349,22 +352,31 @@ class ScriptEditorState(object):
             cls.suppress_errors = cmds.scriptEditorInfo(q=True, suppressErrors=True)
             cls.suppress_warnings = cmds.scriptEditorInfo(q=True, suppressWarnings=True)
             cls.suppress_info = cmds.scriptEditorInfo(q=True, suppressInfo=True)
-            cmds.scriptEditorInfo(e=True,
-                                  suppressResults=True,
-                                  suppressInfo=True,
-                                  suppressWarnings=True,
-                                  suppressErrors=True)
+            cmds.scriptEditorInfo(
+                e=True,
+                suppressResults=True,
+                suppressInfo=True,
+                suppressWarnings=True,
+                suppressErrors=True,
+            )
 
     @classmethod
     def restore_output(cls):
         """Restores the script editor output settings to their original values."""
-        if None not in {cls.suppress_results, cls.suppress_errors, cls.suppress_warnings, cls.suppress_info}:
-            cmds.scriptEditorInfo(e=True,
-                                  suppressResults=cls.suppress_results,
-                                  suppressInfo=cls.suppress_info,
-                                  suppressWarnings=cls.suppress_warnings,
-                                  suppressErrors=cls.suppress_errors)
+        if None not in {
+            cls.suppress_results,
+            cls.suppress_errors,
+            cls.suppress_warnings,
+            cls.suppress_info,
+        }:
+            cmds.scriptEditorInfo(
+                e=True,
+                suppressResults=cls.suppress_results,
+                suppressInfo=cls.suppress_info,
+                suppressWarnings=cls.suppress_warnings,
+                suppressErrors=cls.suppress_errors,
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests_from_commandline()
