@@ -23,6 +23,7 @@ from cmt.qt import QtWidgets
 from cmt.qt import QtGui
 from cmt.qt import QtCore
 import maya.cmds as cmds
+import maya.api.OpenMaya as OpenMaya
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 import cmt.shortcuts as shortcuts
 
@@ -31,6 +32,98 @@ CONTROLS_DIRECTORY = os.path.join(os.path.dirname(__file__), "controls")
 
 # The message attribute specifying which nodes are part of a transform stack.
 STACK_ATTRIBUTE = "cmt_transformStack"
+
+
+class CurveShape(object):
+    """Represents the data required to build a nurbs curve shape
+
+    """
+
+    def __init__(self, curve=None):
+        self.cvs = []
+        self.degree = 3
+        self.form = 0
+        self.knots = []
+        self.color = None
+        self.transform = OpenMaya.MTransformationMatrix()
+        if curve:
+            self.set_from_curve(curve)
+
+    def set_from_curve(self, curve):
+        """Store the parameters from an existing curve in the CurveShape object.
+
+        :param curve: Transform
+        :return:
+        """
+        shape = shortcuts.get_shape(curve)
+        if cmds.nodeType(shape) == "nurbsCurve":
+            self.cvs = cmds.getAttr("{}.cv[*]".format(shape))
+            self.degree = cmds.getAttr("{}.degree".format(shape))
+            self.form = cmds.getAttr("{}.form".format(shape))
+            self.knots = get_knots(shape)
+            if cmds.getAttr("{}.overrideEnabled".format(shape)):
+                if cmds.getAttr("{}.overrideRGBColors".format(shape)):
+                    self.color = cmds.getAttr("{}.overrideColorRGB".format(shape))[0]
+                else:
+                    self.color = cmds.getAttr("{}.overrideColor".format(shape))
+            else:
+                self.color = None
+
+    def create(self, transform):
+        """Create a curve.
+
+        :param transform: Name of the transform to create the curve shape under.
+            If the transform does not exist, it will be created.
+        :return: The transform of the new curve shapes.
+        """
+        if not cmds.objExists(transform):
+            transform = cmds.createNode("transform", name=transform)
+        periodic = self.form == 2
+        points = self._get_transformed_points()
+        points = points + points[: self.degree] if periodic else points
+        curve = cmds.curve(degree=self.degree, p=points, per=periodic, k=self.knots)
+        shape = shortcuts.get_shape(curve)
+        if self.color is not None:
+            cmds.setAttr("{}.overrideEnabled".format(shape), True)
+            if isinstance(self.color, int):
+                cmds.setAttr("{}.overrideColor".format(shape), self.color)
+            else:
+                cmds.setAttr("{}.overrideRGBColors".format(shape), True)
+                cmds.setAttr("{}.overrideColorRGB".format(shape), *self.color)
+        cmds.parent(shape, transform, r=True, s=True)
+        cmds.delete(curve)
+        return transform
+
+    def _get_transformed_points(self):
+        matrix = self.transform.asMatrix()
+        points = [OpenMaya.MPoint(*x) * matrix for x in self.cvs]
+        points = [(p.x, p.y, p.z) for p in points]
+        return points
+
+    def translate_by(self, x, y, z, local=True):
+        space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
+        self.transform.translateBy(OpenMaya.MVector(x, y, z), space)
+
+    def set_translation(self, x, y, z, local=True):
+        space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
+        self.transform.setTranslation(OpenMaya.MVector(x, y, z), space)
+
+    def rotate_by(self, x, y, z, local=True):
+        x, y, z = [v * 0.0174533 for v in [x, y, z]]
+        space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
+        self.transform.rotateBy(OpenMaya.MEulerRotation(x, y, z), space)
+
+    def set_rotation(self, x, y, z):
+        x, y, z = [v * 0.0174533 for v in [x, y, z]]
+        self.transform.setRotation(OpenMaya.MEulerRotation(x, y, z))
+
+    def scale_by(self, x, y, z, local=True):
+        space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
+        self.transform.scaleBy([x, y, z], space)
+
+    def set_scale(self, x, y, z, local=True):
+        space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
+        self.transform.setScale([x, y, z], space)
 
 
 def ui():
@@ -142,6 +235,7 @@ def get_knots(curve):
     info = cmds.createNode("curveInfo")
     cmds.connectAttr("{0}.worldSpace".format(curve), "{0}.inputCurve".format(info))
     knots = cmds.getAttr("{0}.knots[*]".format(info))
+    knots = [int(x) for x in knots]
     cmds.delete(info)
     return knots
 
