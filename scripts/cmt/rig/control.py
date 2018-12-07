@@ -22,9 +22,12 @@ import logging
 from cmt.qt import QtWidgets
 from cmt.qt import QtGui
 from cmt.qt import QtCore
+from PySide2.QtCore import *
+from PySide2.QtWidgets import *
+
 import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
-from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
+from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 import cmt.shortcuts as shortcuts
 
 logger = logging.getLogger(__name__)
@@ -34,29 +37,129 @@ CONTROLS_DIRECTORY = os.path.join(os.path.dirname(__file__), "controls")
 STACK_ATTRIBUTE = "cmt_transformStack"
 
 
-class CurveShape(object):
-    """Represents the data required to build a nurbs curve shape
+def export_controls(controls=None, file_path=None):
+    """Serializes the given curves into the control library.
 
+    :param curves: Optional list of curves.
     """
+    if file_path is None:
+        file_path = shortcuts.get_save_file_name("*.json", "cmt.control")
+        if not file_path:
+            return
+    if controls is None:
+        controls = cmds.ls(sl=True)
+    data = get_control_data(controls)
+    with open(file_path, "w") as fh:
+        json.dump(data, fh, indent=4, cls=CurveShapeEncoder)
+        logger.info("Exported controls {}".format(file_path))
 
-    def __init__(self, curve=None):
-        self.cvs = []
-        self.degree = 3
-        self.form = 0
-        self.knots = []
-        self.color = None
-        self.transform = OpenMaya.MTransformationMatrix()
-        if curve:
-            self.set_from_curve(curve)
 
-    def set_from_curve(self, curve):
+def get_control_data(controls=None):
+    """Get the serializable data of the given controls.
+
+    :param controls: Controls to serialize
+    :return: List of control data dictionaries
+    """
+    if controls is None:
+        controls = cmds.ls(sl=True)
+    data = [CurveShape(transform=control) for control in controls]
+    return data
+
+
+class CurveCreateMode(object):
+    """Used by import_controls to specify how to create new curves."""
+
+    new_curve = 0
+    selected_curve = 1
+    saved_curve = 2
+
+
+def import_controls(
+    file_path=None, create_mode=CurveCreateMode.saved_curve, tag_as_controller=False
+):
+    """Imports control shapes from disk.
+
+    :param file_path: Path to the control file.
+    :param create_mode: One of the values of CurveCreateMode
+        new_curve: Create the curve on a new transform.
+        selected_curve: Create the curve on the selected transform.
+        saved_curve: Create the curve on transform saved with the curve shape.
+    :param tag_as_controller: True to tag the curve transform as a controller
+    :return: The new curve transform
+    """
+    controls = load_controls(file_path)
+    selected_transform = cmds.ls(sl=True)
+    if selected_transform:
+        selected_transform = selected_transform[0]
+
+    transforms = []
+    for curve in controls:
+        transform = {
+            CurveCreateMode.new_curve: _get_new_transform_name(curve.transform),
+            CurveCreateMode.selected_curve: selected_transform,
+            CurveCreateMode.saved_curve: curve.transform,
+        }[create_mode]
+        transforms.append(curve.create(transform, tag_as_controller))
+    return transforms
+
+
+def load_controls(file_path=None):
+    """Load the CurveShape objects from disk.
+
+    :param file_path:
+    :return:
+    """
+    if file_path is None:
+        file_path = shortcuts.get_open_file_name("*.json", "cmt.control")
+        if not file_path:
+            return
+
+    with open(file_path, "r") as fh:
+        data = json.load(fh)
+    logger.info("Loaded controls {}".format(file_path))
+    curves = [CurveShape(**control) for control in data]
+    return curves
+
+
+def _get_new_transform_name(base):
+    """Get a new unique transform name
+
+    :param base: Base name
+    :return: A unique name of a non-existing transform
+    """
+    name = base
+    i = 1
+    while cmds.objExists(name):
+        name = "{}{}".format(base, i)
+        i += 1
+    return name
+
+
+class CurveShape(json.JSONEncoder):
+    """Represents the data required to build a nurbs curve shape"""
+
+    def __init__(
+        self, transform=None, cvs=None, degree=3, form=0, knots=None, color=None
+    ):
+        self.cvs = cvs
+        self.degree = degree
+        self.form = form
+        self.knots = knots
+        self.color = color
+        self.transform_matrix = OpenMaya.MTransformationMatrix()
+        self.transform = transform
+        if transform and cmds.objExists(transform) and not cvs:
+            self.set_from_curve(transform)
+
+    def set_from_curve(self, transform):
         """Store the parameters from an existing curve in the CurveShape object.
 
-        :param curve: Transform
+        :param transform: Transform
         :return:
         """
-        shape = shortcuts.get_shape(curve)
-        if cmds.nodeType(shape) == "nurbsCurve":
+        shape = shortcuts.get_shape(transform)
+        if shape and cmds.nodeType(shape) == "nurbsCurve":
+            self.transform = transform
             self.cvs = cmds.getAttr("{}.cv[*]".format(shape))
             self.degree = cmds.getAttr("{}.degree".format(shape))
             self.form = cmds.getAttr("{}.form".format(shape))
@@ -69,13 +172,15 @@ class CurveShape(object):
             else:
                 self.color = None
 
-    def create(self, transform):
+    def create(self, transform=None, as_controller=True):
         """Create a curve.
 
         :param transform: Name of the transform to create the curve shape under.
             If the transform does not exist, it will be created.
+        :param as_controller: True to mark the curve transform as a controller.
         :return: The transform of the new curve shapes.
         """
+        transform = transform or self.transform
         if not cmds.objExists(transform):
             transform = cmds.createNode("transform", name=transform)
         periodic = self.form == 2
@@ -91,45 +196,57 @@ class CurveShape(object):
                 cmds.setAttr("{}.overrideRGBColors".format(shape), True)
                 cmds.setAttr("{}.overrideColorRGB".format(shape), *self.color)
         cmds.parent(shape, transform, r=True, s=True)
+        shape = cmds.rename(shape, "{}Shape".format(transform))
         cmds.delete(curve)
+        if as_controller:
+            cmds.controller(transform)
+        logger.info("Created curve {} for transform {}".format(shape, transform))
         return transform
 
     def _get_transformed_points(self):
-        matrix = self.transform.asMatrix()
+        matrix = self.transform_matrix.asMatrix()
         points = [OpenMaya.MPoint(*x) * matrix for x in self.cvs]
         points = [(p.x, p.y, p.z) for p in points]
         return points
 
     def translate_by(self, x, y, z, local=True):
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
-        self.transform.translateBy(OpenMaya.MVector(x, y, z), space)
+        self.transform_matrix.translateBy(OpenMaya.MVector(x, y, z), space)
 
     def set_translation(self, x, y, z, local=True):
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
-        self.transform.setTranslation(OpenMaya.MVector(x, y, z), space)
+        self.transform_matrix.setTranslation(OpenMaya.MVector(x, y, z), space)
 
     def rotate_by(self, x, y, z, local=True):
         x, y, z = [v * 0.0174533 for v in [x, y, z]]
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
-        self.transform.rotateBy(OpenMaya.MEulerRotation(x, y, z), space)
+        self.transform_matrix.rotateBy(OpenMaya.MEulerRotation(x, y, z), space)
 
     def set_rotation(self, x, y, z):
         x, y, z = [v * 0.0174533 for v in [x, y, z]]
-        self.transform.setRotation(OpenMaya.MEulerRotation(x, y, z))
+        self.transform_matrix.setRotation(OpenMaya.MEulerRotation(x, y, z))
 
     def scale_by(self, x, y, z, local=True):
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
-        self.transform.scaleBy([x, y, z], space)
+        self.transform_matrix.scaleBy([x, y, z], space)
 
     def set_scale(self, x, y, z, local=True):
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
-        self.transform.setScale([x, y, z], space)
+        self.transform_matrix.setScale([x, y, z], space)
 
 
-def ui():
-    """Display the control creator ui."""
-    win = ControlWindow()
-    win.show()
+class CurveShapeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, CurveShape):
+            return {
+                "cvs": obj.cvs,
+                "degree": obj.degree,
+                "form": obj.form,
+                "knots": obj.knots,
+                "color": obj.color,
+                "transform": obj.transform,
+            }
+        return json.JSONEncoder.default(self, obj)
 
 
 def rotate_components(rx, ry, rz, nodes=None):
@@ -189,42 +306,6 @@ def create_curve(control):
     return curve
 
 
-def dump(curves=None, stack=False):
-    """Get a data dictionary representing all the given curves.
-
-    :param curves: Optional list of curves.
-    :return: A json serializable list of dictionaries containing the data required to recreate the curves.
-    """
-    if curves is None:
-        curves = cmds.ls(sl=True) or []
-    data = []
-    for node in curves:
-        shape = shortcuts.get_shape(node)
-        if cmds.nodeType(shape) == "nurbsCurve":
-            control = {
-                "name": node,
-                "cvs": cmds.getAttr("{0}.cv[*]".format(node)),
-                "degree": cmds.getAttr("{0}.degree".format(node)),
-                "form": cmds.getAttr("{0}.form".format(node)),
-                "xform": cmds.xform(node, q=True, ws=True, matrix=True),
-                "knots": get_knots(node),
-                "pivot": cmds.xform(node, q=True, rp=True),
-                "overrideEnabled": cmds.getAttr("{0}.overrideEnabled".format(node)),
-                "overrideRGBColors": cmds.getAttr("{0}.overrideRGBColors".format(node)),
-                "overrideColorRGB": cmds.getAttr("{0}.overrideColorRGB".format(node))[
-                    0
-                ],
-                "overrideColor": cmds.getAttr("{0}.overrideColor".format(node)),
-            }
-            if stack:
-                control["stack"] = get_stack_count(node)
-                control["parent"] = get_stack_parent(node)
-            data.append(control)
-    if curves:
-        cmds.select(curves)
-    return data
-
-
 def get_knots(curve):
     """Gets the list of knots of a curve so it can be recreated.
 
@@ -240,24 +321,9 @@ def get_knots(curve):
     return knots
 
 
-def dump_controls(curves=None):
-    """Serializes the given curves into the control library.
-
-    :param curves: Optional list of curves.
-    """
-    if curves is None:
-        curves = cmds.ls(sl=True)
-    data = dump(curves)
-    for curve in data:
-        name = curve["name"]
-        file_path = os.path.join(CONTROLS_DIRECTORY, "{0}.json".format(name))
-        logger.info("Exporting %s", file_path)
-        fh = open(file_path, "w")
-        json.dump(curve, fh, indent=4)
-        fh.close()
-
-
-class ControlWindow(MayaQWidgetDockableMixin, QtWidgets.QDialog):
+class ControlWindow(
+    shortcuts.SingletonWindowMixin, MayaQWidgetBaseMixin, QtWidgets.QDialog
+):
     """The UI used to create and manipulate curves from the curve library."""
 
     def __init__(self, parent=None):

@@ -62,7 +62,7 @@ def create_menu():
     cmds.menuItem(
         parent=rig_menu,
         label="Create Control",
-        command="import cmt.rig.control as control; control.ui()",
+        command="import cmt.rig.control as control; control.ControlWindow.show_window()",
         image="orientJoint.png",
     )
 

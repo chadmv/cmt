@@ -200,6 +200,24 @@ class BaseTreeNode(object):
         return ""
 
 
+class SingletonWindowMixin(object):
+    """Mixin to be used with a QWidget based window to only allow one instance of the window"""
+
+    _window_instance = None
+
+    @classmethod
+    def show_window(cls):
+        if not cls._window_instance:
+            cls._window_instance = cls()
+        cls._window_instance.show()
+        cls._window_instance.raise_()
+        cls._window_instance.activateWindow()
+
+    def closeEvent(self, event):
+        self._window_instance = None
+        event.accept()
+
+
 def get_icon_path(name):
     """Get the path of the given icon name.
 
@@ -286,6 +304,51 @@ def set_setting(key, value):
     """
     settings = _get_settings()
     settings.setValue(key, value)
+
+
+def get_save_file_name(file_filter, key=None):
+    """Get a file path from a save dialog.
+
+    :param file_filter: File filter eg "Maya Files (*.ma *.mb)"
+    :param key: Optional key value to access the starting directory which is saved in the persistent cache.
+    :return: The selected file path
+    """
+    return _get_file_path(file_filter, key, 0)
+
+
+def get_open_file_name(file_filter, key=None):
+    """Get a file path from an open file dialog.
+
+    :param file_filter: File filter eg "Maya Files (*.ma *.mb)"
+    :param key: Optional key value to access the starting directory which is saved in the persistent cache.
+    :return: The selected file path
+    """
+    return _get_file_path(file_filter, key, 1)
+
+
+def _get_file_path(file_filter, key, file_mode):
+    """Get a file path from a file dialog.
+
+    :param file_filter: File filter eg "Maya Files (*.ma *.mb)"
+    :param key: Optional key value to access the starting directory which is saved in the persistent cache.
+    :param file_mode: 0 Any file, whether it exists or not.
+        1 A single existing file.
+        2 The name of a directory. Both directories and files are displayed in the dialog.
+        3 The name of a directory. Only directories are displayed in the dialog.
+        4 Then names of one or more existing files.
+    :return: The selected file path
+    """
+    start_directory = cmds.workspace(q=True, rd=True)
+    if key is not None:
+        start_directory = get_settings(key, start_directory)
+
+    file_path = cmds.fileDialog2(
+        fileMode=file_mode, startingDirectory=start_directory, fileFilter=file_filter
+    )
+    if key is not None and file_path:
+        directory = os.path.dirname(file_path)
+        set_setting(key, directory)
+    return file_path
 
 
 # MScriptUtil

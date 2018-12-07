@@ -1,3 +1,5 @@
+import json
+import os
 import maya.cmds as cmds
 import cmt.rig.control as control
 from cmt.test import TestCase
@@ -7,12 +9,12 @@ class ControlTests(TestCase):
     def setUp(self):
         self.knots = [0, 0, 0, 1, 2, 3, 3, 3]
         self.cvs = [
-            (-69.090977, 0, -42.485142),
-            (-12.141088, 0, -22.456294),
-            (4.930275, 0, 2.926625),
-            (0.242549, 0, 14.701021),
-            (-22.959533, 0, 2.415859),
-            (-40.740289, 0, -10.943939),
+            (-69.090977, 0.0, -42.485142),
+            (-12.141088, 0.0, -22.456294),
+            (4.930275, 0.0, 2.926625),
+            (0.242549, 0.0, 14.701021),
+            (-22.959533, 0.0, 2.415859),
+            (-40.740289, 0.0, -10.943939),
         ]
         self.curve = cmds.curve(d=3, p=self.cvs, k=self.knots)
 
@@ -145,6 +147,48 @@ class ControlTests(TestCase):
         transform = obj.create("node4")
         cvs = cmds.getAttr("{}.cv[*]".format(transform))
         self.cvs_are_equal(cvs, expected_cvs)
+
+    def test_get_control_data(self):
+        controls = control.get_control_data([self.curve])
+        expected = [
+            {
+                "transform": self.curve,
+                "cvs": self.cvs,
+                "degree": 3,
+                "form": 0,
+                "knots": self.knots,
+                "color": None,
+            }
+        ]
+        expected = json.dumps(expected, sort_keys=True)
+        actual = json.dumps(controls, sort_keys=True, cls=control.CurveShapeEncoder)
+        self.assertEqual(expected, actual)
+
+    def test_save_and_load_curves(self):
+        file_path = self.get_temp_filename("test_curve.json")
+        control.export_controls([self.curve], file_path)
+        self.assertTrue(os.path.exists(file_path))
+        cmds.delete(self.curve)
+        controls = control.import_controls(file_path)
+        self.assertTrue(cmds.objExists(self.curve))
+        self.assertEqual(controls[0], self.curve)
+        self.test_get_curve_object()
+
+    def test_save_and_load_curve_on_other_transform(self):
+        file_path = self.get_temp_filename("test_curve.json")
+        control.export_controls([self.curve], file_path)
+        other = cmds.createNode("transform", name="other")
+        cmds.setAttr("{}.tx".format(other), 2)
+        control.import_controls(
+            file_path, create_mode=control.CurveCreateMode.selected_curve
+        )
+        self.assertTrue(cmds.objExists("otherShape"))
+        obj = control.CurveShape(other)
+        self.assertEqual(obj.degree, 3)
+        self.assertEqual(obj.form, 0)
+        self.assertListEqual(obj.knots, self.knots)
+        self.cvs_are_equal(obj.cvs, self.cvs)
+        self.assertIsNone(obj.color)
 
     # def test_set_transform_stack(self):
     #     loc = cmds.spaceLocator(name="spine_ctrl")[0]
