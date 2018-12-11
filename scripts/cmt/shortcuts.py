@@ -10,6 +10,7 @@ import re
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
 
+import cmt.settings as settings
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +311,8 @@ def get_save_file_name(file_filter, key=None):
     """Get a file path from a save dialog.
 
     :param file_filter: File filter eg "Maya Files (*.ma *.mb)"
-    :param key: Optional key value to access the starting directory which is saved in the persistent cache.
+    :param key: Optional key value to access the starting directory which is saved in
+        the persistent cache.
     :return: The selected file path
     """
     return _get_file_path(file_filter, key, 0)
@@ -320,17 +322,29 @@ def get_open_file_name(file_filter, key=None):
     """Get a file path from an open file dialog.
 
     :param file_filter: File filter eg "Maya Files (*.ma *.mb)"
-    :param key: Optional key value to access the starting directory which is saved in the persistent cache.
+    :param key: Optional key value to access the starting directory which is saved in
+        the persistent cache.
     :return: The selected file path
     """
     return _get_file_path(file_filter, key, 1)
+
+
+def get_directory_name(key=None):
+    """Get a file path from an open file dialog.
+
+    :param key: Optional key value to access the starting directory which is saved in
+        the persistent cache.
+    :return: The selected file path
+    """
+    return _get_file_path("", key, 3)
 
 
 def _get_file_path(file_filter, key, file_mode):
     """Get a file path from a file dialog.
 
     :param file_filter: File filter eg "Maya Files (*.ma *.mb)"
-    :param key: Optional key value to access the starting directory which is saved in the persistent cache.
+    :param key: Optional key value to access the starting directory which is saved in
+        the persistent cache.
     :param file_mode: 0 Any file, whether it exists or not.
         1 A single existing file.
         2 The name of a directory. Both directories and files are displayed in the dialog.
@@ -346,7 +360,9 @@ def _get_file_path(file_filter, key, file_mode):
         fileMode=file_mode, startingDirectory=start_directory, fileFilter=file_filter
     )
     if key is not None and file_path:
-        directory = os.path.dirname(file_path)
+        directory = (
+            file_path if os.path.isdir(file_path) else os.path.dirname(file_path)
+        )
         set_setting(key, directory)
     return file_path
 
