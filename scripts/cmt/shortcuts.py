@@ -9,6 +9,7 @@ import re
 
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
+import maya.api.OpenMaya as OpenMaya2
 
 import cmt.settings as settings
 
@@ -41,6 +42,17 @@ def get_dag_path(node):
     return path
 
 
+def get_dag_path2(node):
+    """Get the MDagPath of the given node.
+
+    :param node: Node name
+    :return: Node MDagPath
+    """
+    selection_list = OpenMaya2.MSelectionList()
+    selection_list.add(node)
+    return selection_list.getDagPath(0)
+
+
 def get_shape(node, intermediate=False):
     """Get the shape node of a tranform
 
@@ -52,7 +64,7 @@ def get_shape(node, intermediate=False):
     :param intermediate:  intermediate True to get the intermediate shape
     :return: The name of the shape node.
     """
-    if cmds.nodeType(node) == "transform":
+    if cmds.objectType(node, isAType="transform"):
         shapes = cmds.listRelatives(node, shapes=True, path=True)
         if not shapes:
             shapes = []

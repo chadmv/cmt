@@ -1,7 +1,9 @@
 import json
 import os
 import maya.cmds as cmds
+import maya.OpenMaya as OpenMaya
 import cmt.rig.control as control
+import cmt.shortcuts as shortcuts
 from cmt.test import TestCase
 
 
@@ -190,20 +192,23 @@ class ControlTests(TestCase):
         self.cvs_are_equal(obj.cvs, self.cvs)
         self.assertIsNone(obj.color)
 
-    # def test_set_transform_stack(self):
-    #     loc = cmds.spaceLocator(name="spine_ctrl")[0]
-    #     nulls = control.create_transform_stack(loc, 2)
-    #     self.assertEqual(2, len(nulls))
-    #     parent = cmds.listRelatives(loc, parent=True, path=True)[0]
-    #     self.assertEqual("spine_1nul", parent)
-    #     parent = cmds.listRelatives(parent, parent=True, path=True)[0]
-    #     self.assertEqual("spine_2nul", parent)
-    #
-    #     nulls = control.create_transform_stack(loc, 3)
-    #     self.assertEqual(3, len(nulls))
-    #     parent = cmds.listRelatives(loc, parent=True, path=True)[0]
-    #     self.assertEqual("spine_1nul", parent)
-    #     parent = cmds.listRelatives(parent, parent=True, path=True)[0]
-    #     self.assertEqual("spine_2nul", parent)
-    #     parent = cmds.listRelatives(parent, parent=True, path=True)[0]
-    #     self.assertEqual("spine_3nul", parent)
+    def test_mirror_curve(self):
+        cmds.setAttr("{}.t".format(self.curve), 62, 3, 52)
+        cmds.setAttr("{}.r".format(self.curve), 162, -231, -10)
+        other = cmds.createNode("transform")
+        cmds.setAttr("{}.t".format(other), 1, 2, 3)
+        cmds.setAttr("{}.r".format(other), 45, 23, 10)
+        mirrored_curve = control.mirror_curve(self.curve, other)
+
+        path_curve = shortcuts.get_dag_path(self.curve)
+        matrix = path_curve.inclusiveMatrix()
+
+        path_other = shortcuts.get_dag_path(other)
+        inverse_matrix = path_other.inclusiveMatrixInverse()
+
+        world_cvs = [OpenMaya.MPoint(x[0], x[1], x[2]) * matrix for x in self.cvs]
+        for cv in world_cvs:
+            cv.x *= -1
+        expected_local_cvs = [p * inverse_matrix for p in world_cvs]
+        expected_local_cvs = [(p.x, p.y, p.z) for p in expected_local_cvs]
+        self.cvs_are_equal(mirrored_curve.cvs, expected_local_cvs)

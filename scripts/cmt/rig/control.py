@@ -274,44 +274,32 @@ def rotate_components(rx, ry, rz, nodes=None):
         )
 
 
-def create_curves(curves):
-    for curve in curves:
-        create_curve(curve)
+def mirror_curve(source, destination):
+    """Mirrors the curve on source across the YZ plane to destination.
 
-    # Now parent the curves
-    for curve in curves:
-        if curve.get("parent"):
-            parent = curve["parent"]
-            if cmds.objExists(parent):
-                cmds.parent(curve["name"], parent)
+    The cvs will be mirrored in world space no matter the transform of destination.
 
-    # Then create the stacks
-    for curve in curves:
-        if curve.get("stack"):
-            create_transform_stack(curve["name"], curve["stack"])
-
-
-def create_curve(control):
-    """Create a curve.
-
-    :param control: A data dictionary generated from the dump function.
-    :return: The created curve.
+    :param source: Source transform
+    :param destination: Destination transform
+    :return: The mirrored CurveShape object
     """
-    periodic = control["form"] == 2
-    degree = control["degree"]
-    points = control["cvs"]
-    points = points + points[:degree] if periodic else points
-    curve = cmds.curve(
-        degree=degree, p=points, n=control["name"], per=periodic, k=control["knots"]
-    )
-    cmds.xform(curve, ws=True, matrix=control["xform"])
-    cmds.xform(curve, piv=control["pivot"])
-    cmds.delete(curve, constructionHistory=True)
-    cmds.setAttr("{0}.overrideEnabled".format(curve), control["overrideEnabled"])
-    cmds.setAttr("{0}.overrideRGBColors".format(curve), control["overrideRGBColors"])
-    cmds.setAttr("{0}.overrideColorRGB".format(curve), *control["overrideColorRGB"])
-    cmds.setAttr("{0}.overrideColor".format(curve), control["overrideColor"])
-    return curve
+    source_curve = CurveShape(source)
+
+    path_source = shortcuts.get_dag_path2(source)
+    matrix = path_source.inclusiveMatrix()
+
+    path_destination = shortcuts.get_dag_path2(destination)
+    inverse_matrix = path_destination.inclusiveMatrixInverse()
+
+    world_cvs = [OpenMaya.MPoint(*x) * matrix for x in source_curve.cvs]
+    for cv in world_cvs:
+        cv.x *= -1
+    local_cvs = [p * inverse_matrix for p in world_cvs]
+    source_curve.cvs = [(p.x, p.y, p.z) for p in local_cvs]
+    is_controller = cmds.controller(source, q=True, isController=True)
+    source_curve.transform = destination
+    source_curve.create(destination, as_controller=is_controller)
+    return source_curve
 
 
 def get_knots(curve):
@@ -433,6 +421,10 @@ class ControlWindow(shortcuts.SingletonWindowMixin, MayaQWidgetBaseMixin, QMainW
         b.released.connect(self.set_color)
         hbox.addWidget(b)
 
+        b = QPushButton("Mirror Curve")
+        b.released.connect(self.mirror_curve)
+        hbox.addWidget(b)
+
         self.control_list = QListWidget()
         self.control_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         vbox.addWidget(self.control_list)
@@ -501,6 +493,13 @@ class ControlWindow(shortcuts.SingletonWindowMixin, MayaQWidgetBaseMixin, QMainW
                     cmds.setAttr("{}.overrideEnabled".format(shape), True)
                     cmds.setAttr("{}.overrideRGBColors".format(shape), True)
                     cmds.setAttr("{}.overrideColorRGB".format(shape), *color)
+
+    def mirror_curve(self):
+        """Mirrors the curve of the first selected to the second selected."""
+        nodes = cmds.ls(sl=True) or []
+        if len(nodes) != 2:
+            raise RuntimeError("Select source and destination transforms")
+        mirror_curve(nodes[0], nodes[1])
 
     def create_selected(self):
         """Create the curves selected in the curve list."""
