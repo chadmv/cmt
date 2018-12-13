@@ -1,6 +1,8 @@
 """The control module provides functions and a graphical interface to create,
 manipulate, import and export curve controls.
 
+.. image:: control.png
+
 The APIs provided allow curve shapes to be abstracted from transforms.  This allows the
 creation of rigging constructs independent of actual curve shapes which can vary
 greatly from asset to asset.  The general workflow would be to create rig controls
@@ -11,29 +13,57 @@ in an automated build.
 Example Usage
 =============
 
-From the menu:
-CMT > Rigging > Create Control
+The Control Creator tool can be accessed in the cmt menu::
 
-To show the UI:
-import cmt.rig.control
-cmt.rig.control.show()
+    CMT > Rigging > Control Creator
 
-API:
-data = dump(['curve1'])
-new_curve = create_curve(data)
+API
+---
+::
+
+    import cmt.rig.control as control
+    curve = cmds.circle()[0]
+
+    # Save the curve to disk
+    file_path = "{}/control.json".format(cmds.workspace(q=True, rd=True))
+    control.export_curves([curve], file_path)
+
+    # Load the curve back in
+    cmds.file(n=True, f=True)
+    control.import_curves(file_path)
+
+    # Create another copy of the curve
+    control.import_new_curves(file_path)
+
+    # Create the curve on the selected transform
+    node = cmds.createNode('transform', name='newNode')
+    control.import_curves_on_selected(file_path)
+
+    # Manipulate the curve before creating
+    curve = control.load_curves(file_path)[0]
+    curve.scale_by(2, 2, 2)
+    curve.set_rotation(0, 60, 0)
+    curve.set_translation(10, 5, 0)
+    new_node = curve.create("anotherNode")
+
+    # Mirror the curve
+    mirrored = cmds.createNode("transform", name="mirroredNode")
+    cmds.setAttr("{}.t".format(mirrored), -10, -5, 2)
+    cmds.setAttr("{}.r".format(mirrored), -55, 10, 63)
+    control.mirror_curve(new_node, mirrored)
+
 """
-from functools import partial
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import os
 import logging
-from PySide2.QtCore import *
-from PySide2.QtWidgets import *
-from PySide2.QtGui import *
 import webbrowser
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
-from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 
 from cmt.settings import DOCUMENTATION_ROOT
 import cmt.shortcuts as shortcuts
@@ -43,12 +73,13 @@ CONTROLS_DIRECTORY = os.path.join(os.path.dirname(__file__), "controls")
 HELP_URL = "{}/rig/control.html".format(DOCUMENTATION_ROOT)
 
 
-def export_controls(controls=None, file_path=None):
+def export_curves(controls=None, file_path=None):
     """Serializes the given curves into the control library.
 
     :param controls: Optional list of controls to export. If no controls are specified,
         the selected curves will be exported.
     :param file_path: File path to export to
+    :return: The exported list of ControlShapes.
     """
     if file_path is None:
         file_path = shortcuts.get_save_file_name("*.json", "cmt.control")
@@ -56,17 +87,18 @@ def export_controls(controls=None, file_path=None):
             return
     if controls is None:
         controls = cmds.ls(sl=True)
-    data = get_control_data(controls)
+    data = get_curve_data(controls)
     with open(file_path, "w") as fh:
         json.dump(data, fh, indent=4, cls=CurveShapeEncoder)
         logger.info("Exported controls to {}".format(file_path))
+    return data
 
 
-def get_control_data(controls=None):
+def get_curve_data(controls=None):
     """Get the serializable data of the given controls.
 
     :param controls: Controls to serialize
-    :return: List of control data dictionaries
+    :return: List of ControlShape objects
     """
     if controls is None:
         controls = cmds.ls(sl=True)
@@ -74,44 +106,55 @@ def get_control_data(controls=None):
     return data
 
 
-class CurveCreateMode(object):
-    """Used by import_controls to specify how to create new curves."""
-
-    new_curve = 0
-    selected_curve = 1
-    saved_curve = 2
-
-
-def import_controls(
-    file_path=None, create_mode=CurveCreateMode.saved_curve, tag_as_controller=False
-):
-    """Imports control shapes from disk.
+def import_new_curves(file_path=None, tag_as_controller=False):
+    """Imports control shapes from disk onto new transforms.
 
     :param file_path: Path to the control file.
-    :param create_mode: One of the values of CurveCreateMode
-        new_curve: Create the curve on a new transform.
-        selected_curve: Create the curve on the selected transform.
-        saved_curve: Create the curve on transform saved with the curve shape.
     :param tag_as_controller: True to tag the curve transform as a controller
-    :return: The new curve transform
+    :return: The new curve transforms
     """
-    controls = load_controls(file_path)
-    selected_transform = cmds.ls(sl=True)
-    if selected_transform:
-        selected_transform = selected_transform[0]
-
+    controls = load_curves(file_path)
     transforms = []
     for curve in controls:
-        transform = {
-            CurveCreateMode.new_curve: _get_new_transform_name(curve.transform),
-            CurveCreateMode.selected_curve: selected_transform,
-            CurveCreateMode.saved_curve: curve.transform,
-        }[create_mode]
+        transform = _get_new_transform_name(curve.transform)
         transforms.append(curve.create(transform, tag_as_controller))
     return transforms
 
 
-def load_controls(file_path=None):
+def import_curves(file_path=None, tag_as_controller=False):
+    """Imports control shapes from disk onto their saved named transforms.
+
+    :param file_path: Path to the control file.
+    :param tag_as_controller: True to tag the curve transform as a controller
+    :return: The new curve transforms
+    """
+    controls = load_curves(file_path)
+
+    transforms = [
+        curve.create(curve.transform, tag_as_controller) for curve in controls
+    ]
+    return transforms
+
+
+def import_curves_on_selected(file_path=None, tag_as_controller=False):
+    """Imports a control shape from disk onto the selected transform.
+
+    :param file_path: Path to the control file.
+    :param tag_as_controller: True to tag the curve transform as a controller
+    :return: The new curve transform
+    """
+    controls = load_curves(file_path)
+    selected_transform = cmds.ls(sl=True)
+    if not selected_transform:
+        return
+    selected_transform = selected_transform[0]
+
+    for curve in controls:
+        curve.create(selected_transform, tag_as_controller)
+    return selected_transform
+
+
+def load_curves(file_path=None):
     """Load the CurveShape objects from disk.
 
     :param file_path:
@@ -157,16 +200,19 @@ class CurveShape(object):
         self.transform_matrix = OpenMaya.MTransformationMatrix()
         self.transform = transform
         if transform and cmds.objExists(transform) and not cvs:
-            self.set_from_curve(transform)
+            self._set_from_curve(transform)
 
-    def set_from_curve(self, transform):
+    def _set_from_curve(self, transform):
         """Store the parameters from an existing curve in the CurveShape object.
 
         :param transform: Transform
-        :return:
         """
         shape = shortcuts.get_shape(transform)
         if shape and cmds.nodeType(shape) == "nurbsCurve":
+            create_attr = "{}.create".format(shape)
+            connection = cmds.listConnections(create_attr, plugs=True, d=False)
+            if connection:
+                cmds.disconnectAttr(connection[0], create_attr)
             self.transform = transform
             self.cvs = cmds.getAttr("{}.cv[*]".format(shape))
             self.degree = cmds.getAttr("{}.degree".format(shape))
@@ -179,6 +225,8 @@ class CurveShape(object):
                     self.color = cmds.getAttr("{}.overrideColor".format(shape))
             else:
                 self.color = None
+            if connection:
+                cmds.connectAttr(connection[0], create_attr)
 
     def create(self, transform=None, as_controller=True):
         """Create a curve.
@@ -218,27 +266,68 @@ class CurveShape(object):
         return points
 
     def translate_by(self, x, y, z, local=True):
+        """Translate the curve cvs by the given values
+
+        :param x: Translate X
+        :param y: Translate Y
+        :param z: Translate Z
+        :param local: True for local space, False for world
+        """
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
         self.transform_matrix.translateBy(OpenMaya.MVector(x, y, z), space)
 
     def set_translation(self, x, y, z, local=True):
+        """Set the absolute translation of the curve shape.
+
+        :param x: Translate X
+        :param y: Translate Y
+        :param z: Translate Z
+        :param local: True for local space, False for world
+        """
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
         self.transform_matrix.setTranslation(OpenMaya.MVector(x, y, z), space)
 
     def rotate_by(self, x, y, z, local=True):
+        """Rotate the curve cvs by the given euler rotation values
+
+        :param x: Rotate X
+        :param y: Rotate Y
+        :param z: Rotate Z
+        :param local: True for local space, False for world
+        """
         x, y, z = [v * 0.0174533 for v in [x, y, z]]
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
         self.transform_matrix.rotateBy(OpenMaya.MEulerRotation(x, y, z), space)
 
     def set_rotation(self, x, y, z):
+        """Set the absolute rotation of the curve shape in euler rotations.
+
+        :param x: Rotate X
+        :param y: Rotate Y
+        :param z: Rotate Z
+        """
         x, y, z = [v * 0.0174533 for v in [x, y, z]]
         self.transform_matrix.setRotation(OpenMaya.MEulerRotation(x, y, z))
 
     def scale_by(self, x, y, z, local=True):
+        """Scale the curve cvs by the given amount.
+
+        :param x: Scale X
+        :param y: Scale Y
+        :param z: Scale Z
+        :param local: True for local space, False for world
+        """
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
         self.transform_matrix.scaleBy([x, y, z], space)
 
     def set_scale(self, x, y, z, local=True):
+        """Set the absolute scale of the curve shape.
+
+        :param x: Scale X
+        :param y: Scale Y
+        :param z: Scale Z
+        :param local: True for local space, False for world
+        """
         space = OpenMaya.MSpace.kObject if local else OpenMaya.MSpace.kWorld
         self.transform_matrix.setScale([x, y, z], space)
 
@@ -317,221 +406,19 @@ def get_knots(curve):
     return knots
 
 
-def show():
-    ControlWindow.show_window()
-
-
 def documentation():
     webbrowser.open(HELP_URL)
 
 
-class ControlWindow(shortcuts.SingletonWindowMixin, MayaQWidgetBaseMixin, QMainWindow):
-    """The UI used to create and manipulate curves from the curve library."""
+def get_control_paths_in_library():
+    """Get the file paths of all controls in the library.
 
-    def __init__(self, parent=None):
-        super(ControlWindow, self).__init__(parent)
-        self.setWindowTitle("CMT Control Creator")
-        self.resize(300, 500)
-
-        menubar = self.menuBar()
-        menu = menubar.addMenu("Help")
-        action = menu.addAction("Documentation")
-        action.triggered.connect(documentation)
-
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        vbox = QVBoxLayout(self)
-        main_widget.setLayout(vbox)
-
-        size = 20
-        label_width = 60
-        icon_left = QIcon(QPixmap(":/nudgeLeft.png").scaled(size, size))
-        icon_right = QIcon(QPixmap(":/nudgeRight.png").scaled(size, size))
-        validator = QDoubleValidator(-180.0, 180.0, 2)
-        grid = QGridLayout()
-        vbox.addLayout(grid)
-
-        # Rotate X
-        label = QLabel("Rotate X")
-        label.setMaximumWidth(label_width)
-        grid.addWidget(label, 0, 0, Qt.AlignRight)
-        b = QPushButton(icon_left, "")
-        b.released.connect(partial(self.rotate_x, direction=-1))
-        grid.addWidget(b, 0, 1)
-        self.offset_x = QLineEdit("45.0")
-        self.offset_x.setValidator(validator)
-        grid.addWidget(self.offset_x, 0, 2)
-        b = QPushButton(icon_right, "")
-        b.released.connect(partial(self.rotate_x, direction=1))
-        grid.addWidget(b, 0, 3)
-
-        # Rotate Y
-        label = QLabel("Rotate Y")
-        label.setMaximumWidth(label_width)
-        grid.addWidget(label, 1, 0, Qt.AlignRight)
-        b = QPushButton(icon_left, "")
-        b.released.connect(partial(self.rotate_y, direction=-1))
-        grid.addWidget(b, 1, 1)
-        self.offset_y = QLineEdit("45.0")
-        self.offset_y.setValidator(validator)
-        grid.addWidget(self.offset_y, 1, 2)
-        b = QPushButton(icon_right, "")
-        b.released.connect(partial(self.rotate_y, direction=1))
-        grid.addWidget(b, 1, 3)
-
-        # Rotate Z
-        label = QLabel("Rotate Z")
-        label.setMaximumWidth(label_width)
-        grid.addWidget(label, 2, 0, Qt.AlignRight)
-        b = QPushButton(icon_left, "")
-        b.released.connect(partial(self.rotate_z, direction=-1))
-        grid.addWidget(b, 2, 1)
-        self.offset_z = QLineEdit("45.0")
-        self.offset_z.setValidator(validator)
-        grid.addWidget(self.offset_z, 2, 2)
-        b = QPushButton(icon_right, "")
-        b.released.connect(partial(self.rotate_z, direction=1))
-        grid.addWidget(b, 2, 3)
-        grid.setColumnStretch(2, 2)
-
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        b = QPushButton("Export to Library")
-        b.released.connect(self.export_to_library)
-        hbox.addWidget(b)
-
-        b = QPushButton("Export Single File")
-        b.released.connect(export_controls)
-        hbox.addWidget(b)
-
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        b = QPushButton("Create Selected")
-        b.released.connect(self.create_selected)
-        hbox.addWidget(b)
-
-        b = QPushButton("Remove Selected")
-        b.released.connect(self.remove_selected)
-        hbox.addWidget(b)
-
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-
-        b = QPushButton("Set Color")
-        b.released.connect(self.set_color)
-        hbox.addWidget(b)
-
-        b = QPushButton("Mirror Curve")
-        b.released.connect(self.mirror_curve)
-        hbox.addWidget(b)
-
-        self.control_list = QListWidget()
-        self.control_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        vbox.addWidget(self.control_list)
-
-        self.populate_controls()
-
-    def populate_controls(self):
-        """Populates the control list with the available controls stored in
-        CONTROLS_DIRECTORY."""
-        self.control_list.clear()
-        controls = [
-            os.path.splitext(x)[0]
-            for x in os.listdir(CONTROLS_DIRECTORY)
-            if x.endswith(".json")
-        ]
-        controls.sort()
-        self.control_list.addItems(controls)
-
-    def rotate_x(self, direction):
-        """Callback function to rotate the components around the x axis by the amount of
-        degrees in offset_x.
-
-        :param direction: 1 or -1
-        """
-        amount = float(self.offset_x.text()) * direction
-        rotate_components(amount, 0, 0)
-
-    def rotate_y(self, direction):
-        """Callback function to rotate the components around the y axis by the amount of
-        degrees in offset_y.
-
-        :param direction: 1 or -1
-        """
-        amount = float(self.offset_y.text()) * direction
-        rotate_components(0, amount, 0)
-
-    def rotate_z(self, direction):
-        """Callback function to rotate the components around the z axis by the amount of
-        degrees in offset_z.
-
-        :param direction: 1 or -1
-        """
-        amount = float(self.offset_z.text()) * direction
-        rotate_components(0, 0, amount)
-
-    def export_to_library(self):
-        """Exports the selected curves into the CONTROLS_DIRECTORY."""
-        controls = cmds.ls(sl=True)
-        for control in controls:
-            name = control.split("|")[-1].split(":")[-1]
-            file_path = os.path.join(CONTROLS_DIRECTORY, "{}.json".format(name))
-            export_controls([control], file_path)
-        self.populate_controls()
-
-    def set_color(self):
-        """Open a dialog to set the override RGB color of the selected nodes."""
-        nodes = cmds.ls(sl=True) or []
-        if nodes:
-            color = cmds.getAttr("{}.overrideColorRGB".format(nodes[0]))[0]
-            color = QColor(color[0] * 255, color[1] * 255, color[2] * 255)
-            color = QColorDialog.getColor(color, self, "Set Curve Color")
-            if color.isValid():
-                color = [color.redF(), color.greenF(), color.blueF()]
-                for node in nodes:
-                    shape = shortcuts.get_shape(node)
-                    cmds.setAttr("{}.overrideEnabled".format(shape), True)
-                    cmds.setAttr("{}.overrideRGBColors".format(shape), True)
-                    cmds.setAttr("{}.overrideColorRGB".format(shape), *color)
-
-    def mirror_curve(self):
-        """Mirrors the curve of the first selected to the second selected."""
-        nodes = cmds.ls(sl=True) or []
-        if len(nodes) != 2:
-            raise RuntimeError("Select source and destination transforms")
-        mirror_curve(nodes[0], nodes[1])
-
-    def create_selected(self):
-        """Create the curves selected in the curve list."""
-        sel = cmds.ls(sl=True)
-        target = sel[0] if sel else None
-        mode = CurveCreateMode.selected_curve if target else CurveCreateMode.new_curve
-        curves = []
-        for item in self.control_list.selectedItems():
-            text = item.text()
-            control_file = os.path.join(CONTROLS_DIRECTORY, "{0}.json".format(text))
-            controls = import_controls(control_file, create_mode=mode)
-            curves += controls
-            if target:
-                cmds.select(target)
-        if curves:
-            cmds.select(curves)
-
-    def remove_selected(self):
-        """Remove the curves selected in the curve list from the curve library."""
-        items = self.control_list.selectedItems()
-        if items:
-            button = QMessageBox.question(
-                self,
-                "Remove Controls",
-                "Are you sure you want to remove the selected controls?",
-                QMessageBox.Yes | QMessageBox.No,
-            )
-            if button == QMessageBox.Yes:
-                for item in items:
-                    text = item.text()
-                    control_file = os.path.join(
-                        CONTROLS_DIRECTORY, "{0}.json".format(text)
-                    )
-                    os.remove(control_file)
-                self.populate_controls()
+    :return: List of file paths
+    """
+    controls = [
+        os.path.splitext(x)[0]
+        for x in os.listdir(CONTROLS_DIRECTORY)
+        if x.endswith(".json")
+    ]
+    controls.sort()
+    return controls

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>cmt.rig.control &#8212; cmt  documentation</title>
+    <link rel="stylesheet" href="../../../_static/bootstrap-sphinx.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/js/jquery-1.11.0.min.js"></script>
+    <script type="text/javascript" src="../../../_static/js/jquery-fix.js"></script>
+    <script type="text/javascript" src="../../../_static/bootstrap-3.3.7/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="../../../_static/bootstrap-sphinx.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+  </head><body>
+
+  <div id="navbar" class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../../index.html">
+          cmt</a>
+        <span class="navbar-text navbar-version pull-left"><b></b></span>
+      </div>
+
+        <div class="collapse navbar-collapse nav-collapse">
+          <ul class="nav navbar-nav">
+            
+            
+              <li class="dropdown globaltoc-container">
+  <a role="button"
+     id="dLabelGlobalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="../../../index.html">Site <b class="caret"></b></a>
+  <ul class="dropdown-menu globaltoc"
+      role="menu"
+      aria-labelledby="dLabelGlobalToc"><ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation Instructions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../rigging.html">Rigging Tools</a></li>
+</ul>
+</ul>
+</li>
+              
+                <li class="dropdown">
+  <a role="button"
+     id="dLabelLocalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="#">Page <b class="caret"></b></a>
+  <ul class="dropdown-menu localtoc"
+      role="menu"
+      aria-labelledby="dLabelLocalToc"></ul>
+</li>
+              
+            
+            
+              
+                
+              
+            
+            
+            
+            
+              <li class="hidden-sm"></li>
+            
+          </ul>
+
+          
+            
+<form class="navbar-form navbar-right" action="../../../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+          
+        </div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12 content">
+      
+  <h1>Source code for cmt.rig.control</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;The control module provides functions and a graphical interface to create,</span>
+<span class="sd">manipulate, import and export curve controls.</span>
+
+<span class="sd">.. image:: control.png</span>
+
+<span class="sd">The APIs provided allow curve shapes to be abstracted from transforms.  This allows the</span>
+<span class="sd">creation of rigging constructs independent of actual curve shapes which can vary</span>
+<span class="sd">greatly from asset to asset.  The general workflow would be to create rig controls</span>
+<span class="sd">with transforms only without shapes.  After the rigs are created, add shapes to the</span>
+<span class="sd">transforms with this tool/API.  The shapes can then be serialized to disk to load back</span>
+<span class="sd">in an automated build.</span>
+
+<span class="sd">Example Usage</span>
+<span class="sd">=============</span>
+
+<span class="sd">The Control Creator tool can be accessed in the cmt menu::</span>
+
+<span class="sd">    CMT &gt; Rigging &gt; Control Creator</span>
+
+<span class="sd">API</span>
+<span class="sd">---</span>
+<span class="sd">::</span>
+
+<span class="sd">    import cmt.rig.control as control</span>
+<span class="sd">    curve = cmds.circle()[0]</span>
+
+<span class="sd">    # Save the curve to disk</span>
+<span class="sd">    file_path = &quot;{}/control.json&quot;.format(cmds.workspace(q=True, rd=True))</span>
+<span class="sd">    control.export_curves([curve], file_path)</span>
+
+<span class="sd">    # Load the curve back in</span>
+<span class="sd">    cmds.file(n=True, f=True)</span>
+<span class="sd">    control.import_curves(file_path)</span>
+
+<span class="sd">    # Create another copy of the curve</span>
+<span class="sd">    control.import_new_curves(file_path)</span>
+
+<span class="sd">    # Create the curve on the selected transform</span>
+<span class="sd">    node = cmds.createNode(&#39;transform&#39;, name=&#39;newNode&#39;)</span>
+<span class="sd">    control.import_curves_on_selected(file_path)</span>
+
+<span class="sd">    # Manipulate the curve before creating</span>
+<span class="sd">    curve = control.load_curves(file_path)[0]</span>
+<span class="sd">    curve.scale_by(2, 2, 2)</span>
+<span class="sd">    curve.set_rotation(0, 60, 0)</span>
+<span class="sd">    curve.set_translation(10, 5, 0)</span>
+<span class="sd">    new_node = curve.create(&quot;anotherNode&quot;)</span>
+
+<span class="sd">    # Mirror the curve</span>
+<span class="sd">    mirrored = cmds.createNode(&quot;transform&quot;, name=&quot;mirroredNode&quot;)</span>
+<span class="sd">    cmds.setAttr(&quot;{}.t&quot;.format(mirrored), -10, -5, 2)</span>
+<span class="sd">    cmds.setAttr(&quot;{}.r&quot;.format(mirrored), -55, 10, 63)</span>
+<span class="sd">    control.mirror_curve(new_node, mirrored)</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">absolute_import</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">webbrowser</span>
+
+<span class="kn">import</span> <span class="nn">maya.cmds</span> <span class="k">as</span> <span class="nn">cmds</span>
+<span class="kn">import</span> <span class="nn">maya.api.OpenMaya</span> <span class="k">as</span> <span class="nn">OpenMaya</span>
+
+<span class="kn">from</span> <span class="nn">cmt.settings</span> <span class="k">import</span> <span class="n">DOCUMENTATION_ROOT</span>
+<span class="kn">import</span> <span class="nn">cmt.shortcuts</span> <span class="k">as</span> <span class="nn">shortcuts</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">CONTROLS_DIRECTORY</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;controls&quot;</span><span class="p">)</span>
+<span class="n">HELP_URL</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">/rig/control.html&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">DOCUMENTATION_ROOT</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="export_curves"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.export_curves">[docs]</a><span class="k">def</span> <span class="nf">export_curves</span><span class="p">(</span><span class="n">controls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Serializes the given curves into the control library.</span>
+
+<span class="sd">    :param controls: Optional list of controls to export. If no controls are specified,</span>
+<span class="sd">        the selected curves will be exported.</span>
+<span class="sd">    :param file_path: File path to export to</span>
+<span class="sd">    :return: The exported list of ControlShapes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">file_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_save_file_name</span><span class="p">(</span><span class="s2">&quot;*.json&quot;</span><span class="p">,</span> <span class="s2">&quot;cmt.control&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
+            <span class="k">return</span>
+    <span class="k">if</span> <span class="n">controls</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">controls</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">get_curve_data</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">fh</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="bp">cls</span><span class="o">=</span><span class="n">CurveShapeEncoder</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Exported controls to </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_path</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+<span class="k">def</span> <span class="nf">get_curve_data</span><span class="p">(</span><span class="n">controls</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get the serializable data of the given controls.</span>
+
+<span class="sd">    :param controls: Controls to serialize</span>
+<span class="sd">    :return: List of ControlShape objects</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">controls</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">controls</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">CurveShape</span><span class="p">(</span><span class="n">transform</span><span class="o">=</span><span class="n">control</span><span class="p">)</span> <span class="k">for</span> <span class="n">control</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">data</span>
+
+
+<div class="viewcode-block" id="import_new_curves"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.import_new_curves">[docs]</a><span class="k">def</span> <span class="nf">import_new_curves</span><span class="p">(</span><span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Imports control shapes from disk onto new transforms.</span>
+
+<span class="sd">    :param file_path: Path to the control file.</span>
+<span class="sd">    :param tag_as_controller: True to tag the curve transform as a controller</span>
+<span class="sd">    :return: The new curve transforms</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="n">load_curves</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    <span class="n">transforms</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">curve</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">:</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">_get_new_transform_name</span><span class="p">(</span><span class="n">curve</span><span class="o">.</span><span class="n">transform</span><span class="p">)</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">curve</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">transforms</span></div>
+
+
+<span class="k">def</span> <span class="nf">import_curves</span><span class="p">(</span><span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Imports control shapes from disk onto their saved named transforms.</span>
+
+<span class="sd">    :param file_path: Path to the control file.</span>
+<span class="sd">    :param tag_as_controller: True to tag the curve transform as a controller</span>
+<span class="sd">    :return: The new curve transforms</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="n">load_curves</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+
+    <span class="n">transforms</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">curve</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">curve</span><span class="o">.</span><span class="n">transform</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="p">)</span> <span class="k">for</span> <span class="n">curve</span> <span class="ow">in</span> <span class="n">controls</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">transforms</span>
+
+
+<div class="viewcode-block" id="import_curves_on_selected"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.import_curves_on_selected">[docs]</a><span class="k">def</span> <span class="nf">import_curves_on_selected</span><span class="p">(</span><span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Imports a control shape from disk onto the selected transform.</span>
+
+<span class="sd">    :param file_path: Path to the control file.</span>
+<span class="sd">    :param tag_as_controller: True to tag the curve transform as a controller</span>
+<span class="sd">    :return: The new curve transform</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="n">load_curves</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+    <span class="n">selected_transform</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">selected_transform</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">selected_transform</span> <span class="o">=</span> <span class="n">selected_transform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">curve</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">:</span>
+        <span class="n">curve</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">selected_transform</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">selected_transform</span></div>
+
+
+<div class="viewcode-block" id="load_curves"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.load_curves">[docs]</a><span class="k">def</span> <span class="nf">load_curves</span><span class="p">(</span><span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Load the CurveShape objects from disk.</span>
+
+<span class="sd">    :param file_path:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">file_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_open_file_name</span><span class="p">(</span><span class="s2">&quot;*.json&quot;</span><span class="p">,</span> <span class="s2">&quot;cmt.control&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
+            <span class="k">return</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fh</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loaded controls </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_path</span><span class="p">))</span>
+    <span class="n">curves</span> <span class="o">=</span> <span class="p">[</span><span class="n">CurveShape</span><span class="p">(</span><span class="o">**</span><span class="n">control</span><span class="p">)</span> <span class="k">for</span> <span class="n">control</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">curves</span></div>
+
+
+<span class="k">def</span> <span class="nf">_get_new_transform_name</span><span class="p">(</span><span class="n">base</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get a new unique transform name</span>
+
+<span class="sd">    :param base: Base name</span>
+<span class="sd">    :return: A unique name of a non-existing transform</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">base</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">name</span>
+
+
+<div class="viewcode-block" id="CurveShape"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape">[docs]</a><span class="k">class</span> <span class="nc">CurveShape</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Represents the data required to build a nurbs curve shape&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cvs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">form</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">knots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cvs</span> <span class="o">=</span> <span class="n">cvs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">degree</span> <span class="o">=</span> <span class="n">degree</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">form</span> <span class="o">=</span> <span class="n">form</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">knots</span> <span class="o">=</span> <span class="n">knots</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">color</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MTransformationMatrix</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span>
+        <span class="k">if</span> <span class="n">transform</span> <span class="ow">and</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">cvs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_from_curve</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_set_from_curve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transform</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Store the parameters from an existing curve in the CurveShape object.</span>
+
+<span class="sd">        :param transform: Transform</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_shape</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">shape</span> <span class="ow">and</span> <span class="n">cmds</span><span class="o">.</span><span class="n">nodeType</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;nurbsCurve&quot;</span><span class="p">:</span>
+            <span class="n">create_attr</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.create&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+            <span class="n">connection</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">listConnections</span><span class="p">(</span><span class="n">create_attr</span><span class="p">,</span> <span class="n">plugs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">d</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">connection</span><span class="p">:</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">disconnectAttr</span><span class="p">(</span><span class="n">connection</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">create_attr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cvs</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.cv[*]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">degree</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.degree&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">form</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.form&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">knots</span> <span class="o">=</span> <span class="n">get_knots</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideEnabled&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideRGBColors&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">)):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideColorRGB&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideColor&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">connection</span><span class="p">:</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="n">connection</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">create_attr</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CurveShape.create"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.create">[docs]</a>    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">as_controller</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a curve.</span>
+
+<span class="sd">        :param transform: Name of the transform to create the curve shape under.</span>
+<span class="sd">            If the transform does not exist, it will be created.</span>
+<span class="sd">        :param as_controller: True to mark the curve transform as a controller.</span>
+<span class="sd">        :return: The transform of the new curve shapes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cmds</span><span class="o">.</span><span class="n">objExists</span><span class="p">(</span><span class="n">transform</span><span class="p">):</span>
+            <span class="n">transform</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s2">&quot;transform&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">transform</span><span class="p">)</span>
+        <span class="n">periodic</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">form</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_transformed_points</span><span class="p">()</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">points</span> <span class="o">+</span> <span class="n">points</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">]</span> <span class="k">if</span> <span class="n">periodic</span> <span class="k">else</span> <span class="n">points</span>
+        <span class="n">curve</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">curve</span><span class="p">(</span><span class="n">degree</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">points</span><span class="p">,</span> <span class="n">per</span><span class="o">=</span><span class="n">periodic</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">knots</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_shape</span><span class="p">(</span><span class="n">curve</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideEnabled&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">color</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideColor&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">color</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideRGBColors&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="kc">True</span><span class="p">)</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">setAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.overrideColorRGB&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">color</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">parent</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">transform</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">Shape&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">transform</span><span class="p">))</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">curve</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">as_controller</span><span class="p">:</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">controller</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created curve </span><span class="si">{}</span><span class="s2"> for transform </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">transform</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">transform</span></div>
+
+    <span class="k">def</span> <span class="nf">_get_transformed_points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">asMatrix</span><span class="p">()</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[</span><span class="n">OpenMaya</span><span class="o">.</span><span class="n">MPoint</span><span class="p">(</span><span class="o">*</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">matrix</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cvs</span><span class="p">]</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[(</span><span class="n">p</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">z</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">points</span>
+
+<div class="viewcode-block" id="CurveShape.translate_by"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.translate_by">[docs]</a>    <span class="k">def</span> <span class="nf">translate_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">local</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Translate the curve cvs by the given values</span>
+
+<span class="sd">        :param x: Translate X</span>
+<span class="sd">        :param y: Translate Y</span>
+<span class="sd">        :param z: Translate Z</span>
+<span class="sd">        :param local: True for local space, False for world</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kObject</span> <span class="k">if</span> <span class="n">local</span> <span class="k">else</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kWorld</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">translateBy</span><span class="p">(</span><span class="n">OpenMaya</span><span class="o">.</span><span class="n">MVector</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">),</span> <span class="n">space</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CurveShape.set_translation"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.set_translation">[docs]</a>    <span class="k">def</span> <span class="nf">set_translation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">local</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set the absolute translation of the curve shape.</span>
+
+<span class="sd">        :param x: Translate X</span>
+<span class="sd">        :param y: Translate Y</span>
+<span class="sd">        :param z: Translate Z</span>
+<span class="sd">        :param local: True for local space, False for world</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kObject</span> <span class="k">if</span> <span class="n">local</span> <span class="k">else</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kWorld</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">setTranslation</span><span class="p">(</span><span class="n">OpenMaya</span><span class="o">.</span><span class="n">MVector</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">),</span> <span class="n">space</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CurveShape.rotate_by"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.rotate_by">[docs]</a>    <span class="k">def</span> <span class="nf">rotate_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">local</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Rotate the curve cvs by the given euler rotation values</span>
+
+<span class="sd">        :param x: Rotate X</span>
+<span class="sd">        :param y: Rotate Y</span>
+<span class="sd">        :param z: Rotate Z</span>
+<span class="sd">        :param local: True for local space, False for world</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span> <span class="o">*</span> <span class="mf">0.0174533</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">]]</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kObject</span> <span class="k">if</span> <span class="n">local</span> <span class="k">else</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kWorld</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">rotateBy</span><span class="p">(</span><span class="n">OpenMaya</span><span class="o">.</span><span class="n">MEulerRotation</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">),</span> <span class="n">space</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CurveShape.set_rotation"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.set_rotation">[docs]</a>    <span class="k">def</span> <span class="nf">set_rotation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set the absolute rotation of the curve shape in euler rotations.</span>
+
+<span class="sd">        :param x: Rotate X</span>
+<span class="sd">        :param y: Rotate Y</span>
+<span class="sd">        :param z: Rotate Z</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span> <span class="o">*</span> <span class="mf">0.0174533</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">setRotation</span><span class="p">(</span><span class="n">OpenMaya</span><span class="o">.</span><span class="n">MEulerRotation</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="CurveShape.scale_by"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.scale_by">[docs]</a>    <span class="k">def</span> <span class="nf">scale_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">local</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Scale the curve cvs by the given amount.</span>
+
+<span class="sd">        :param x: Scale X</span>
+<span class="sd">        :param y: Scale Y</span>
+<span class="sd">        :param z: Scale Z</span>
+<span class="sd">        :param local: True for local space, False for world</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kObject</span> <span class="k">if</span> <span class="n">local</span> <span class="k">else</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kWorld</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">scaleBy</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">],</span> <span class="n">space</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CurveShape.set_scale"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.CurveShape.set_scale">[docs]</a>    <span class="k">def</span> <span class="nf">set_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">local</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set the absolute scale of the curve shape.</span>
+
+<span class="sd">        :param x: Scale X</span>
+<span class="sd">        :param y: Scale Y</span>
+<span class="sd">        :param z: Scale Z</span>
+<span class="sd">        :param local: True for local space, False for world</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kObject</span> <span class="k">if</span> <span class="n">local</span> <span class="k">else</span> <span class="n">OpenMaya</span><span class="o">.</span><span class="n">MSpace</span><span class="o">.</span><span class="n">kWorld</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform_matrix</span><span class="o">.</span><span class="n">setScale</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">],</span> <span class="n">space</span><span class="p">)</span></div></div>
+
+
+<span class="k">class</span> <span class="nc">CurveShapeEncoder</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">CurveShape</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="s2">&quot;cvs&quot;</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">cvs</span><span class="p">,</span>
+                <span class="s2">&quot;degree&quot;</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span>
+                <span class="s2">&quot;form&quot;</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">form</span><span class="p">,</span>
+                <span class="s2">&quot;knots&quot;</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">knots</span><span class="p">,</span>
+                <span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">color</span><span class="p">,</span>
+                <span class="s2">&quot;transform&quot;</span><span class="p">:</span> <span class="n">obj</span><span class="o">.</span><span class="n">transform</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="o">.</span><span class="n">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">rotate_components</span><span class="p">(</span><span class="n">rx</span><span class="p">,</span> <span class="n">ry</span><span class="p">,</span> <span class="n">rz</span><span class="p">,</span> <span class="n">nodes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Rotate the given nodes&#39; components the given number of degrees about each axis.</span>
+
+<span class="sd">    :param rx: Degrees around x.</span>
+<span class="sd">    :param ry: Degrees around y.</span>
+<span class="sd">    :param rz: Degrees around z.</span>
+<span class="sd">    :param nodes: Optional list of curves.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">nodes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
+        <span class="n">pivot</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">xform</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">rp</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ws</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">cmds</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span>
+            <span class="n">rx</span><span class="p">,</span> <span class="n">ry</span><span class="p">,</span> <span class="n">rz</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{0}</span><span class="s2">.cv[*]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node</span><span class="p">),</span> <span class="n">r</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">pivot</span><span class="p">,</span> <span class="n">os</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fo</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="mirror_curve"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.mirror_curve">[docs]</a><span class="k">def</span> <span class="nf">mirror_curve</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">destination</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Mirrors the curve on source across the YZ plane to destination.</span>
+
+<span class="sd">    The cvs will be mirrored in world space no matter the transform of destination.</span>
+
+<span class="sd">    :param source: Source transform</span>
+<span class="sd">    :param destination: Destination transform</span>
+<span class="sd">    :return: The mirrored CurveShape object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">source_curve</span> <span class="o">=</span> <span class="n">CurveShape</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+    <span class="n">path_source</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_dag_path2</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+    <span class="n">matrix</span> <span class="o">=</span> <span class="n">path_source</span><span class="o">.</span><span class="n">inclusiveMatrix</span><span class="p">()</span>
+
+    <span class="n">path_destination</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_dag_path2</span><span class="p">(</span><span class="n">destination</span><span class="p">)</span>
+    <span class="n">inverse_matrix</span> <span class="o">=</span> <span class="n">path_destination</span><span class="o">.</span><span class="n">inclusiveMatrixInverse</span><span class="p">()</span>
+
+    <span class="n">world_cvs</span> <span class="o">=</span> <span class="p">[</span><span class="n">OpenMaya</span><span class="o">.</span><span class="n">MPoint</span><span class="p">(</span><span class="o">*</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">matrix</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">source_curve</span><span class="o">.</span><span class="n">cvs</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">cv</span> <span class="ow">in</span> <span class="n">world_cvs</span><span class="p">:</span>
+        <span class="n">cv</span><span class="o">.</span><span class="n">x</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">local_cvs</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="o">*</span> <span class="n">inverse_matrix</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">world_cvs</span><span class="p">]</span>
+    <span class="n">source_curve</span><span class="o">.</span><span class="n">cvs</span> <span class="o">=</span> <span class="p">[(</span><span class="n">p</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">z</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">local_cvs</span><span class="p">]</span>
+    <span class="n">is_controller</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">controller</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">isController</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">source_curve</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">destination</span>
+    <span class="n">source_curve</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">destination</span><span class="p">,</span> <span class="n">as_controller</span><span class="o">=</span><span class="n">is_controller</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">source_curve</span></div>
+
+
+<span class="k">def</span> <span class="nf">get_knots</span><span class="p">(</span><span class="n">curve</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Gets the list of knots of a curve so it can be recreated.</span>
+
+<span class="sd">    :param curve: Curve to query.</span>
+<span class="sd">    :return: A list of knot values that can be passed into the curve creation command.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">curve</span> <span class="o">=</span> <span class="n">shortcuts</span><span class="o">.</span><span class="n">get_shape</span><span class="p">(</span><span class="n">curve</span><span class="p">)</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">createNode</span><span class="p">(</span><span class="s2">&quot;curveInfo&quot;</span><span class="p">)</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">connectAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{0}</span><span class="s2">.worldSpace&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">curve</span><span class="p">),</span> <span class="s2">&quot;</span><span class="si">{0}</span><span class="s2">.inputCurve&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">info</span><span class="p">))</span>
+    <span class="n">knots</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">getAttr</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{0}</span><span class="s2">.knots[*]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">info</span><span class="p">))</span>
+    <span class="n">knots</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">knots</span><span class="p">]</span>
+    <span class="n">cmds</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">info</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">knots</span>
+
+
+<span class="k">def</span> <span class="nf">documentation</span><span class="p">():</span>
+    <span class="n">webbrowser</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">HELP_URL</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">get_control_paths_in_library</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Get the file paths of all controls in the library.</span>
+
+<span class="sd">    :return: List of file paths</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">x</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">CONTROLS_DIRECTORY</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.json&quot;</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">controls</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">controls</span>
+</pre></div>
+
+    </div>
+      
+  </div>
+</div>
+<footer class="footer">
+  <div class="container">
+    <p class="pull-right">
+      <a href="#">Back to top</a>
+      
+    </p>
+    <p>
+        &copy; Copyright 2018, Chad Vernon.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.2.<br/>
+    </p>
+  </div>
+</footer>
+  </body>
+</html>

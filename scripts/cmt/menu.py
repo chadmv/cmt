@@ -61,9 +61,20 @@ def create_menu():
     cmds.menuItem(parent=rig_menu, divider=True, dividerLabel="Animation Rig")
     cmds.menuItem(
         parent=rig_menu,
-        label="Create Control",
-        command="import cmt.rig.control as control; control.show()",
+        label="Control Creator",
+        command="import cmt.rig.control_ui as control_ui; control_ui.show()",
         image="orientJoint.png",
+    )
+    cmds.menuItem(
+        parent=rig_menu,
+        label="Export Selected Control Curves",
+        command="import cmt.rig.control as control; control.export_curves()",
+    )
+
+    cmds.menuItem(
+        parent=rig_menu,
+        label="Import Control Curves",
+        command="import cmt.rig.control as control; control.import_curves()",
     )
 
     # Deform

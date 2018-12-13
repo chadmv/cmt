@@ -32,6 +32,25 @@ class ControlTests(TestCase):
         self.cvs_are_equal(obj.cvs, self.cvs)
         self.assertIsNone(obj.color)
 
+    def test_get_curve_object_with_history(self):
+        curve = cmds.circle()[0]
+        obj = control.CurveShape(curve)
+        self.assertEqual(obj.degree, 3)
+        self.assertEqual(obj.form, 2)
+        self.assertListEqual(obj.knots, range(-2, 11))
+        expected_cvs = [
+            (0.7836116248912245, 0.7836116248912246, 0.0),
+            (6.785732323110912e-17, 1.1081941875543877, 0.0),
+            (-0.7836116248912245, 0.7836116248912244, 0.0),
+            (-1.1081941875543881, 5.74489823752483e-17, 0.0),
+            (-0.7836116248912245, -0.7836116248912245, 0.0),
+            (-1.1100856969603225e-16, -1.1081941875543884, 0.0),
+            (0.7836116248912245, -0.7836116248912244, 0.0),
+            (1.1081941875543881, -1.511240500779959e-16, 0.0),
+        ]
+        self.cvs_are_equal(obj.cvs, expected_cvs)
+        self.assertIsNone(obj.color)
+
     def test_create_on_nonexisting_transform(self):
         obj = control.CurveShape(self.curve)
         transform = obj.create("node1")
@@ -151,7 +170,7 @@ class ControlTests(TestCase):
         self.cvs_are_equal(cvs, expected_cvs)
 
     def test_get_control_data(self):
-        controls = control.get_control_data([self.curve])
+        controls = control.get_curve_data([self.curve])
         expected = [
             {
                 "transform": self.curve,
@@ -168,22 +187,20 @@ class ControlTests(TestCase):
 
     def test_save_and_load_curves(self):
         file_path = self.get_temp_filename("test_curve.json")
-        control.export_controls([self.curve], file_path)
+        control.export_curves([self.curve], file_path)
         self.assertTrue(os.path.exists(file_path))
         cmds.delete(self.curve)
-        controls = control.import_controls(file_path)
+        controls = control.import_curves(file_path)
         self.assertTrue(cmds.objExists(self.curve))
         self.assertEqual(controls[0], self.curve)
         self.test_get_curve_object()
 
     def test_save_and_load_curve_on_other_transform(self):
         file_path = self.get_temp_filename("test_curve.json")
-        control.export_controls([self.curve], file_path)
+        control.export_curves([self.curve], file_path)
         other = cmds.createNode("transform", name="other")
         cmds.setAttr("{}.tx".format(other), 2)
-        control.import_controls(
-            file_path, create_mode=control.CurveCreateMode.selected_curve
-        )
+        control.import_curves_on_selected(file_path)
         self.assertTrue(cmds.objExists("otherShape"))
         obj = control.CurveShape(other)
         self.assertEqual(obj.degree, 3)

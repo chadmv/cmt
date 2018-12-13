@@ -11,8 +11,6 @@ import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
 import maya.api.OpenMaya as OpenMaya2
 
-import cmt.settings as settings
-
 logger = logging.getLogger(__name__)
 
 
@@ -366,12 +364,13 @@ def _get_file_path(file_filter, key, file_mode):
     """
     start_directory = cmds.workspace(q=True, rd=True)
     if key is not None:
-        start_directory = get_settings(key, start_directory)
+        start_directory = get_setting(key, start_directory)
 
     file_path = cmds.fileDialog2(
         fileMode=file_mode, startingDirectory=start_directory, fileFilter=file_filter
     )
     if key is not None and file_path:
+        file_path = file_path[0]
         directory = (
             file_path if os.path.isdir(file_path) else os.path.dirname(file_path)
         )
