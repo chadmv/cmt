@@ -56,7 +56,7 @@ def retarget(source, target, shapes, rbf=None, radius=0.5, stride=1):
 
 def points_to_np_array(mesh, stride=1):
     points = get_points(mesh)
-    sparse_points = [p for p in points][::stride]
+    sparse_points = [OpenMaya.MPoint(p) for p in points][::stride]
     np_points = np.array([[p.x, p.y, p.z] for p in sparse_points])
     return np_points
 
