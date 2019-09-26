@@ -24,6 +24,7 @@ ATTRIBUTES = [
     "translate",
     "rotate",
     "scale",
+    "jointOrient",
     "radius",
     "rotateOrder",
     "rotateAxis",
