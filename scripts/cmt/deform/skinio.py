@@ -56,6 +56,10 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
     with open(file_path, "r") as fh:
         data = json.load(fh)
 
+    # Some cases the skinningMethod may have been set to -1
+    if data.get("skinningMethod", 0) < 0:
+        data["skinningMethod"] = 0
+
     if to_selected_shapes:
         shape = cmds.ls(sl=True)
         if shape:
@@ -63,7 +67,8 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
     if shape is None:
         shape = data["shape"]
     if not cmds.objExists(shape):
-        raise RuntimeError("Cannot import skin, {} does not exist".format(shape))
+        logging.warning("Cannot import skin, {} does not exist".format(shape))
+        return
 
     # Make sure the vertex count is the same
     mesh_vertex_count = cmds.polyEvaluate(shape, vertex=True)
@@ -88,13 +93,14 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
             [shortcuts.remove_namespace_from_name(x) for x in cmds.ls(type="joint")]
         )
         for j in joints:
+            j = j.split("|")[-1]
             if j in no_match:
                 no_match.remove(j)
             else:
                 unused_imports.append(j)
         # If there were unmapped influences ask the user to map them
         if unused_imports and no_match:
-            mapping_dialog = WeightRemapDialog()
+            mapping_dialog = WeightRemapDialog(file_path)
             mapping_dialog.set_influences(unused_imports, no_match)
             mapping_dialog.exec_()
             for src, dst in mapping_dialog.mapping.items():
@@ -340,6 +346,7 @@ class SkinCluster(object):
         ]
 
         for imported_influence, imported_weights in self.data["weights"].items():
+            imported_influence = imported_influence.split("|")[-1]
             for ii in range(influence_paths.length()):
                 influence_name = influence_paths[ii].partialPathName()
                 influence_without_namespace = shortcuts.remove_namespace_from_name(
@@ -385,7 +392,7 @@ class SkinCluster(object):
 
 
 class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, file_path=None, parent=None):
         super(WeightRemapDialog, self).__init__(parent)
         self.setWindowTitle("Remap Weights")
         self.setObjectName("remapWeightsUI")
@@ -394,10 +401,14 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
         self.mapping = {}
 
         mainvbox = QVBoxLayout(self)
+        if file_path is None:
+            file_path = ""
 
         label = QLabel(
-            "The following influences have no corresponding influence from the "
-            "imported file.  You can either remap the influences or skip them."
+            "{} The following influences have no corresponding influence from the "
+            "imported file.  You can either remap the influences or skip them.".format(
+                file_path
+            )
         )
         label.setWordWrap(True)
         mainvbox.addWidget(label)
