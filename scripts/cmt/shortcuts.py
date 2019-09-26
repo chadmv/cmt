@@ -88,6 +88,30 @@ def get_shape(node, intermediate=False):
     return None
 
 
+def get_points(mesh):
+    """Get the MPointArray of a mesh.
+
+    :param mesh: Mesh name
+    :return: MPointArray
+    """
+    mesh = get_shape(mesh)
+    path = get_dag_path2(mesh)
+    fn_mesh = OpenMaya2.MFnMesh(path)
+    return fn_mesh.getPoints()
+
+
+def set_points(mesh, points):
+    """Set the MPointArray of a mesh.
+
+    :param mesh: Mesh name
+    :param points: MPointArray
+    """
+    mesh = get_shape(mesh)
+    path = get_dag_path2(mesh)
+    fn_mesh = OpenMaya2.MFnMesh(path)
+    fn_mesh.setPoints(points)
+
+
 def get_node_in_namespace_hierarchy(node, namespace=None, shape=False):
     """Searches a namespace and all nested namespaces for the given node.
 
