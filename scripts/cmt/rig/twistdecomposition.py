@@ -145,7 +145,7 @@ def _create_twist_decomposition_network(driver, twist_axis):
     world_rest_matrix = cmds.createNode(
         "multMatrix", name="{}_world_rest_matrix".format(driver)
     )
-    for i, attr in enumerate(["parentMatrix[0]", REST_MATRIX]):
+    for i, attr in enumerate([REST_MATRIX, "parentMatrix[0]"]):
         cmds.connectAttr(
             "{}.{}".format(driver, attr), "{}.matrixIn[{}]".format(world_rest_matrix, i)
         )
