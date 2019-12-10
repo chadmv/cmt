@@ -3,12 +3,13 @@ from itertools import product
 
 
 class Side(object):
-    left = "L"
-    middle = "M"
-    right = "R"
-    top = "T"
-    bottom = "B"
+    left = "l"
+    middle = "m"
+    right = "r"
+    top = "t"
+    bottom = "b"
     left_right = [left, right]
+    left_middle_right = [left, middle, right]
 
 
 class Section(object):
@@ -40,6 +41,10 @@ ATTRIBUTES = [
             [Direction.in_out, Direction.up_down],
         ],
     },
+    {
+        "name": "brow",
+        "tokens": [Side.left_right, [Direction.in_out, Direction.up_down]],
+    },
     {"name": "browTwist", "tokens": [Side.left_right]},
     {"name": "cheek", "tokens": [Side.left_right, [Direction.in_out]]},
     {"name": "cheekRaiser", "tokens": [Side.left_right]},
@@ -53,35 +58,34 @@ ATTRIBUTES = [
     },
     {
         "name": "lipCorner",
-        "tokens": [Side.left_right, [Direction.left_right, Direction.up_down]],
+        "tokens": [Side.left_right, [Direction.in_out, Direction.up_down]],
     },
     {"name": "lipPressor", "tokens": [Side.left_right]},
-    {
-        "name": "lipRoll",
-        "tokens": [
-            [
-                "{}{}".format(Side.left, Side.bottom),
-                "{}{}".format(Side.right, Side.bottom),
-                "{}{}".format(Side.left, Side.top),
-                "{}{}".format(Side.right, Side.top),
-            ]
-        ],
-    },
+    {"name": "lipUpperRoll", "tokens": [Side.left_right]},
+    {"name": "lipLowerRoll", "tokens": [Side.left_right]},
     {
         "name": "eyeLidLower",
         "tokens": [
             Side.left_right,
             Section.inner_middle_outer,
-            [Direction.left_right, Direction.up_down],
+            [Direction.in_out, Direction.up_down],
         ],
+    },
+    {
+        "name": "eyeLidLower",
+        "tokens": [Side.left_right, [Direction.in_out, Direction.up_down]],
     },
     {
         "name": "eyeLidUpper",
         "tokens": [
             Side.left_right,
             Section.inner_middle_outer,
-            [Direction.left_right, Direction.up_down],
+            [Direction.in_out, Direction.up_down],
         ],
+    },
+    {
+        "name": "eyeLidUpper",
+        "tokens": [Side.left_right, [Direction.in_out, Direction.up_down]],
     },
     {
         "name": "mouth",
@@ -95,6 +99,8 @@ ATTRIBUTES = [
             [Direction.in_out, Direction.left_right, Direction.twist, Direction.up_down]
         ],
     },
+    {"name": "noseRotate", "tokens": [[Direction.up_down]]},
+    {"name": "noseTip", "tokens": [[Direction.left_right, Direction.up_down]]},
     {"name": "noseWrinkler", "tokens": [Side.left_right]},
     {"name": "pucker", "tokens": [Side.left_right]},
     {
@@ -104,6 +110,7 @@ ATTRIBUTES = [
             [Direction.in_out, Direction.left_right, Direction.up_down],
         ],
     },
+    {"name": "lipLowerPinch", "tokens": [Side.left_right]},
     {
         "name": "lipUpper",
         "tokens": [
@@ -111,6 +118,7 @@ ATTRIBUTES = [
             [Direction.in_out, Direction.left_right, Direction.up_down],
         ],
     },
+    {"name": "lipUpperPinch", "tokens": [Side.left_right]},
 ]
 
 
@@ -168,19 +176,92 @@ class DrivenAnimationNode(object):
     def get_blend_weighted(self, name):
         return self.blend_weighted[name]
 
-    def add_secondary_driver(self, target, driver, weight):
+    def add_secondary_driver(
+        self,
+        target,
+        driver,
+        weight,
+        offset=0,
+        multiplier=None,
+        negate=False,
+        clamp=False,
+        inverse=False,
+    ):
         """Add a new driver to the attribute in second layer.
 
         :param target: Attribute to drive
         :param driver: Attribute on the first layer to add as a driver
         :param weight: Weight multiplier to use with the driver
+        :param clamp: True to clamp the min driver weight to 0
         """
         blend = self.get_blend_weighted(target)
         index = cmds.getAttr("{}.input".format(blend), mi=True)[-1] + 1
-        cmds.connectAttr(
-            "{}.{}".format(self.anim_node, driver), "{}.input[{}]".format(blend, index)
+        source = (
+            driver
+            if cmds.objExists(driver)
+            else "{}.{}".format(self.driven_node, driver)
         )
-        cmds.setAttr("{}.w[{}]".format(blend, index), weight)
+        connect_attribute(
+            source,
+            "{}.input[{}]".format(blend, index),
+            offset,
+            multiplier,
+            negate,
+            clamp,
+            inverse,
+        )
+        if isinstance(weight, float):
+            cmds.setAttr("{}.w[{}]".format(blend, index), weight)
+        else:
+            cmds.connectAttr(weight, "{}.w[{}]".format(blend, index))
+        return blend
+
+
+def connect_attribute(
+    source,
+    destination,
+    offset=0,
+    multiplier=None,
+    negate=False,
+    clamp=False,
+    inverse=False,
+):
+
+    output = source
+    name = source.split(".")[-1]
+    if negate:
+        mdl = cmds.createNode("multDoubleLinear", name="{}_negate".format(name))
+        cmds.setAttr("{}.input1".format(mdl), -1)
+        cmds.connectAttr(output, "{}.input2".format(mdl))
+        output = "{}.output".format(mdl)
+
+    if clamp:
+        clamp = cmds.createNode("clamp", name="{}_clamp".format(name))
+        cmds.setAttr("{}.minR".format(clamp), 0.0)
+        cmds.setAttr("{}.maxR".format(clamp), 10.0)
+        cmds.connectAttr(output, "{}.inputR".format(clamp))
+        output = "{}.outputR".format(clamp)
+
+    if multiplier is not None:
+        mdl = cmds.createNode("multDoubleLinear", name="{}_multiplier".format(name))
+        cmds.setAttr("{}.input1".format(mdl), multiplier)
+        cmds.connectAttr(output, "{}.input2".format(mdl))
+        output = "{}.output".format(mdl)
+
+    if offset:
+        adl = cmds.createNode("addDoubleLinear", name="{}_offset".format(name))
+        cmds.setAttr("{}.input1".format(adl), offset)
+        cmds.connectAttr(output, "{}.input2".format(adl))
+        output = "{}.output".format(adl)
+
+    if inverse:
+        pma = cmds.createNode("plusMinusAverage", name="{}_inverse".format(name))
+        cmds.setAttr("{}.operation".format(pma), 2)  # subtract
+        cmds.setAttr("{}.input1D[0]".format(pma), 1)
+        cmds.connectAttr(output, "{}.input1D[1]".format(pma))
+        output = "{}.output1D".format(pma)
+
+    cmds.connectAttr(output, destination)
 
 
 def create_attribute_node(name="face_animation"):

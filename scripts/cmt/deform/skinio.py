@@ -75,8 +75,9 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
     imported_vertex_count = len(data["blendWeights"])
     if mesh_vertex_count != imported_vertex_count:
         raise RuntimeError(
-            "Vertex counts do not match. Mesh %d != File %d"
-            % (mesh_vertex_count, imported_vertex_count)
+            "Vertex counts do not match. Mesh {} != File {}".format(
+                mesh_vertex_count, imported_vertex_count
+            )
         )
 
     # Check if the shape has a skinCluster

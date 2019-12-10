@@ -269,40 +269,6 @@ def get_icon_path(name):
     return None
 
 
-def duplicate_chain(start, end, prefix="", suffix="", search_for="", replace_with=""):
-    """Duplicates the transform chain starting at start and ending at end.
-
-    :param start: The start transform.
-    :param end: The end transform.
-    :param prefix: Prefix to add to the new chain.
-    :param suffix: Suffix to add to the new chain.
-    :param search_for: Search for token
-    :param replace_with: Replace token
-    :return: A list of the duplicated joints, a list of the original joints that were
-    duplicated.
-    """
-    joint = end
-    joints = []
-    original_joints = []
-    while joint:
-        name = "{0}{1}{2}".format(prefix, joint, suffix)
-        if search_for or replace_with:
-            name = name.replace(search_for, replace_with)
-        original_joints.append(joint)
-        duplicate_joint = cmds.duplicate(joint, name=name, parentOnly=True)[0]
-        if joints:
-            cmds.parent(joints[-1], duplicate_joint)
-        joints.append(duplicate_joint)
-        if joint == start:
-            break
-        joint = cmds.listRelatives(joint, parent=True, path=True)
-        if joint:
-            joint = joint[0]
-        else:
-            raise RuntimeError("{0} is not a descendant of {1}".format(end, start))
-    joints.reverse()
-    original_joints.reverse()
-    return joints, original_joints
 
 
 _settings = None
@@ -411,3 +377,47 @@ def get_int_ptr():
 
 def ptr_to_int(int_ptr):
     return OpenMaya.MScriptUtil.getInt(int_ptr)
+
+
+def distance(node1=None, node2=None):
+    """Calculate the distance between two nodes
+
+    :param node1: First node
+    :param node2: Second node
+    :return: The distance
+    """
+    if node1 is None or node2 is None:
+        # Default to selection
+        selection = cmds.ls(sl=True, type='transform')
+        if len(selection) != 2:
+            raise RuntimeError('Select 2 transforms.')
+        node1, node2 = selection
+
+    pos1 = cmds.xform(node1, query=True, worldSpace=True, translation=True)
+    pos2 = cmds.xform(node2, query=True, worldSpace=True, translation=True)
+
+    pos1 = OpenMaya.MPoint(pos1[0], pos1[1], pos1[2])
+    pos2 = OpenMaya.MPoint(pos2[0], pos2[1], pos2[2])
+    return pos1.distanceTo(pos2)
+
+
+def vector_to(source=None, target=None):
+    """Calculate the distance between two nodes
+
+    :param source: First node
+    :param target: Second node
+    :return: MVector (API2)
+    """
+    if source is None or target is None:
+        # Default to selection
+        selection = cmds.ls(sl=True, type='transform')
+        if len(selection) != 2:
+            raise RuntimeError('Select 2 transforms.')
+        source, target = selection
+
+    pos1 = cmds.xform(source, query=True, worldSpace=True, translation=True)
+    pos2 = cmds.xform(target, query=True, worldSpace=True, translation=True)
+
+    source = OpenMaya2.MPoint(pos1[0], pos1[1], pos1[2])
+    target = OpenMaya2.MPoint(pos2[0], pos2[1], pos2[2])
+    return target - source
