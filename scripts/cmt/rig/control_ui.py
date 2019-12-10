@@ -194,7 +194,7 @@ class ControlWindow(shortcuts.SingletonWindowMixin, MayaQWidgetBaseMixin, QMainW
         """Create the curves selected in the curve list."""
         sel = cmds.ls(sl=True)
         target = sel[0] if sel else None
-        func = import_curve_on_selected if target else import_new_curves
+        func = import_curves_on_selected if target else import_new_curves
         curves = []
         for item in self.control_list.selectedItems():
             text = item.text()

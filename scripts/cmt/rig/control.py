@@ -144,14 +144,14 @@ def import_curves_on_selected(file_path=None, tag_as_controller=False):
     :return: The new curve transform
     """
     controls = load_curves(file_path)
-    selected_transform = cmds.ls(sl=True)
-    if not selected_transform:
+    selected_transforms = cmds.ls(sl=True)
+    if not selected_transforms:
         return
-    selected_transform = selected_transform[0]
 
-    for curve in controls:
-        curve.create(selected_transform, tag_as_controller)
-    return selected_transform
+    for transform in selected_transforms:
+        for curve in controls:
+            curve.create(transform, tag_as_controller)
+    return selected_transforms
 
 
 def load_curves(file_path=None):
