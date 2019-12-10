@@ -384,6 +384,7 @@ class Options(OptionBox):
             v2=twist_axis[1],
             v3=twist_axis[2],
             enable=specify_twist_axis,
+            precision=3,
         )
 
     def on_axis_enable_changed(self, value):
