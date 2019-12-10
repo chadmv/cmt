@@ -15,6 +15,7 @@ Example Usage
     Section.print_timing()
 
 """
+import functools
 import time
 from collections import OrderedDict
 
@@ -39,7 +40,8 @@ class Section(object):
         """Prints the existing timing data"""
         global _workspaces
         for workspace, tasks in _workspaces.items():
-            print("-- Timing.Workspace: {}".format(workspace))
+            total_time = sum(tasks.values())
+            print("-- {}: {:.6f} seconds".format(workspace, total_time))
             for task, run_time in tasks.items():
                 print("  - {}: {:.6f} seconds".format(task, run_time))
 
@@ -55,3 +57,16 @@ class Section(object):
         run_time = time.time() - self.start_time
         workspace = _workspaces.setdefault(self.workspace, OrderedDict())
         workspace[self.task] = run_time
+
+
+def timed(workspace, task):
+    def decorator_timed(func):
+        @functools.wraps(func)
+        def wrapper_timed(*args, **kwargs):
+            with Section(workspace, task):
+                result = func(*args, **kwargs)
+            return result
+
+        return wrapper_timed
+
+    return decorator_timed
