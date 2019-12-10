@@ -14,9 +14,13 @@ from __future__ import division
 from __future__ import print_function
 from six import string_types
 
+import maya.api.OpenMaya as OpenMaya
 import maya.cmds as cmds
 import json
 import logging
+
+import cmt.shortcuts as shortcuts
+from cmt.shortcuts import distance, vector_to
 
 logger = logging.getLogger(__name__)
 
@@ -185,3 +189,51 @@ def mirror(joint, search_for, replace_with):
 
             scale = cmds.getAttr("{0}.s".format(joint))[0]
             cmds.setAttr("{0}.s".format(mirrored_joint), *scale)
+
+
+def insert_joints(joints=None, joint_count=1):
+    """Inserts joints evenly spaced along a bone.
+
+    :param joints: List of joints to insert child joints to.
+    :param joint_count: Number of joints to insert.
+    :return: List of joints created.
+    """
+
+    if joints is None:
+        joints = cmds.ls(sl=True, type="joint")
+        if not joints:
+            raise RuntimeError("No joint selected")
+
+    if joint_count < 1:
+        raise RuntimeError("Must insert at least 1 joint.")
+
+    result = []
+    for joint in joints:
+        children = cmds.listRelatives(joint, children=True, type="joint")
+        if not children:
+            raise RuntimeError(
+                "Joint {} needs a child in order to insert joints".format(joint)
+            )
+
+        name = joint
+        end_joint = children[0]
+        d = distance(joint, children[0])
+        increment = d / (joint_count + 1)
+        direction = vector_to(joint, end_joint)
+        direction.normalize()
+        direction *= increment
+
+        for i in range(joint_count):
+            position = cmds.xform(joint, query=True, worldSpace=True, translation=True)
+            position = OpenMaya.MPoint(position[0], position[1], position[2])
+            position += direction
+            joint = cmds.insertJoint(joint)
+            joint = cmds.rename(joint, ("{}_seg#".format(name)))
+            cmds.joint(
+                joint,
+                edit=True,
+                component=True,
+                position=(position.x, position.y, position.z),
+            )
+            result.append(joint)
+    return result

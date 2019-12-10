@@ -15,6 +15,9 @@ import logging
 import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
 
+import cmt.rig.skeleton as skeleton
+reload(skeleton)
+
 log = logging.getLogger(__name__)
 MESSAGE_ATTRIBUTE = "cmt_jointOrient"
 ORIENT_GROUP = "cmt_orient_grp"
@@ -28,10 +31,21 @@ class OrientJointsWindow(object):
         if cmds.windowPref(name, exists=True):
             cmds.windowPref(name, remove=True)
         self.window = cmds.window(
-            name, title="CMT Orient Joints", widthHeight=(358, 330)
+            name, title="CMT Orient Joints", widthHeight=(358, 380)
         )
         cmds.columnLayout(adjustableColumn=True)
         margin_width = 4
+        cmds.frameLayout(
+            bv=False, label="Operations", collapsable=True, mw=margin_width
+        )
+        cmds.rowColumnLayout(numberOfColumns=2, adj=1)
+
+        self.insert_joint_field = cmds.intField(minValue=1, value=1)
+        cmds.button(label="Insert Joints", c=self.insert_joints)
+
+        cmds.setParent("..")
+        cmds.setParent("..")
+
         cmds.frameLayout(
             bv=False, label="Quick Actions", collapsable=True, mw=margin_width
         )
@@ -126,6 +140,10 @@ class OrientJointsWindow(object):
         cmds.setParent("..")
         cmds.setParent("..")
         cmds.showWindow(self.window)
+
+    def insert_joints(self, *args):
+        joint_count = cmds.intField(self.insert_joint_field, q=True, v=True)
+        skeleton.insert_joints(joint_count=joint_count)
 
     def template_joints(self, dummy):
         reorient_children = cmds.checkBox(
