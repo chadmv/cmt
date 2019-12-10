@@ -109,6 +109,12 @@ def create_menu():
     )
     cmds.menuItem(
         parent=utility_menu,
+        label="Reload",
+        command="import cmt.reloadmodules; cmt.reloadmodules.reload_modules()",
+        imageOverlayLabel="Test",
+    )
+    cmds.menuItem(
+        parent=utility_menu,
         label="Resource Browser",
         command="import maya.app.general.resourceBrowser as rb; rb.resourceBrowser().run()",
         imageOverlayLabel="name",

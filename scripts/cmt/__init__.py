@@ -36,5 +36,6 @@ def initialize():
     Runs any initialization for CMT such as creating the menu.
     """
     import cmt.menu
+    import cmt.reloadmodules
 
     cmt.menu.create_menu()
