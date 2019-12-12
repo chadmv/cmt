@@ -1,4 +1,6 @@
 import maya.cmds as cmds
+import cmt.shortcuts as shortcuts
+from six import string_types
 
 HIERARCHY = {
     "top": {"anim": None, "skeleton": None, "rig": {"orients": None}, "geo": None}
@@ -97,13 +99,13 @@ def duplicate_chain(start, end, prefix="", suffix="", search_for="", replace_wit
 
 
 def connect_attribute(
-        source,
-        destination,
-        offset=0,
-        multiplier=None,
-        negate=False,
-        clamp=False,
-        inverse=False,
+    source,
+    destination,
+    offset=0,
+    multiplier=None,
+    negate=False,
+    clamp=False,
+    inverse=False,
 ):
     output = source
     name = source.split(".")[-1]
@@ -140,3 +142,32 @@ def connect_attribute(
         output = "{}.output1D".format(pma)
 
     cmds.connectAttr(output, destination)
+
+
+def freeze_to_parent_offset(node):
+    """Transfer the local matrix of the specified node into the offsetParentMatrix
+
+    :param node: Node name or list of node names
+    """
+    if not isinstance(node, string_types):
+        for n in node:
+            freeze_to_parent_offset(n)
+        return
+
+    if cmds.about(api=True) < 20200000:
+        raise RuntimeError("offsetParentMatrix is only available starting in Maya 2020")
+    m = cmds.getAttr("{}.m".format(node))
+    cmds.setAttr("{}.offsetParentMatrix".format(node), m, type="matrix")
+    for attr in ["{}{}".format(x, y) for x in "trs" for y in "xyz"]:
+        is_locked = cmds.getAttr("{}.{}".format(node, attr), lock=True)
+        if is_locked:
+            cmds.setAttr("{}.{}".format(node, attr), lock=False)
+        value = 1.0 if attr.startswith("s") else 0.0
+        cmds.setAttr("{}.{}".format(node, attr), value)
+        if is_locked:
+            cmds.setAttr("{}.{}".format(node, attr), lock=True)
+
+
+def snap_to_position(node, snap_to):
+    pos = cmds.xform(snap_to, q=True, ws=True, t=True)
+    cmds.xform(node, ws=True, t=pos)
