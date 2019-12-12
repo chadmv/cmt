@@ -20,9 +20,9 @@ import os
 from six import string_types
 from functools import partial
 
-from cmt.qt.QtCore import *
-from cmt.qt.QtGui import *
-from cmt.qt.QtWidgets import *
+from PySide2.QtCore import *
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 
 import maya.cmds as cmds

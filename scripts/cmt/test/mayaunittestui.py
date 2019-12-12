@@ -21,10 +21,9 @@ import webbrowser
 
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 
-import cmt.qt
-from cmt.qt.QtCore import *
-from cmt.qt.QtGui import *
-from cmt.qt.QtWidgets import *
+from PySide2.QtCore import *
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
 import cmt.test.mayaunittest as mayaunittest
 import cmt.shortcuts as shortcuts
 
@@ -362,9 +361,7 @@ class TestTreeModel(QAbstractItemModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         node = index.internalPointer()
-        data_changed_kwargs = (
-            [index, index] if cmt.qt.__binding__ == "PySide" else [index, index, []]
-        )
+        data_changed_kwargs = ([index, index, []])
         if role == Qt.EditRole:
             self.dataChanged.emit(*data_changed_kwargs)
         if role == Qt.DecorationRole:
