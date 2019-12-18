@@ -4,7 +4,7 @@ from cmt.test import TestCase
 import math
 
 
-class ControlTests(TestCase):
+class DGETests(TestCase):
 
     def test_add(self):
         loc = cmds.spaceLocator()[0]
@@ -71,6 +71,14 @@ class ControlTests(TestCase):
         z = cmds.getAttr("{}.tz".format(loc))
         self.assertAlmostEquals(z, 6.0)
 
+    def test_parentheses(self):
+        loc = cmds.spaceLocator()[0]
+        result = dge("(x+3)*(2+x)", x="{}.tx".format(loc))
+        cmds.connectAttr(result, "{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 5)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 56.0)
+
     def test_multiply(self):
         loc = cmds.spaceLocator()[0]
         result = dge("x*3", x="{}.tx".format(loc))
@@ -132,3 +140,25 @@ class ControlTests(TestCase):
         cmds.setAttr("{}.tx".format(loc), 5)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, -5)
+
+    def test_ternary(self):
+        loc = cmds.spaceLocator()[0]
+        result = dge("x < 1 ? x : 4", x="{}.tx".format(loc))
+        cmds.connectAttr(result, "{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 5)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 4)
+        cmds.setAttr("{}.tx".format(loc), 0)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 0)
+
+    def test_ternary_with_function(self):
+        loc = cmds.spaceLocator()[0]
+        result = dge("x < 1 ? x : exp(x)", x="{}.tx".format(loc))
+        cmds.connectAttr(result, "{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 5)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, math.exp(5), places=3)
+        cmds.setAttr("{}.tx".format(loc), 0)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 0)
