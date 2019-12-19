@@ -152,6 +152,17 @@ class DGETests(TestCase):
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 0)
 
+    def test_ternary_is_equal(self):
+        loc = cmds.spaceLocator()[0]
+        result = dge("x == 1 ? x : 4", x="{}.tx".format(loc))
+        cmds.connectAttr(result, "{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 5)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 4)
+        cmds.setAttr("{}.tx".format(loc), 1)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 1)
+
     def test_ternary_with_function(self):
         loc = cmds.spaceLocator()[0]
         result = dge("x < 1 ? x : exp(x)", x="{}.tx".format(loc))
@@ -162,3 +173,10 @@ class DGETests(TestCase):
         cmds.setAttr("{}.tx".format(loc), 0)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 0)
+
+    def test_assignment(self):
+        loc = cmds.spaceLocator()[0]
+        result = dge("y=x^2", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 5)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 25)

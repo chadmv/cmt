@@ -53,6 +53,7 @@
       aria-labelledby="dLabelGlobalToc"><ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation Instructions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../rigging.html">Rigging Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dge.html">Dependency Graph Expressions</a></li>
 </ul>
 </ul>
 </li>
@@ -246,14 +247,14 @@
 <span class="sd">    :return: The new curve transform</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">controls</span> <span class="o">=</span> <span class="n">load_curves</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
-    <span class="n">selected_transform</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">selected_transform</span><span class="p">:</span>
+    <span class="n">selected_transforms</span> <span class="o">=</span> <span class="n">cmds</span><span class="o">.</span><span class="n">ls</span><span class="p">(</span><span class="n">sl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">selected_transforms</span><span class="p">:</span>
         <span class="k">return</span>
-    <span class="n">selected_transform</span> <span class="o">=</span> <span class="n">selected_transform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-    <span class="k">for</span> <span class="n">curve</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">:</span>
-        <span class="n">curve</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">selected_transform</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">selected_transform</span></div>
+    <span class="k">for</span> <span class="n">transform</span> <span class="ow">in</span> <span class="n">selected_transforms</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">curve</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">:</span>
+            <span class="n">curve</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">tag_as_controller</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">selected_transforms</span></div>
 
 
 <div class="viewcode-block" id="load_curves"><a class="viewcode-back" href="../../../rig/control.html#cmt.rig.control.load_curves">[docs]</a><span class="k">def</span> <span class="nf">load_curves</span><span class="p">(</span><span class="n">file_path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
