@@ -2,6 +2,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
 import cmt.shortcuts as shortcuts
 import cmt.rig.common as common
+from cmt.dge import dge
 
 
 class LegRig(object):
@@ -273,92 +274,17 @@ class LegRig(object):
             keyable=True,
         )
 
-        clamp = cmds.createNode("clamp", name="{}_softik_clamp".format(self.name))
-        cmds.setAttr("{}.minR".format(clamp), 0.001)
-        cmds.setAttr("{}.maxR".format(clamp), 1)
-        cmds.connectAttr("{}.softIk".format(ik_control), "{}.inputR".format(clamp))
-        softik = "{}.outputR".format(clamp)
+        softik = dge("clamp(x, 0.001, 1)", x="{}.softIk".format(ik_control))
 
         # We need to adjust how far the ik handle is from the start to create the soft
         # effect
-        # x = current % of rest distance
-        # if x > (1.0-softIk):
-        #     x = (1.0 - softIk) + softIk * (1.0 - exp(-(x - (1.0 - softIk)) / softIk))
-
-        # (1.0 - softik)
-        one_minus = cmds.createNode(
-            "plusMinusAverage", name="{}_one_minus_softik".format(self.name)
+        soft_ik_percentage = dge(
+            "x > (1.0 - softIk)"
+            "? (1.0 - softIk) + softIk * (1.0 - exp(-(x - (1.0 - softIk)) / softIk)) "
+            ": x",
+            container="{}_softik".format(self.name),
+            x=self.percent_rest_distance,
+            softIk=softik,
         )
-        cmds.setAttr("{}.operation".format(one_minus), 2)
-        cmds.setAttr("{}.input1D[0]".format(one_minus), 1)
-        cmds.connectAttr(softik, "{}.input1D[1]".format(one_minus))
+        return soft_ik_percentage
 
-        # x - (1.0 - softik)
-        x_minus = cmds.createNode(
-            "plusMinusAverage", name="{}_x_minus_one_minus_softik".format(self.name)
-        )
-        cmds.setAttr("{}.operation".format(x_minus), 2)
-        cmds.connectAttr(self.percent_rest_distance, "{}.input1D[0]".format(x_minus))
-        cmds.connectAttr(
-            "{}.output1D".format(one_minus), "{}.input1D[1]".format(x_minus)
-        )
-
-        # -(x - (1.0 - softik))
-        negate = cmds.createNode(
-            "multDoubleLinear", name="{}_softik_negate".format(self.name)
-        )
-        cmds.setAttr("{}.input1".format(negate), -1)
-        cmds.connectAttr("{}.output1D".format(x_minus), "{}.input2".format(negate))
-
-        # -(x - (1.0 - softik)) / softik
-        divide = cmds.createNode(
-            "multiplyDivide", name="{}_softik_divide".format(self.name)
-        )
-        cmds.setAttr("{}.operation".format(divide), 2)  # divide
-        cmds.connectAttr("{}.output".format(negate), "{}.input1X".format(divide))
-        cmds.connectAttr(softik, "{}.input2X".format(divide))
-
-        # exp(-(x - (1.0 - softIk)) / softIk)
-        exp = cmds.createNode("multiplyDivide", name="{}_softik_exp".format(self.name))
-        cmds.setAttr("{}.operation".format(exp), 3)  # pow
-        cmds.setAttr("{}.input1X".format(exp), 2.71828)
-        cmds.connectAttr("{}.outputX".format(divide), "{}.input2X".format(exp))
-
-        # 1.0 - exp(-(x - (1.0 - softIk)) / softIk)
-        one_minus_exp = cmds.createNode(
-            "plusMinusAverage", name="{}_one_minus_exp".format(self.name)
-        )
-        cmds.setAttr("{}.operation".format(one_minus_exp), 2)
-        cmds.setAttr("{}.input1D[0]".format(one_minus_exp), 1)
-        cmds.connectAttr(
-            "{}.outputX".format(exp), "{}.input1D[1]".format(one_minus_exp)
-        )
-
-        # softik * (1.0 - exp(-(x - (1.0 - softIk)) / softIk))
-        mdl = cmds.createNode(
-            "multDoubleLinear", name="{}_softik_mdl".format(self.name)
-        )
-        cmds.connectAttr(softik, "{}.input1".format(mdl))
-        cmds.connectAttr("{}.output1D".format(one_minus_exp), "{}.input2".format(mdl))
-
-        # (1.0 - softik) + softik * (1.0 - exp(-(x - (1.0 - softIk)) / softIk))
-        adl = cmds.createNode("addDoubleLinear", name="{}_softik_adl".format(self.name))
-        cmds.connectAttr("{}.output1D".format(one_minus), "{}.input1".format(adl))
-        cmds.connectAttr("{}.output".format(mdl), "{}.input2".format(adl))
-        # Now output of adl is the % of the rest distance the ik handle should be from
-        # the start joint
-
-        # Only adjust the ik handle if it is less than the soft percentage threshold
-        cnd = cmds.createNode(
-            "condition",
-            name="{}_current_length_greater_than_soft_length".format(self.name),
-        )
-        cmds.setAttr("{}.operation".format(cnd), 2)  # greater than
-        cmds.connectAttr(self.percent_rest_distance, "{}.firstTerm".format(cnd))
-        cmds.connectAttr("{}.output1D".format(one_minus), "{}.secondTerm".format(cnd))
-        cmds.connectAttr("{}.output".format(adl), "{}.colorIfTrueR".format(cnd))
-        cmds.connectAttr(self.percent_rest_distance, "{}.colorIfFalseR".format(cnd))
-
-        softik_percentage = "{}.outColorR".format(cnd)
-
-        return softik_percentage
