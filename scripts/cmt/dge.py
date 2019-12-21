@@ -210,6 +210,8 @@ class DGParser(object):
         self.expression_string = None
         self.results = None
         self.container = None
+        # Look up to optimize redundant nodes
+        self.created_nodes = {}
 
         self.opn = {
             "+": self.add,
@@ -269,13 +271,16 @@ class DGParser(object):
         ternary = (
             comparison + (qm + expr + colon + expr).setParseAction(self.push_first)[...]
         )
-        # self.bnf = ternary
         assignment = Optional(assignment_op).setParseAction(self.push_last) + ternary
 
         self.bnf = assignment
 
     def eval(self, expression_string, container=None, **kwargs):
         self.kwargs = kwargs
+        # Reverse variable look up to write cleaner notes
+        self._reverse_kwargs = {}
+        for k, v in kwargs.items():
+            self._reverse_kwargs[v] = k
         self.expression_string = expression_string
         self.expr_stack = []
         self.assignment_stack = []
@@ -283,13 +288,13 @@ class DGParser(object):
         self.container = (
             cmds.container(name=container, current=True) if container else None
         )
+        self.created_nodes = {}
         stack = self.expr_stack[:] + self.assignment_stack[:]
         result = self.evaluate_stack(stack)
 
         if self.container:
             self.publish_container_attributes()
         return result
-
 
     def push_first(self, toks):
         self.expr_stack.append(toks[0])
@@ -311,9 +316,7 @@ class DGParser(object):
             op, num_args = op
         if op == "unary -":
             op1 = self.evaluate_stack(s)
-            result = self.multiply(-1, op1)
-            self.add_notes(result, "*", -1, op1)
-            return result
+            return self.get_op_result(op, self.multiply, -1, op1)
         elif op == "?":
             # ternary
             if_false = self.evaluate_stack(s)
@@ -321,14 +324,20 @@ class DGParser(object):
             condition = self.evaluate_stack(s)
             second_term = self.evaluate_stack(s)
             first_term = self.evaluate_stack(s)
-            result = self.condition(
-                first_term, second_term, condition, if_true, if_false
-            )
             note = "{} {} {} ? {} : {}".format(
                 first_term, self.conditionals[condition], second_term, if_true, if_false
             )
-            self.add_notes(result, note)
-            return result
+
+            return self.get_op_result(
+                note,
+                self.condition,
+                first_term,
+                second_term,
+                condition,
+                if_true,
+                if_false,
+                op_str=note,
+            )
         elif op == ":":
             # Return the if_true statement to the ternary
             return self.evaluate_stack(s)
@@ -336,20 +345,17 @@ class DGParser(object):
             # operands are pushed onto the stack in reverse order
             op2 = self.evaluate_stack(s)
             op1 = self.evaluate_stack(s)
-            result = self.opn[op](op1, op2)
-            self.add_notes(result, op, op1, op2)
-            return result
+
+            return self.get_op_result(op, self.opn[op], op1, op2)
         elif op == "PI":
-            return math.pi  # 3.1415926535
+            return math.pi
         elif op == "E":
-            return math.e  # 2.718281828
+            return math.e
         elif op in self.fn:
             # args are pushed onto the stack in reverse order
             args = reversed([self.evaluate_stack(s) for _ in range(num_args)])
             args = list(args)
-            result = self.fn[op](*args)
-            self.add_notes(result, op, *args)
-            return result
+            return self.get_op_result(op, self.fn[op], *args)
         elif op[0].isalpha():
             value = self.kwargs.get(op)
             if value is None:
@@ -368,6 +374,15 @@ class DGParser(object):
                 return int(op)
             except ValueError:
                 return float(op)
+
+    def get_op_result(self, op, func, *args, **kwargs):
+        op_str = kwargs.get("op_str", self.op_str(op, *args))
+        result = self.created_nodes.get(op_str)
+        if result is None:
+            result = func(*args)
+            self.created_nodes[op_str] = result
+            self.add_notes(result, op_str)
+        return result
 
     def add(self, v1, v2):
         return self._connect_plus_minus_average(1, v1, v2)
@@ -424,8 +439,6 @@ class DGParser(object):
 
     def _connect_multiply_divide(self, operation, v1, v2):
         mdn = cmds.createNode("multiplyDivide")
-        # if self.container:
-        #     cmds.container(self.container, e=True, addNode=[mdn])
         cmds.setAttr("{}.operation".format(mdn), operation)
         value_count = 1
         # Determine whether we should use 1D or 3D attributes
@@ -515,20 +528,13 @@ class DGParser(object):
             else "{}.outColorR".format(node)
         )
 
-    def add_notes(self, node, op, *args):
+    def add_notes(self, node, op_str):
         node = node.split(".")[0]
         attrs = cmds.listAttr(node, ud=True) or []
         if "notes" not in attrs:
             cmds.addAttr(node, ln="notes", dt="string")
         keys = self.kwargs.keys()
         keys.sort()
-        args = [str(v) for v in args]
-        if op in self.fn:
-            op_str = "{}({})".format(op, ", ".join(args))
-        elif args:
-            op_str = (op.join(args),)
-        else:
-            op_str = op
         notes = "Node generated by dge\n\nExpression:\n  {}\n\nOperation:\n  {}\n\nkwargs:\n  {}".format(
             self.expression_string,
             op_str,
@@ -538,8 +544,9 @@ class DGParser(object):
 
     def publish_container_attributes(self):
         self.add_notes(self.container, self.expression_string)
-        external_connections = cmds.container(self.container, q=True,
-                                              connectionList=True)
+        external_connections = cmds.container(
+            self.container, q=True, connectionList=True
+        )
         external_connections = set(external_connections)
         container_nodes = set(cmds.container(self.container, q=True, nodeList=True))
         for var, value in self.kwargs.items():
@@ -548,15 +555,9 @@ class DGParser(object):
             # To connect multiple attributes to a bound container attribute, we
             # need to create an intermediary attribute that is bound and connected
             # to the internal attributes
-            cmds.addAttr(
-                self.container, ln="_{}".format(var), at=attribute_type(value)
-            )
+            cmds.addAttr(self.container, ln="_{}".format(var), at=attribute_type(value))
             published_attr = "{}._{}".format(self.container, var)
-            cmds.container(
-                self.container,
-                e=True,
-                publishAndBind=[published_attr, var],
-            )
+            cmds.container(self.container, e=True, publishAndBind=[published_attr, var])
             cmds.connectAttr(value, published_attr)
 
             # Reroute connections into the container to go through the published
@@ -568,6 +569,23 @@ class DGParser(object):
                     if node_name in container_nodes:
                         cmds.connectAttr(published_attr, connection, force=True)
         cmds.container(self.container, e=True, current=False)
+
+    def op_str(self, op, *args):
+        """Get the string form of the op and args.
+
+        This is used for notes on the node as well as identifying which nodes can be
+        reused.
+
+        :param op: Name of the op
+        :param args: Optional op arguments
+        :return: The unique op string
+        """
+        args = [str(v) for v in args]
+        if op in self.fn:
+            return "{}({})".format(op, ", ".join(args))
+        elif args:
+            return op.join([self._reverse_kwargs.get(x, x) for x in args])
+        return op
 
 
 def attribute_is_array(value):

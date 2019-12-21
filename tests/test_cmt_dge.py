@@ -8,11 +8,11 @@ class DGETests(TestCase):
 
     def test_add(self):
         loc = cmds.spaceLocator()[0]
-        result = dge("x+3", x="{}.tx".format(loc))
+        result = dge("x+3.5", x="{}.tx".format(loc))
         cmds.connectAttr(result, "{}.ty".format(loc))
         cmds.setAttr("{}.tx".format(loc), 5)
         y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, 8.0)
+        self.assertAlmostEquals(y, 8.5)
 
     def test_add_two_attrs(self):
         loc = cmds.spaceLocator()[0]
@@ -180,3 +180,13 @@ class DGETests(TestCase):
         cmds.setAttr("{}.tx".format(loc), 5)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 25)
+
+    def test_reuse_nodes(self):
+        loc = cmds.spaceLocator()[0]
+        result = dge("y=(1-x)*(1-x)+(1-x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 5)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 12)
+        pma = cmds.ls(type="plusMinusAverage")
+        self.assertEqual(len(pma), 2)
+
