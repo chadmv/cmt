@@ -190,3 +190,17 @@ class DGETests(TestCase):
         pma = cmds.ls(type="plusMinusAverage")
         self.assertEqual(len(pma), 2)
 
+    def test_lerp(self):
+        loc = cmds.spaceLocator()[0]
+        dge("y=lerp(x, 4, 8)", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 1)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 8)
+
+        cmds.setAttr("{}.tx".format(loc), 0)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 4)
+
+        cmds.setAttr("{}.tx".format(loc), 0.25)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 5)

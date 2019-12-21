@@ -58,6 +58,7 @@ Functions::
 
     exp(x)
     clamp(x, min, max)
+    lerp(x, at_0, at_1)
 
 Constants::
 
@@ -221,7 +222,7 @@ class DGParser(object):
             "^": self.pow,
         }
 
-        self.fn = {"exp": self.exp, "clamp": self.clamp}
+        self.fn = {"exp": self.exp, "clamp": self.clamp, "lerp": self.lerp}
         self.conditionals = ["==", "!=", ">", ">=", "<", "<="]
 
         # use CaselessKeyword for e and pi, to avoid accidentally matching
@@ -527,6 +528,23 @@ class DGParser(object):
             if value_count == 3
             else "{}.outColorR".format(node)
         )
+
+    def lerp(self, value, at_0, at_1):
+        node = cmds.createNode("blendTwoAttr")
+
+        if isinstance(value, string_types):
+            cmds.connectAttr(value, "{}.attributesBlender".format(node))
+        else:
+            # Static value on attributesBlender doesn't make much sense
+            # but we don't want to error out
+            cmds.setAttr("{}.attributesBlender".format(node), value)
+
+        for i, v in enumerate([at_0, at_1]):
+            if isinstance(v, string_types):
+                cmds.connectAttr(v, "{}.input[{}]".format(node, i))
+            else:
+                cmds.setAttr("{}.input[{}]".format(node, i), v)
+        return "{}.output".format(node)
 
     def add_notes(self, node, op_str):
         node = node.split(".")[0]
