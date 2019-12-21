@@ -40,7 +40,7 @@ class LegRig(object):
         )[0]
 
         self.__create_pivots(ik_control, pivots)
-        self.__create_stretch(ik_control)
+        self.__create_stretch(ik_control, global_scale_attr)
 
         is_right_leg = "_r" in self.name.lower()
         cmds.addAttr(ik_control, ln="kneeRotate", keyable=True)
@@ -175,28 +175,19 @@ class LegRig(object):
         cmds.connectAttr(
             "{}.worldPosition".format(end_loc), "{}.point2".format(distance_between)
         )
-        mdn = cmds.createNode(
-            "multiplyDivide", name="{}_stretch_scale".format(self.name)
-        )
+
         rest_length = shortcuts.distance(self.up_leg_joint, self.knee_joint)
         rest_length += shortcuts.distance(self.knee_joint, self.ankle_joint)
-        cmds.setAttr("{}.operation".format(mdn), 2)  # divide
-        cmds.connectAttr(
-            "{}.distance".format(distance_between), "{}.input1X".format(mdn)
+
+        percent_rest_distance = dge(
+            "distance / (restLength * globalScale)",
+            container="{}_percent_from_rest".format(self.name),
+            distance="{}.distance".format(distance_between),
+            restLength=rest_length,
+            globalScale=global_scale_attr or 1.0,
         )
 
-        if global_scale_attr:
-            global_scale = cmds.createNode(
-                "multDoubleLinear", name="{}_global_scale".format(self.name)
-            )
-            cmds.setAttr("{}.input1".format(global_scale), rest_length)
-            cmds.connectAttr(global_scale_attr, "{}.input2".format(global_scale))
-            cmds.connectAttr("{}.output".format(global_scale), "{}.input2X".format(mdn))
-        else:
-            cmds.setAttr("{}.input2X".format(mdn), rest_length)
-        self.percent_rest_distance = "{}.outputX".format(mdn)
-
-        softik_percentage = self.__create_soft_ik(ik_control)
+        softik_percentage = self.__create_soft_ik(ik_control, percent_rest_distance)
 
         # Create the locators used to calculate the actual position we want the ik to
         # be placed
@@ -210,60 +201,40 @@ class LegRig(object):
         # Calculate length for the target position to allow stretch with soft ik
         # rest_length = rest_length * min(1, percent_rest) * stretch)
 
-        # min(1, percent_rest)
-        clamp = cmds.createNode("clamp", name="{}_stretch_clamp".format(self.name))
-        cmds.setAttr("{}.minR".format(clamp), 1)
-        cmds.setAttr("{}.maxR".format(clamp), 100)
-        cmds.connectAttr(self.percent_rest_distance, "{}.inputR".format(clamp))
-        stretch_percent = "{}.outputR".format(clamp)
-
-        # min(1, percent_rest) * stretch
-        enable_stretch = cmds.createNode(
-            "blendTwoAttr", name="{}_stretch_enable".format(self.name)
+        stretch_factor = dge(
+            "lerp(stretch, 1, clamp(lengthPercent, 1, 100))",
+            container="{}_stretch_factor".format(self.name),
+            stretch="{}.stretch".format(ik_control),
+            lengthPercent=percent_rest_distance,
         )
-        cmds.setAttr("{}.input[0]".format(enable_stretch), 1)
-        cmds.connectAttr(stretch_percent, "{}.input[1]".format(enable_stretch))
-        cmds.connectAttr(
-            "{}.stretch".format(ik_control),
-            "{}.attributesBlender".format(enable_stretch),
+
+        dge(
+            "tx = restLength * stretchFactor * softIk",
+            container="{}_softik_length".format(self.name),
+            tx="{}.tx".format(offset_loc),
+            restLength=rest_length,
+            stretchFactor=stretch_factor,
+            softIk=softik_percentage,
         )
-        stretch_factor = "{}.output".format(enable_stretch)
-
-        # rest_length * min(1, percent_rest) * stretch
-        mdl = cmds.createNode(
-            "multDoubleLinear", name="{}_stretch_target_length".format(self.name)
-        )
-        cmds.setAttr("{}.input1".format(mdl), rest_length)
-        cmds.connectAttr(stretch_factor, "{}.input2".format(mdl))
-
-        target_rest_length = "{}.output".format(mdl)
-
         # Now the final position will be the percentage of the rest length calculated
         # from soft ik
-        mdl = cmds.createNode("multDoubleLinear")
-        cmds.connectAttr(softik_percentage, "{}.input1".format(mdl))
-        cmds.connectAttr(target_rest_length, "{}.input2".format(mdl))
-        cmds.connectAttr("{}.output".format(mdl), "{}.tx".format(offset_loc))
         cmds.pointConstraint(offset_loc, self.hierarchy.soft_ik)
 
         # Inverse scale for volume preservation
-        inverse_scale = cmds.createNode(
-            "multiplyDivide", name="{}_inverse_scale".format(self.name)
-        )
-        cmds.setAttr("{}.operation".format(inverse_scale), 2)  # divide
-        cmds.setAttr("{}.input1X".format(inverse_scale), 1)
-        cmds.connectAttr(stretch_factor, "{}.input2X".format(inverse_scale))
+        inverse_scale = dge("1/sf", sf=stretch_factor)
         for node in [self.up_leg_joint, self.knee_joint]:
             cmds.connectAttr(stretch_factor, "{}.sx".format(node))
-            cmds.connectAttr("{}.outputX".format(inverse_scale), "{}.sy".format(node))
-            cmds.connectAttr("{}.outputX".format(inverse_scale), "{}.sz".format(node))
+            cmds.connectAttr(inverse_scale, "{}.sy".format(node))
+            cmds.connectAttr(inverse_scale, "{}.sz".format(node))
 
-    def __create_soft_ik(self, ik_control):
+    def __create_soft_ik(self, ik_control, percent_rest_distance):
         """Create the node network to allow soft ik
 
         :param ik_control: Name of the ik control
-        :return: The attribute containing the percentage length from start joint to handle
-        that the ik should be placed
+        :param percent_rest_distance: The attribute containing the current percentage
+        value from the rest length
+        :return: The attribute containing the percentage length from start joint to
+        handle that the ik should be placed
         """
         cmds.addAttr(
             ik_control,
@@ -274,6 +245,7 @@ class LegRig(object):
             keyable=True,
         )
 
+        # Prevent divide by 0
         softik = dge("clamp(x, 0.001, 1)", x="{}.softIk".format(ik_control))
 
         # We need to adjust how far the ik handle is from the start to create the soft
@@ -283,8 +255,7 @@ class LegRig(object):
             "? (1.0 - softIk) + softIk * (1.0 - exp(-(x - (1.0 - softIk)) / softIk)) "
             ": x",
             container="{}_softik".format(self.name),
-            x=self.percent_rest_distance,
+            x=percent_rest_distance,
             softIk=softik,
         )
         return soft_ik_percentage
-
