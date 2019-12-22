@@ -142,14 +142,16 @@ class LegRig(object):
         self.hierarchy = hierarchy
 
     def __create_stretch(self, ik_control, global_scale_attr=None):
-        cmds.addAttr(
-            ik_control,
-            ln="stretch",
-            minValue=0.0,
-            maxValue=1.0,
-            defaultValue=1.0,
-            keyable=True,
-        )
+        for attr in ["stretch", "softIk"]:
+            cmds.addAttr(
+                ik_control,
+                ln=attr,
+                minValue=0.0,
+                maxValue=1.0,
+                defaultValue=0.0,
+                keyable=True,
+            )
+
         # Locator for start distance measurement
         self.start_loc = cmds.spaceLocator(name="{}_stretch_start".format(self.name))[0]
         common.snap_to_position(self.start_loc, self.up_leg_joint)
@@ -166,6 +168,15 @@ class LegRig(object):
         cmds.parent(self.end_loc, ik_control)
         end_loc = cmds.listRelatives(self.end_loc, children=True, shapes=True)[0]
 
+        # Create the locators used to calculate the actual position we want the ik to
+        # be placed
+        loc = cmds.spaceLocator(name="{}_softik_aim".format(self.name))[0]
+        offset_loc = cmds.spaceLocator(name="{}_softik_goal".format(self.name))[0]
+        cmds.parent(offset_loc, loc)
+        cmds.parent(loc, self.start_loc)
+        common.snap_to_position(loc, self.start_loc)
+        cmds.aimConstraint(self.end_loc, loc, worldUpType="none")
+
         distance_between = cmds.createNode(
             "distanceBetween", name="{}_distance".format(self.name)
         )
@@ -179,7 +190,7 @@ class LegRig(object):
         rest_length = shortcuts.distance(self.up_leg_joint, self.knee_joint)
         rest_length += shortcuts.distance(self.knee_joint, self.ankle_joint)
 
-        percent_rest_distance = dge(
+        length_ratio = dge(
             "distance / (restLength * globalScale)",
             container="{}_percent_from_rest".format(self.name),
             distance="{}.distance".format(distance_between),
@@ -187,75 +198,48 @@ class LegRig(object):
             globalScale=global_scale_attr or 1.0,
         )
 
-        softik_percentage = self.__create_soft_ik(ik_control, percent_rest_distance)
-
-        # Create the locators used to calculate the actual position we want the ik to
-        # be placed
-        loc = cmds.spaceLocator(name="{}_softik_aim".format(self.name))[0]
-        offset_loc = cmds.spaceLocator(name="{}_softik_goal".format(self.name))[0]
-        cmds.parent(offset_loc, loc)
-        cmds.parent(loc, self.start_loc)
-        common.snap_to_position(loc, self.start_loc)
-        cmds.aimConstraint(self.end_loc, loc, worldUpType="none")
-
-        # Calculate length for the target position to allow stretch with soft ik
-        # rest_length = rest_length * min(1, percent_rest) * stretch)
-
-        stretch_factor = dge(
-            "lerp(stretch, 1, clamp(lengthPercent, 1, 100))",
-            container="{}_stretch_factor".format(self.name),
-            stretch="{}.stretch".format(ik_control),
-            lengthPercent=percent_rest_distance,
-        )
-
-        dge(
-            "tx = restLength * stretchFactor * softIk",
-            container="{}_softik_length".format(self.name),
-            tx="{}.tx".format(offset_loc),
-            restLength=rest_length,
-            stretchFactor=stretch_factor,
-            softIk=softik_percentage,
-        )
-        # Now the final position will be the percentage of the rest length calculated
-        # from soft ik
-        cmds.pointConstraint(offset_loc, self.hierarchy.soft_ik)
-
-        # Inverse scale for volume preservation
-        inverse_scale = dge("1/sf", sf=stretch_factor)
-        for node in [self.up_leg_joint, self.knee_joint]:
-            cmds.connectAttr(stretch_factor, "{}.sx".format(node))
-            cmds.connectAttr(inverse_scale, "{}.sy".format(node))
-            cmds.connectAttr(inverse_scale, "{}.sz".format(node))
-
-    def __create_soft_ik(self, ik_control, percent_rest_distance):
-        """Create the node network to allow soft ik
-
-        :param ik_control: Name of the ik control
-        :param percent_rest_distance: The attribute containing the current percentage
-        value from the rest length
-        :return: The attribute containing the percentage length from start joint to
-        handle that the ik should be placed
-        """
-        cmds.addAttr(
-            ik_control,
-            ln="softIk",
-            minValue=0.0,
-            maxValue=1.0,
-            defaultValue=0.0,
-            keyable=True,
-        )
-
         # Prevent divide by 0
-        softik = dge("clamp(x, 0.001, 1)", x="{}.softIk".format(ik_control))
+        softik = dge("max(x, 0.001)", x="{}.softIk".format(ik_control))
 
-        # We need to adjust how far the ik handle is from the start to create the soft
+        # We need to adjust offset the ik handle and scale the joints to create the soft
         # effect
-        soft_ik_percentage = dge(
+        # See this graph to see the the softIk and scale values plotted
+        # https://www.desmos.com/calculator/csi40rsztl
+        # x = length_ratio
+        # f(x) = softik_scale
+        # c(x) = Scale x of the joints
+        # s = softIk attribute
+        # t = stretch attribute
+        softik_scale = dge(
             "x > (1.0 - softIk)"
             "? (1.0 - softIk) + softIk * (1.0 - exp(-(x - (1.0 - softIk)) / softIk)) "
             ": x",
             container="{}_softik".format(self.name),
-            x=percent_rest_distance,
+            x=length_ratio,
             softIk=softik,
         )
-        return soft_ik_percentage
+
+        # Set the effector position
+        dge(
+            "tx = restLength * lerp(softIk, lengthRatio, stretch)",
+            container="{}_effector_position".format(self.name),
+            tx="{}.tx".format(offset_loc),
+            restLength=rest_length,
+            lengthRatio=length_ratio,
+            softIk=softik_scale,
+            stretch="{}.stretch".format(ik_control),
+        )
+        cmds.pointConstraint(offset_loc, self.hierarchy.soft_ik)
+
+        # Drive the joint scale for stretch
+        scale = dge(
+            "lerp(1, lengthRatio / softIk, stretch)",
+            lengthRatio=length_ratio,
+            softIk=softik_scale,
+            stretch="{}.stretch".format(ik_control),
+        )
+        inverse_scale = dge("1/scale", scale=scale)
+        for node in [self.up_leg_joint, self.knee_joint]:
+            cmds.connectAttr(scale, "{}.sx".format(node))
+            cmds.connectAttr(inverse_scale, "{}.sy".format(node))
+            cmds.connectAttr(inverse_scale, "{}.sz".format(node))
