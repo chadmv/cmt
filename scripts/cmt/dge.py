@@ -58,7 +58,9 @@ Functions::
 
     exp(x)
     clamp(x, min, max)
-    lerp(x, at_0, at_1)
+    lerp(a, b, t)
+    min(x, y)
+    max(x, y)
 
 Constants::
 
@@ -222,7 +224,7 @@ class DGParser(object):
             "^": self.pow,
         }
 
-        self.fn = {"exp": self.exp, "clamp": self.clamp, "lerp": self.lerp}
+        self.fn = {"exp": self.exp, "clamp": self.clamp, "lerp": self.lerp, "min": self.min, "max": self.max}
         self.conditionals = ["==", "!=", ">", ">=", "<", "<="]
 
         # use CaselessKeyword for e and pi, to avoid accidentally matching
@@ -529,22 +531,28 @@ class DGParser(object):
             else "{}.outColorR".format(node)
         )
 
-    def lerp(self, value, at_0, at_1):
+    def lerp(self, a, b, t):
         node = cmds.createNode("blendTwoAttr")
 
-        if isinstance(value, string_types):
-            cmds.connectAttr(value, "{}.attributesBlender".format(node))
+        if isinstance(t, string_types):
+            cmds.connectAttr(t, "{}.attributesBlender".format(node))
         else:
             # Static value on attributesBlender doesn't make much sense
             # but we don't want to error out
-            cmds.setAttr("{}.attributesBlender".format(node), value)
+            cmds.setAttr("{}.attributesBlender".format(node), t)
 
-        for i, v in enumerate([at_0, at_1]):
+        for i, v in enumerate([a, b]):
             if isinstance(v, string_types):
                 cmds.connectAttr(v, "{}.input[{}]".format(node, i))
             else:
                 cmds.setAttr("{}.input[{}]".format(node, i), v)
         return "{}.output".format(node)
+
+    def min(self, x, y):
+        return self.condition(x, y, self.conditionals.index("<="), x, y)
+
+    def max(self, x, y):
+        return self.condition(x, y, self.conditionals.index(">="), x, y)
 
     def add_notes(self, node, op_str):
         node = node.split(".")[0]

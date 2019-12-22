@@ -192,7 +192,7 @@ class DGETests(TestCase):
 
     def test_lerp(self):
         loc = cmds.spaceLocator()[0]
-        dge("y=lerp(x, 4, 8)", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        dge("y=lerp(4, 8, x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
         cmds.setAttr("{}.tx".format(loc), 1)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 8)
@@ -204,3 +204,25 @@ class DGETests(TestCase):
         cmds.setAttr("{}.tx".format(loc), 0.25)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 5)
+
+    def test_min(self):
+        loc = cmds.spaceLocator()[0]
+        dge("y=min(x, 2)", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 1)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 1)
+
+        cmds.setAttr("{}.tx".format(loc), 4)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 2)
+
+    def test_max(self):
+        loc = cmds.spaceLocator()[0]
+        dge("y=max(x, 2)", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        cmds.setAttr("{}.tx".format(loc), 1)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 2)
+
+        cmds.setAttr("{}.tx".format(loc), 4)
+        y = cmds.getAttr("{}.ty".format(loc))
+        self.assertAlmostEquals(y, 4)
