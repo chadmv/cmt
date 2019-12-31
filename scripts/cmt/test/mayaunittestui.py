@@ -26,6 +26,7 @@ from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 import cmt.test.mayaunittest as mayaunittest
 import cmt.shortcuts as shortcuts
+from cmt.ui.widgets.outputconsole import OutputConsole
 
 logger = logging.getLogger(__name__)
 
@@ -104,12 +105,14 @@ class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QMainWindow):
         self.test_view = QTreeView()
         self.test_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
         splitter.addWidget(self.test_view)
-        self.output_console = QTextEdit()
-        self.output_console.setReadOnly(True)
+        self.output_console = OutputConsole()
+        self.output_console.add_color("^ok", 92, 184, 92)
+        self.output_console.add_color("^FAIL", 240, 173, 78)
+        self.output_console.add_color("^ERROR", 217, 83, 79)
+        self.output_console.add_color("^skipped", 88, 165, 204)
         splitter.addWidget(self.output_console)
         vbox.addWidget(splitter)
         splitter.setStretchFactor(1, 4)
-        self.stream = TestCaptureStream(self.output_console)
 
         self.refresh_tests()
 
@@ -138,7 +141,7 @@ class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QMainWindow):
         test_suite = unittest.TestSuite()
         mayaunittest.get_tests(test_suite=test_suite)
         self.output_console.clear()
-        self.model.run_tests(self.stream, test_suite)
+        self.model.run_tests(self.output_console, test_suite)
 
     def run_selected_tests(self):
         """Callback method to run the selected tests in the UI."""
@@ -167,7 +170,7 @@ class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QMainWindow):
             mayaunittest.get_tests(test=path, test_suite=test_suite)
 
         self.output_console.clear()
-        self.model.run_tests(self.stream, test_suite)
+        self.model.run_tests(self.output_console, test_suite)
 
     def run_failed_tests(self):
         """Callback method to run all the tests with fail or error statuses."""
@@ -180,7 +183,7 @@ class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QMainWindow):
             }:
                 mayaunittest.get_tests(test=node.path(), test_suite=test_suite)
         self.output_console.clear()
-        self.model.run_tests(self.stream, test_suite)
+        self.model.run_tests(self.output_console, test_suite)
 
     def reset_rollback_importer(self):
         """Resets the RollbackImporter which allows the test runner to pick up code
@@ -196,37 +199,6 @@ class MayaTestRunnerDialog(MayaQWidgetBaseMixin, QMainWindow):
         self.rollback_importer.uninstall()
         self.deleteLater()
         _win = None
-
-
-class TestCaptureStream(object):
-    """Allows the output of the tests to be displayed in a QTextEdit."""
-
-    success_color = QColor(92, 184, 92)
-    fail_color = QColor(240, 173, 78)
-    error_color = QColor(217, 83, 79)
-    skip_color = QColor(88, 165, 204)
-    normal_color = QColor(200, 200, 200)
-
-    def __init__(self, text_edit):
-        self.text_edit = text_edit
-
-    def write(self, text):
-        """Write text into the QTextEdit."""
-        # Color the output
-        if text.startswith("ok"):
-            self.text_edit.setTextColor(TestCaptureStream.success_color)
-        elif text.startswith("FAIL"):
-            self.text_edit.setTextColor(TestCaptureStream.fail_color)
-        elif text.startswith("ERROR"):
-            self.text_edit.setTextColor(TestCaptureStream.error_color)
-        elif text.startswith("skipped"):
-            self.text_edit.setTextColor(TestCaptureStream.skip_color)
-
-        self.text_edit.insertPlainText(text)
-        self.text_edit.setTextColor(TestCaptureStream.normal_color)
-
-    def flush(self):
-        pass
 
 
 class TestStatus:
