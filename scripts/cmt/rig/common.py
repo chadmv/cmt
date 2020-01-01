@@ -36,6 +36,14 @@ class RigHierarchy(object):
             if children:
                 self.create(children, node)
 
+    def delete(self, name):
+        """Delete the node from the hierarchy
+
+        :param name: Hierarchy node name (Could be different from the Maya node name)
+        """
+        cmds.delete(getattr(self, name))
+        delattr(self, name)
+
 
 def _create_parent_method(node):
     def func(nodes_to_parent):

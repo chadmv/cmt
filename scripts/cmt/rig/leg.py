@@ -18,7 +18,7 @@ class LegRig(object):
         self.hierarchy = None
         self.name = name
 
-    def create(self, ik_control, global_scale_attr=None, pivots=None):
+    def create(self, ik_control, pole_vector=None, global_scale_attr=None, pivots=None):
         # Create ik handles
         self.ik_handle_leg = cmds.ikHandle(
             name="{}_leg_ikh".format(self.name),
@@ -39,16 +39,21 @@ class LegRig(object):
             endEffector=self.toe_joint,
         )[0]
 
-        self.__create_pivots(ik_control, pivots)
+        self.__create_pivots(ik_control, pole_vector, pivots)
         self.__create_stretch(ik_control, global_scale_attr)
 
         is_right_leg = "_r" in self.name.lower()
-        cmds.addAttr(ik_control, ln="kneeRotate", keyable=True)
-        common.connect_attribute(
-            "{}.kneeRotate".format(ik_control),
-            "{}.ry".format(self.hierarchy.pole_vector_rotate),
-            negate=is_right_leg,
-        )
+
+        if pole_vector:
+            cmds.poleVectorConstraint(pole_vector, self.ik_handle_leg)
+        else:
+            cmds.addAttr(ik_control, ln="kneeRotate", keyable=True)
+            common.connect_attribute(
+                "{}.kneeRotate".format(ik_control),
+                "{}.ry".format(self.hierarchy.pole_vector_rotate),
+                negate=is_right_leg,
+            )
+
         cmds.addAttr(ik_control, ln="ballPivot", keyable=True)
         common.connect_attribute(
             "{}.ballPivot".format(ik_control),
@@ -79,7 +84,7 @@ class LegRig(object):
             negate=is_right_leg,
         )
 
-    def __create_pivots(self, ik_control, pivots):
+    def __create_pivots(self, ik_control, pole_vector, pivots):
         """
         """
         hierarchy = {
@@ -135,9 +140,14 @@ class LegRig(object):
         hierarchy.parent_to_toe_lift(self.ik_handle_toe)
         hierarchy.parent_to_heel_raise(self.ik_handle_leg)
 
-        cmds.poleVectorConstraint(hierarchy.pole_vector, self.ik_handle_leg)
-        cmds.xform(hierarchy.pole_vector, ws=True, r=True, t=(50, 0, 0))
-        cmds.setAttr("{}.twist".format(self.ik_handle_leg), 90)
+        if pole_vector:
+            # An explicit pole vector is being used to remove the one in the hierarchy
+            hierarchy.delete("pole_vector_rotate")
+        else:
+            # Use a twist pole vector
+            cmds.poleVectorConstraint(hierarchy.pole_vector, self.ik_handle_leg)
+            cmds.xform(hierarchy.pole_vector, ws=True, r=True, t=(50, 0, 0))
+            cmds.setAttr("{}.twist".format(self.ik_handle_leg), 90)
 
         self.hierarchy = hierarchy
 

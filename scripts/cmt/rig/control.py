@@ -103,6 +103,8 @@ def get_curve_data(controls=None):
     if controls is None:
         controls = cmds.ls(sl=True)
     data = [CurveShape(transform=control) for control in controls]
+    # Prune empty curves
+    data = [x for x in data if x.cvs]
     return data
 
 
