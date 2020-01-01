@@ -148,4 +148,4 @@ class RecentList(QListView):
 
         menu = QMenu()
         menu.addAction(QAction("Run Script", self, triggered=partial(run_script, path)))
-        menu.exec_(pos)
+        menu.exec_(self.mapToGlobal(pos))
