@@ -279,10 +279,23 @@ class DGParser(object):
         self.bnf = assignment
 
     def eval(self, expression_string, container=None, **kwargs):
-        self.kwargs = kwargs
+
+        long_kwargs = {}
+        for var, value in kwargs.items():
+            if isinstance(value, string_types):
+                # Turn all attribute names into long names for consistency with
+                # results in listConnections
+                tokens = value.split(".")
+                value = tokens[0]
+                for t in tokens[1:]:
+                    attr = "{}.{}".format(value, t)
+                    value += ".{}".format(cmds.attributeName(attr, long=True))
+            long_kwargs[var] = value
+
+        self.kwargs = long_kwargs
         # Reverse variable look up to write cleaner notes
         self._reverse_kwargs = {}
-        for k, v in kwargs.items():
+        for k, v in self.kwargs.items():
             self._reverse_kwargs[v] = k
         self.expression_string = expression_string
         self.expr_stack = []
@@ -363,7 +376,6 @@ class DGParser(object):
             value = self.kwargs.get(op)
             if value is None:
                 raise Exception("invalid identifier '%s'" % op)
-
             return value
         elif op in self.conditionals:
             return self.conditionals.index(op)
@@ -594,6 +606,14 @@ class DGParser(object):
                     node_name = connection.split(".")[0]
                     if node_name in container_nodes:
                         cmds.connectAttr(published_attr, connection, force=True)
+
+                source_plug = cmds.listConnections(value, d=False, plugs=True)
+                if source_plug:
+                    source_plug = source_plug[0]
+                    node_name = source_plug.split(".")[0]
+                    if node_name in container_nodes:
+                        cmds.connectAttr(source_plug, published_attr, force=True)
+                        cmds.connectAttr(published_attr, value, force=True)
         cmds.container(self.container, e=True, current=False)
 
     def op_str(self, op, *args):
