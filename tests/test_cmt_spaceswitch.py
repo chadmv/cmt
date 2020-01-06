@@ -7,6 +7,7 @@ import math
 class SpaceSwitchTests(TestCase):
     def test_create(self):
         target = cmds.spaceLocator()[0]
+        cmds.setAttr("{}.t".format(target), 0, 1, 2)
         driver1 = cmds.spaceLocator()[0]
         cmds.setAttr("{}.t".format(driver1), 10, 0, 5)
         driver2 = cmds.spaceLocator()[0]
@@ -26,7 +27,7 @@ class SpaceSwitchTests(TestCase):
 
         cmds.setAttr("{}.tx".format(driver2), -10)
         pos = cmds.xform(target, q=True, ws=True, t=True)
-        self.assertListAlmostEqual(pos, [-5.0, 0.0, 0.0])
+        self.assertListAlmostEqual(pos, [-5.0, 1.0, 2.0])
 
         cmds.setAttr("{}.space".format(target), 0)
         m = cmds.getAttr("{}.worldMatrix[0]".format(target))
@@ -48,8 +49,8 @@ class SpaceSwitchTests(TestCase):
             0.8660254037844387,
             0.0,
             0.0,
-            2.4999999999999996,
-            0.6698729810778064,
+            2.3660254037844384,
+            2.9019237886466835,
             1.0,
         ]
         self.assertListAlmostEqual(expected, m)

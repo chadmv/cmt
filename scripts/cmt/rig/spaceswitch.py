@@ -102,13 +102,16 @@ def _connect_driver_matrix_network(blend, node, driver, index, to_parent_local):
     mult = cmds.createNode(
         "multMatrix", name="spaceswitch_{}_to_{}".format(node, driver)
     )
+
     offset = matrix_to_list(
         OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(node)))
+        * OpenMaya.MMatrix(cmds.getAttr("{}.matrix".format(node))).inverse()
         * OpenMaya.MMatrix(cmds.getAttr("{}.worldInverseMatrix[0]".format(driver)))
     )
     cmds.setAttr("{}.matrixIn[0]".format(mult), offset, type="matrix")
-    world_matrix_attr = "{}.worldMatrix[0]".format(driver)
-    cmds.connectAttr(world_matrix_attr, "{}.matrixIn[1]".format(mult))
+
+    cmds.connectAttr("{}.worldMatrix[0]".format(driver), "{}.matrixIn[1]".format(mult))
+
     if to_parent_local:
         # Using parentInverseMatrix seems to cause a cycle when driving
         # offsetParentMatrix?
