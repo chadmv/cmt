@@ -1,3 +1,4 @@
+import maya.api.OpenMaya as OpenMaya
 import maya.cmds as cmds
 import cmt.shortcuts as shortcuts
 from six import string_types
@@ -152,11 +153,16 @@ def connect_attribute(
     cmds.connectAttr(output, destination)
 
 
-def freeze_to_parent_offset(node):
+def freeze_to_parent_offset(node=None):
     """Transfer the local matrix of the specified node into the offsetParentMatrix
 
     :param node: Node name or list of node names
     """
+    if node is None:
+        node = cmds.ls(sl=True)
+    if node is None:
+        return
+
     if not isinstance(node, string_types):
         for n in node:
             freeze_to_parent_offset(n)
@@ -164,8 +170,15 @@ def freeze_to_parent_offset(node):
 
     if cmds.about(api=True) < 20200000:
         raise RuntimeError("offsetParentMatrix is only available starting in Maya 2020")
-    m = cmds.getAttr("{}.m".format(node))
-    cmds.setAttr("{}.offsetParentMatrix".format(node), m, type="matrix")
+
+    m = OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(node)))
+    pinv = OpenMaya.MMatrix(cmds.getAttr("{}.parentInverseMatrix[0]".format(node)))
+    offset = m * pinv
+    cmds.setAttr("{}.offsetParentMatrix".format(node), list(offset), type="matrix")
+    for attr in ["jo", "ra"]:
+        if cmds.objExists("{}.{}".format(node, attr)):
+            cmds.setAttr("{}.{}".format(node, attr), 0, 0, 0)
+
     for attr in ["{}{}".format(x, y) for x in "trs" for y in "xyz"]:
         is_locked = cmds.getAttr("{}.{}".format(node, attr), lock=True)
         if is_locked:

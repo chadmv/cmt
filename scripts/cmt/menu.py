@@ -17,6 +17,11 @@ def create_menu():
     rig_menu = cmds.menuItem(subMenu=True, tearOff=True, parent=menu, label="Rigging")
     cmds.menuItem(
         parent=rig_menu,
+        label="Freeze to offsetParentMatrix",
+        command="import cmt.rig.common; cmt.rig.common.freeze_to_parent_offset()",
+    )
+    cmds.menuItem(
+        parent=rig_menu,
         label="CQueue",
         command="import cmt.cqueue.window; cmt.cqueue.window.show()",
         imageOverlayLabel="cqueue",
