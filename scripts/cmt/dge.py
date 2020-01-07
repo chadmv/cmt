@@ -642,5 +642,5 @@ def attribute_is_array(value):
 def attribute_type(a):
     tokens = a.split(".")
     node = tokens[0]
-    attribute = ".".join(tokens[1:])
+    attribute = tokens[-1]
     return cmds.attributeQuery(attribute, node=node, at=True)
