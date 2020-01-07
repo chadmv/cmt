@@ -17,8 +17,12 @@ class LegRig(object):
         self.toe_joint = toe_joint
         self.hierarchy = None
         self.name = name
+        self.group = "{}_grp".format(self.name)
 
     def create(self, ik_control, pole_vector=None, global_scale_attr=None, pivots=None):
+        if not cmds.objExists(self.group):
+            self.group = cmds.createNode("transform", name=self.group)
+
         # Create ik handles
         self.ik_handle_leg = cmds.ikHandle(
             name="{}_leg_ikh".format(self.name),
@@ -164,12 +168,12 @@ class LegRig(object):
 
         # Locator for start distance measurement
         self.start_loc = cmds.spaceLocator(name="{}_stretch_start".format(self.name))[0]
-        common.snap_to_position(self.start_loc, self.up_leg_joint)
         parent = cmds.listRelatives(self.up_leg_joint, parent=True, path=True)
         if parent:
-            cmds.parentConstraint(parent[0], self.start_loc, mo=True)
-            cmds.scaleConstraint(parent[0], self.start_loc)
+            cmds.connectAttr("{}.worldMatrix[0]".format(parent[0]), "{}.offsetParentMatrix".format(self.start_loc))
+        common.snap_to_position(self.start_loc, self.up_leg_joint)
         start_loc = cmds.listRelatives(self.start_loc, children=True, shapes=True)[0]
+        cmds.parent(self.start_loc, self.group)
 
         # Locator for end distance measurement
         self.end_loc = cmds.spaceLocator(name="{}_stretch_end".format(self.name))[0]
@@ -177,15 +181,6 @@ class LegRig(object):
         common.snap_to_position(self.end_loc, self.ankle_joint)
         cmds.parent(self.end_loc, ik_control)
         end_loc = cmds.listRelatives(self.end_loc, children=True, shapes=True)[0]
-
-        # Create the locators used to calculate the actual position we want the ik to
-        # be placed
-        loc = cmds.spaceLocator(name="{}_softik_aim".format(self.name))[0]
-        offset_loc = cmds.spaceLocator(name="{}_softik_goal".format(self.name))[0]
-        cmds.parent(offset_loc, loc)
-        cmds.parent(loc, self.start_loc)
-        common.snap_to_position(loc, self.start_loc)
-        cmds.aimConstraint(self.end_loc, loc, worldUpType="none")
 
         distance_between = cmds.createNode(
             "distanceBetween", name="{}_distance".format(self.name)
@@ -229,17 +224,18 @@ class LegRig(object):
             softIk=softik,
         )
 
+        compose_matrix = cmds.createNode("composeMatrix")
+
         # Set the effector position
         dge(
             "tx = restLength * lerp(softIk, lengthRatio, stretch)",
             container="{}_effector_position".format(self.name),
-            tx="{}.tx".format(offset_loc),
+            tx="{}.inputTranslate.inputTranslateX".format(compose_matrix),
             restLength=rest_length,
             lengthRatio=length_ratio,
             softIk=softik_scale,
             stretch="{}.stretch".format(ik_control),
         )
-        cmds.pointConstraint(offset_loc, self.hierarchy.soft_ik)
 
         # Drive the joint scale for stretch
         scale = dge(
@@ -253,3 +249,30 @@ class LegRig(object):
             cmds.connectAttr(scale, "{}.sx".format(node))
             cmds.connectAttr(inverse_scale, "{}.sy".format(node))
             cmds.connectAttr(inverse_scale, "{}.sz".format(node))
+
+        # Drive the soft ik transform
+        aim = cmds.createNode("aimMatrix")
+        cmds.connectAttr(
+            "{}.worldMatrix[0]".format(self.start_loc), "{}.inputMatrix".format(aim)
+        )
+        cmds.connectAttr(
+            "{}.worldMatrix[0]".format(self.end_loc),
+            "{}.primary.primaryTargetMatrix".format(aim),
+        )
+        mult = cmds.createNode("multMatrix")
+        cmds.connectAttr(
+            "{}.outputMatrix".format(compose_matrix), "{}.matrixIn[0]".format(mult)
+        )
+        cmds.connectAttr("{}.outputMatrix".format(aim), "{}.matrixIn[1]".format(mult))
+        cmds.connectAttr(
+            "{}.worldInverseMatrix[0]".format(ik_control), "{}.matrixIn[2]".format(mult)
+        )
+        pick = cmds.createNode("pickMatrix")
+        cmds.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(pick))
+        for attr in ["Scale", "Shear", "Rotate"]:
+            cmds.setAttr("{}.use{}".format(pick, attr), 0)
+        cmds.connectAttr(
+            "{}.outputMatrix".format(pick),
+            "{}.offsetParentMatrix".format(self.hierarchy.soft_ik),
+        )
+        cmds.setAttr("{}.t".format(self.hierarchy.soft_ik), 0, 0, 0)
