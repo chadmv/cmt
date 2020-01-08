@@ -56,11 +56,19 @@ Operators::
 
 Functions::
 
+    abs(x)
     exp(x)
     clamp(x, min, max)
     lerp(a, b, t)
     min(x, y)
     max(x, y)
+    sqrt(x)
+    cos(x)
+    sin(x)
+    tan(x)
+    acos(x)
+    asin(x)
+    atan(x)
 
 Constants::
 
@@ -224,7 +232,21 @@ class DGParser(object):
             "^": self.pow,
         }
 
-        self.fn = {"exp": self.exp, "clamp": self.clamp, "lerp": self.lerp, "min": self.min, "max": self.max}
+        self.fn = {
+            "abs": self.abs,
+            "exp": self.exp,
+            "clamp": self.clamp,
+            "lerp": self.lerp,
+            "min": self.min,
+            "max": self.max,
+            "sqrt": self.sqrt,
+            "cos": self.cos,
+            "sin": self.sin,
+            "tan": self.tan,
+            "acos": self.acos,
+            "asin": self.asin,
+            "atan": self.atan,
+        }
         self.conditionals = ["==", "!=", ">", ">=", "<", "<="]
 
         # use CaselessKeyword for e and pi, to avoid accidentally matching
@@ -407,8 +429,6 @@ class DGParser(object):
 
     def _connect_plus_minus_average(self, operation, v1, v2):
         pma = cmds.createNode("plusMinusAverage")
-        # if self.container:
-        #     cmds.container(self.container, e=True, addNode=[pma])
         cmds.setAttr("{}.operation".format(pma), operation)
         in_attr = "input1D"
         out_attr = "output1D"
@@ -452,6 +472,9 @@ class DGParser(object):
     def exp(self, v):
         return self._connect_multiply_divide(3, math.e, v)
 
+    def sqrt(self, x):
+        return self._connect_multiply_divide(3, x, 0.5)
+
     def _connect_multiply_divide(self, operation, v1, v2):
         mdn = cmds.createNode("multiplyDivide")
         cmds.setAttr("{}.operation".format(mdn), operation)
@@ -482,8 +505,6 @@ class DGParser(object):
 
     def clamp(self, value, min_value, max_value):
         clamp = cmds.createNode("clamp")
-        # if self.container:
-        #     cmds.container(self.container, e=True, addNode=[clamp])
 
         for v, attr in [[min_value, "min"], [max_value, "max"]]:
             if isinstance(v, string_types):
@@ -516,8 +537,6 @@ class DGParser(object):
 
     def condition(self, first_term, second_term, operation, if_true, if_false):
         node = cmds.createNode("condition")
-        # if self.container:
-        #     cmds.container(self.container, e=True, addNode=[node])
         cmds.setAttr("{}.operation".format(node), operation)
 
         for v, attr in [[first_term, "firstTerm"], [second_term, "secondTerm"]]:
@@ -560,11 +579,81 @@ class DGParser(object):
                 cmds.setAttr("{}.input[{}]".format(node, i), v)
         return "{}.output".format(node)
 
+    def abs(self, x):
+        return dge("x > 0 ? x : -x", x=x)
+
     def min(self, x, y):
         return self.condition(x, y, self.conditionals.index("<="), x, y)
 
     def max(self, x, y):
         return self.condition(x, y, self.conditionals.index(">="), x, y)
+
+    def sin(self, x):
+        return self._euler_to_quat(x, "X")
+
+    def cos(self, x):
+        return self._euler_to_quat(x, "W")
+
+    def _euler_to_quat(self, x, attr):
+        cmds.loadPlugin("quatNodes", qt=False)
+        mdl = cmds.createNode("multDoubleLinear")
+        cmds.setAttr("{}.input1".format(mdl), 2 * 57.2958)  # To degrees
+        if isinstance(x, string_types):
+            cmds.connectAttr(x, "{}.input2".format(mdl))
+        else:
+            cmds.setAttr("{}.inputw".format(mdl), x)
+        quat = cmds.createNode("eulerToQuat")
+        cmds.connectAttr("{}.output".format(mdl), "{}.inputRotateX".format(quat))
+        return "{}.outputQuat.outputQuat{}".format(quat, attr)
+
+    def tan(self, x):
+        half_pi = math.pi * 0.5
+        c = dge("{} - x".format(half_pi), x=x)
+        return dge("sin(x) / sin(c)", x=x, c=c)
+
+    def acos(self, x):
+        angle = cmds.createNode("angleBetween")
+        for attr in ["{}{}".format(i, j) for i in [1, 2] for j in "XYZ"]:
+            cmds.setAttr("{}.vector{}".format(angle, attr), 0)
+
+        if isinstance(x, string_types):
+            cmds.connectAttr(x, "{}.vector1X".format(angle))
+            dge("y=abs(x)", y="{}.vector2X".format(angle), x=x)
+        else:
+            cmds.setAttr("{}.vector1X".format(angle), x)
+            cmds.setAttr("{}.vector2X".format(angle), math.fabs(x))
+        dge("y=sqrt(1.0 - x*x)",
+            y="{}.vector1Y".format(angle),
+            x=x)
+        return "{}.axisAngle.angle".format(angle)
+
+    def asin(self, x):
+        angle = cmds.createNode("angleBetween")
+        for attr in ["{}{}".format(i, j) for i in [1, 2] for j in "XYZ"]:
+            cmds.setAttr("{}.vector{}".format(angle, attr), 0)
+
+        if isinstance(x, string_types):
+            cmds.connectAttr(x, "{}.vector1Y".format(angle))
+        else:
+            cmds.setAttr("{}.vector1Y".format(angle), x)
+        result = dge("sqrt(1.0 - x*x)", x=x)
+        cmds.connectAttr(result, "{}.vector1X".format(angle))
+        cmds.connectAttr(result, "{}.vector2X".format(angle))
+        return dge("x < 0 ? -y : y", x=x, y="{}.axisAngle.angle".format(angle))
+
+    def atan(self, x):
+        angle = cmds.createNode("angleBetween")
+        for attr in ["{}{}".format(i, j) for i in [1, 2] for j in "XYZ"]:
+            cmds.setAttr("{}.vector{}".format(angle, attr), 0)
+        cmds.setAttr("{}.vector1X".format(angle), 1)
+        cmds.setAttr("{}.vector2X".format(angle), 1)
+
+        if isinstance(x, string_types):
+            cmds.connectAttr(x, "{}.vector1Y".format(angle))
+        else:
+            cmds.setAttr("{}.vector1Y".format(angle), x)
+        return dge("x < 0 ? -y : y", x=x, y="{}.axisAngle.angle".format(angle))
+
 
     def add_notes(self, node, op_str):
         node = node.split(".")[0]
