@@ -5,7 +5,6 @@ import math
 
 
 class DGETests(TestCase):
-
     def test_add(self):
         loc = cmds.spaceLocator()[0]
         result = dge("x+3.5", x="{}.tx".format(loc))
@@ -183,7 +182,9 @@ class DGETests(TestCase):
 
     def test_reuse_nodes(self):
         loc = cmds.spaceLocator()[0]
-        result = dge("y=(1-x)*(1-x)+(1-x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
+        result = dge(
+            "y=(1-x)*(1-x)+(1-x)", x="{}.tx".format(loc), y="{}.ty".format(loc)
+        )
         cmds.setAttr("{}.tx".format(loc), 5)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 12)
@@ -237,56 +238,61 @@ class DGETests(TestCase):
     def test_cos(self):
         loc = cmds.spaceLocator()[0]
         dge("y=cos(x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
-        cmds.setAttr("{}.tx".format(loc), 3.4)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.cos(3.4), places=5)
+        for i in range(100):
+            v = -10.0 + 0.1 * i
+            cmds.setAttr("{}.tx".format(loc), v)
+            y = cmds.getAttr("{}.ty".format(loc))
+            self.assertAlmostEquals(y, math.cos(v), places=5)
 
     def test_sin(self):
         loc = cmds.spaceLocator()[0]
         dge("y=sin(x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
-        cmds.setAttr("{}.tx".format(loc), 3.4)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.sin(3.4), places=5)
+        for i in range(100):
+            v = -math.pi * 0.5 + 0.1 * i
+            cmds.setAttr("{}.tx".format(loc), v)
+            y = cmds.getAttr("{}.ty".format(loc))
+            self.assertAlmostEquals(y, math.sin(v), places=5)
 
     def test_tan(self):
         loc = cmds.spaceLocator()[0]
-        dge("y=tan(x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
-        cmds.setAttr("{}.tx".format(loc), 1.464)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.tan(1.464), places=4)
+        loc2 = cmds.spaceLocator()[0]
+        dge("y=tan(x)", x="{}.tx".format(loc), y="{}.ty".format(loc2))
+        v = -math.pi * 0.5 + 0.02
+        while v < math.pi * 0.5:
+            v += 0.02
+            cmds.setAttr("{}.tx".format(loc), v)
+            y = cmds.getAttr("{}.ty".format(loc2))
+            self.assertAlmostEquals(y, math.tan(v), places=1)
 
     def test_acos(self):
         loc = cmds.spaceLocator()[0]
-        dge("y=acos(x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
-        cmds.setAttr("{}.tx".format(loc), 0.75)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.degrees(math.acos(0.75)), places=5)
-
-        cmds.setAttr("{}.tx".format(loc), -0.75)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.degrees(math.acos(-0.75)), places=5)
+        loc2 = cmds.spaceLocator()[0]
+        dge("y=acos(x)", x="{}.tx".format(loc), y="{}.ty".format(loc2))
+        for i in range(101):
+            v = -1.0 + 0.02 * i
+            cmds.setAttr("{}.tx".format(loc), v)
+            y = cmds.getAttr("{}.ty".format(loc2))
+            self.assertAlmostEquals(y, math.degrees(math.acos(v)), places=4)
 
     def test_asin(self):
         loc = cmds.spaceLocator()[0]
-        dge("y=asin(x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
-        cmds.setAttr("{}.tx".format(loc), 0.75)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.degrees(math.asin(0.75)), places=5)
-
-        cmds.setAttr("{}.tx".format(loc), -0.75)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.degrees(math.asin(-0.75)), places=5)
+        loc2 = cmds.spaceLocator()[0]
+        dge("y=asin(x)", x="{}.tx".format(loc), y="{}.ty".format(loc2))
+        for i in range(101):
+            v = -1.0 + 0.02 * i
+            cmds.setAttr("{}.tx".format(loc), v)
+            y = cmds.getAttr("{}.ty".format(loc2))
+            self.assertAlmostEquals(y, math.degrees(math.asin(v)), places=4)
 
     def test_atan(self):
         loc = cmds.spaceLocator()[0]
-        dge("y=atan(x)", x="{}.tx".format(loc), y="{}.ty".format(loc))
-        cmds.setAttr("{}.tx".format(loc), 0.75)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.degrees(math.atan(0.75)), places=5)
-
-        cmds.setAttr("{}.tx".format(loc), -0.75)
-        y = cmds.getAttr("{}.ty".format(loc))
-        self.assertAlmostEquals(y, math.degrees(math.atan(-0.75)), places=5)
+        loc2 = cmds.spaceLocator()[0]
+        dge("y=atan(x)", x="{}.tx".format(loc), y="{}.ty".format(loc2))
+        for i in range(100):
+            v = -5.0 + 0.1 * i
+            cmds.setAttr("{}.tx".format(loc), v)
+            y = cmds.getAttr("{}.ty".format(loc2))
+            self.assertAlmostEquals(y, math.degrees(math.atan(v)), places=5)
 
     def test_abs(self):
         loc = cmds.spaceLocator()[0]
@@ -298,3 +304,11 @@ class DGETests(TestCase):
         cmds.setAttr("{}.tx".format(loc), -0.75)
         y = cmds.getAttr("{}.ty".format(loc))
         self.assertAlmostEquals(y, 0.75)
+
+    def test_distance(self):
+        loc = cmds.spaceLocator()[0]
+        loc2 = cmds.spaceLocator()[0]
+        cmds.setAttr("{}.tx".format(loc), 2.5)
+        result = dge("distance(i, j)", container="mydistance", i=loc, j=loc2)
+        d = cmds.getAttr(result)
+        self.assertAlmostEquals(d, 2.5)

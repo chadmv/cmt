@@ -69,6 +69,7 @@ Functions::
     acos(x)
     asin(x)
     atan(x)
+    distance(node1, node2)
 
 Constants::
 
@@ -246,6 +247,7 @@ class DGParser(object):
             "acos": self.acos,
             "asin": self.asin,
             "atan": self.atan,
+            "distance": self.distance,
         }
         self.conditionals = ["==", "!=", ">", ">=", "<", "<="]
 
@@ -305,13 +307,17 @@ class DGParser(object):
         long_kwargs = {}
         for var, value in kwargs.items():
             if isinstance(value, string_types):
-                # Turn all attribute names into long names for consistency with
-                # results in listConnections
                 tokens = value.split(".")
-                value = tokens[0]
-                for t in tokens[1:]:
-                    attr = "{}.{}".format(value, t)
-                    value += ".{}".format(cmds.attributeName(attr, long=True))
+                if len(tokens) == 1:
+                    # Assume a single node name is the world matrix
+                    value = "{}.worldMatrix[0]".format(tokens[0])
+                else:
+                    # Turn all attribute names into long names for consistency with
+                    # results in listConnections
+                    value = tokens[0]
+                    for t in tokens[1:]:
+                        attr = "{}.{}".format(value, t)
+                        value += ".{}".format(cmds.attributeName(attr, long=True))
             long_kwargs[var] = value
 
         self.kwargs = long_kwargs
@@ -601,7 +607,7 @@ class DGParser(object):
         if isinstance(x, string_types):
             cmds.connectAttr(x, "{}.input2".format(mdl))
         else:
-            cmds.setAttr("{}.inputw".format(mdl), x)
+            cmds.setAttr("{}.input2".format(mdl), x)
         quat = cmds.createNode("eulerToQuat")
         cmds.connectAttr("{}.output".format(mdl), "{}.inputRotateX".format(quat))
         return "{}.outputQuat.outputQuat{}".format(quat, attr)
@@ -618,13 +624,11 @@ class DGParser(object):
 
         if isinstance(x, string_types):
             cmds.connectAttr(x, "{}.vector1X".format(angle))
-            dge("y=abs(x)", y="{}.vector2X".format(angle), x=x)
+            dge("y = x == 0.0 ? 1.0 : abs(x)", y="{}.vector2X".format(angle), x=x)
         else:
             cmds.setAttr("{}.vector1X".format(angle), x)
             cmds.setAttr("{}.vector2X".format(angle), math.fabs(x))
-        dge("y=sqrt(1.0 - x*x)",
-            y="{}.vector1Y".format(angle),
-            x=x)
+        dge("y = sqrt(1.0 - x*x)", y="{}.vector1Y".format(angle), x=x)
         return "{}.axisAngle.angle".format(angle)
 
     def asin(self, x):
@@ -638,7 +642,7 @@ class DGParser(object):
             cmds.setAttr("{}.vector1Y".format(angle), x)
         result = dge("sqrt(1.0 - x*x)", x=x)
         cmds.connectAttr(result, "{}.vector1X".format(angle))
-        cmds.connectAttr(result, "{}.vector2X".format(angle))
+        dge("y=abs(x) == 1.0 ? 1.0 : r", y="{}.vector2X".format(angle), x=x, r=result)
         return dge("x < 0 ? -y : y", x=x, y="{}.axisAngle.angle".format(angle))
 
     def atan(self, x):
@@ -654,6 +658,11 @@ class DGParser(object):
             cmds.setAttr("{}.vector1Y".format(angle), x)
         return dge("x < 0 ? -y : y", x=x, y="{}.axisAngle.angle".format(angle))
 
+    def distance(self, node1, node2):
+        distance_between = cmds.createNode("distanceBetween")
+        cmds.connectAttr(node1, "{}.inMatrix1".format(distance_between))
+        cmds.connectAttr(node2, "{}.inMatrix2".format(distance_between))
+        return "{}.distance".format(distance_between)
 
     def add_notes(self, node, op_str):
         node = node.split(".")[0]
@@ -682,7 +691,9 @@ class DGParser(object):
             # To connect multiple attributes to a bound container attribute, we
             # need to create an intermediary attribute that is bound and connected
             # to the internal attributes
-            cmds.addAttr(self.container, ln="_{}".format(var), at=attribute_type(value))
+            attr_type = attribute_type(value)
+            kwargs = {"dt": attr_type} if attr_type == "matrix" else {"at": attr_type}
+            cmds.addAttr(self.container, ln="_{}".format(var), **kwargs)
             published_attr = "{}._{}".format(self.container, var)
             cmds.container(self.container, e=True, publishAndBind=[published_attr, var])
             cmds.connectAttr(value, published_attr)
@@ -732,4 +743,7 @@ def attribute_type(a):
     tokens = a.split(".")
     node = tokens[0]
     attribute = tokens[-1]
+    if attribute.startswith("worldMatrix"):
+        # attributeQuery doesn't seem to work with worldMatrix
+        return "matrix"
     return cmds.attributeQuery(attribute, node=node, at=True)
