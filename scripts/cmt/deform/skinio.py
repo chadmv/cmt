@@ -17,6 +17,7 @@ from __future__ import print_function
 import json
 import logging
 import os
+import re
 from six import string_types
 from functools import partial
 
@@ -44,13 +45,11 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
     """
 
     if file_path is None:
-        file_path = cmds.fileDialog2(
-            dialogStyle=2, fileMode=1, fileFilter="Skin Files (*{0})".format(EXTENSION)
+        file_path = shortcuts.get_open_file_name(
+            "Skin Files (*{})".format(EXTENSION), key=KEY_STORE
         )
     if not file_path:
         return
-    if not isinstance(file_path, string_types):
-        file_path = file_path[0]
 
     # Read in the file
     with open(file_path, "r") as fh:
@@ -60,10 +59,15 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
     if data.get("skinningMethod", 0) < 0:
         data["skinningMethod"] = 0
 
+    selected_components = []
     if to_selected_shapes:
         shape = cmds.ls(sl=True)
         if shape:
-            shape = shape[0]
+            components = cmds.filterExpand(sm=31) or []
+            selected_components = [
+                int(re.search("(?<=\[)\d+", x).group(0)) for x in components
+            ]
+            shape = shape[0].split(".")[0]
     if shape is None:
         shape = data["shape"]
     if not cmds.objExists(shape):
@@ -88,26 +92,14 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
         # Create a new skinCluster
         joints = data["weights"].keys()
 
-        # Make sure all the joints exist
-        unused_imports = []
-        no_match = set(
-            [shortcuts.remove_namespace_from_name(x) for x in cmds.ls(type="joint")]
-        )
-        for j in joints:
-            j = j.split("|")[-1]
-            if j in no_match:
-                no_match.remove(j)
-            else:
-                unused_imports.append(j)
+        unused_imports, no_match = get_joints_that_need_remapping(joints)
+
         # If there were unmapped influences ask the user to map them
         if unused_imports and no_match:
             mapping_dialog = WeightRemapDialog(file_path)
             mapping_dialog.set_influences(unused_imports, no_match)
             mapping_dialog.exec_()
-            for src, dst in mapping_dialog.mapping.items():
-                # Swap the mapping
-                data["weights"][dst] = data["weights"][src]
-                del data["weights"][src]
+            remap_weights(mapping_dialog.mapping, data["weights"])
 
         # Create the skinCluster with post normalization so setting the weights does not
         # normalize all the weights
@@ -121,7 +113,7 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
         )[0]
         skin_cluster = SkinCluster(skin)
 
-    skin_cluster.set_data(data)
+    skin_cluster.set_data(data, selected_components)
     logging.info("Imported %s", file_path)
 
 
@@ -146,6 +138,28 @@ def get_skin_clusters(nodes):
     return list(set(all_skins))
 
 
+def get_joints_that_need_remapping(joints_in_file):
+    # Make sure all the joints exist
+    unused_joints_from_file = []
+    joints_that_get_no_weights = set(
+        [shortcuts.remove_namespace_from_name(x) for x in cmds.ls(type="joint")]
+    )
+    for j in joints_in_file:
+        j = j.split("|")[-1]
+        if j in joints_that_get_no_weights:
+            joints_that_get_no_weights.remove(j)
+        else:
+            unused_joints_from_file.append(j)
+    return unused_joints_from_file, joints_that_get_no_weights
+
+
+def remap_weights(remapping, weight_dict):
+    for src, dst in remapping.items():
+        weight_dict[dst] = weight_dict[src]
+        del weight_dict[src]
+    return weight_dict
+
+
 def export_skin(file_path=None, shapes=None):
     """Exports the skinClusters of the given shapes to disk.
 
@@ -162,27 +176,16 @@ def export_skin(file_path=None, shapes=None):
         raise RuntimeError("No skins to export.")
 
     if file_path is None:
-        start_dir = shortcuts.get_setting(KEY_STORE, cmds.workspace(q=True, rd=True))
         if len(skins) == 1:
-            file_path = cmds.fileDialog2(
-                dialogStyle=2,
-                fileMode=0,
-                fileFilter="Skin Files (*{0})".format(EXTENSION),
-                startingDirectory=start_dir,
+            file_path = shortcuts.get_save_file_name(
+                "Skin Files (*{})".format(EXTENSION), KEY_STORE
             )
-            if file_path and not file_path[0].endswith(EXTENSION):
-                file_path[0] += EXTENSION
         else:
-            file_path = cmds.fileDialog2(
-                dialogStyle=2, fileMode=3, startingDirectory=start_dir
-            )
+            file_path = shortcuts.get_directory_name(KEY_STORE)
         if not file_path:
             return
-        file_path = file_path[0]
 
     directory = file_path if len(skins) > 1 else os.path.dirname(file_path)
-    # Save the directory in the cache
-    shortcuts.set_setting(KEY_STORE, directory)
 
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -190,19 +193,20 @@ def export_skin(file_path=None, shapes=None):
     for skin in skins:
         skin = SkinCluster(skin)
         data = skin.gather_data()
-        logger.info(
-            "Exporting skinCluster %s on %s (%d influences, %d vertices)",
-            skin.node,
-            skin.shape,
-            len(data["weights"].keys()),
-            len(data["blendWeights"]),
-        )
         if len(skins) > 1:
             # With multiple skinClusters, the user just chooses an export directory.  Set the
             # name to the transform name.
             file_path = os.path.join(
                 directory, "{}{}".format(skin.shape.replace("|", "!"), EXTENSION)
             )
+        logger.info(
+            "Exporting skinCluster %s on %s (%d influences, %d vertices) : %s",
+            skin.node,
+            skin.shape,
+            len(data["weights"].keys()),
+            len(data["blendWeights"]),
+            file_path
+        )
         with open(file_path, "w") as fh:
             json.dump(data, fh)
 
@@ -312,7 +316,7 @@ class SkinCluster(object):
         self.fn.getWeights(dag_path, components, weights, ptr)
         return weights
 
-    def set_data(self, data):
+    def set_data(self, data, selected_components=None):
         """Sets the data and stores it in the Maya skinCluster node.
 
         :param data: Data dictionary.
@@ -320,6 +324,11 @@ class SkinCluster(object):
 
         self.data = data
         dag_path, components = self.__get_geometry_components()
+        if selected_components:
+            fncomp = OpenMaya.MFnSingleIndexedComponent()
+            components = fncomp.create(OpenMaya.MFn.kMeshVertComponent)
+            for i in selected_components:
+                fncomp.addElement(i)
         self.set_influence_weights(dag_path, components)
         self.set_blend_weights(dag_path, components)
 
@@ -332,19 +341,15 @@ class SkinCluster(object):
         :param dag_path: MDagPath of the deformed geometry.
         :param components: Component MObject of the deformed components.
         """
-        weights = self.__get_current_weights(dag_path, components)
         influence_paths = OpenMaya.MDagPathArray()
         influence_count = self.fn.influenceObjects(influence_paths)
-        components_per_influence = weights.length() // influence_count
 
-        # Keep track of which imported influences aren't used
-        unused_imports = []
+        elements = OpenMaya.MIntArray()
+        fncomp = OpenMaya.MFnSingleIndexedComponent(components)
+        fncomp.getElements(elements)
+        weights = OpenMaya.MDoubleArray(elements.length() * influence_count)
 
-        # Keep track of which existing influences don't get anything imported
-        no_match = [
-            influence_paths[ii].partialPathName()
-            for ii in range(influence_paths.length())
-        ]
+        components_per_influence = elements.length()
 
         for imported_influence, imported_weights in self.data["weights"].items():
             imported_influence = imported_influence.split("|")[-1]
@@ -356,24 +361,8 @@ class SkinCluster(object):
                 if influence_without_namespace == imported_influence:
                     # Store the imported weights into the MDoubleArray
                     for jj in range(components_per_influence):
-                        weights.set(imported_weights[jj], jj * influence_count + ii)
-                    no_match.remove(influence_name)
+                        weights.set(imported_weights[elements[jj]], jj * influence_count + ii)
                     break
-            else:
-                unused_imports.append(imported_influence)
-
-        if unused_imports and no_match:
-            mapping_dialog = WeightRemapDialog()
-            mapping_dialog.set_influences(unused_imports, no_match)
-            mapping_dialog.exec_()
-            for src, dst in mapping_dialog.mapping.items():
-                for ii in range(influence_paths.length()):
-                    if influence_paths[ii].partialPathName() == dst:
-                        for jj in range(components_per_influence):
-                            weights.set(
-                                self.data["weights"][src][jj], jj * influence_count + ii
-                            )
-                        break
 
         influence_indices = OpenMaya.MIntArray(influence_count)
         for ii in range(influence_count):
@@ -386,9 +375,12 @@ class SkinCluster(object):
         :param dag_path: MDagPath of the deformed geometry.
         :param components: Component MObject of the deformed components.
         """
-        blend_weights = OpenMaya.MDoubleArray(len(self.data["blendWeights"]))
-        for i, w in enumerate(self.data["blendWeights"]):
-            blend_weights.set(w, i)
+        elements = OpenMaya.MIntArray()
+        fncomp = OpenMaya.MFnSingleIndexedComponent(components)
+        fncomp.getElements(elements)
+        blend_weights = OpenMaya.MDoubleArray(elements.length())
+        for i in range(elements.length()):
+            blend_weights.set(self.data["blendWeights"][elements[i]], i)
         self.fn.setBlendWeights(dag_path, components, blend_weights)
 
 
