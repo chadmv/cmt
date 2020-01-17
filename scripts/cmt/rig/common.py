@@ -192,3 +192,11 @@ def freeze_to_parent_offset(node=None):
 def snap_to_position(node, snap_to):
     pos = cmds.xform(snap_to, q=True, ws=True, t=True)
     cmds.xform(node, ws=True, t=pos)
+
+def snap_to_orientation(node, snap_to):
+    r = cmds.xform(snap_to, q=True, ws=True, ro=True)
+    cmds.xform(node, ws=True, ro=r)
+
+def snap_to(node, snap_to):
+    snap_to_position(node, snap_to)
+    snap_to_orientation(node, snap_to)

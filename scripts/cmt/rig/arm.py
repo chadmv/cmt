@@ -8,14 +8,9 @@ import cmt.rig.twoboneik as twoboneik
 reload(twoboneik)
 
 
-class LegRig(object):
-    def __init__(self, up_leg_joint, ankle_joint, ball_joint, toe_joint, name="leg"):
-        self.two_bone_ik = twoboneik.TwoBoneIk(up_leg_joint, ankle_joint, name)
-        self.ik_handle_ball = None
-        self.ik_handle_toe = None
-        self.ball_joint = ball_joint
-        self.toe_joint = toe_joint
-        self.hierarchy = None
+class ArmRig(object):
+    def __init__(self, upper_arm_joint, hand_joint, name="arm"):
+        self.two_bone_ik = twoboneik.TwoBoneIk(upper_arm_joint, hand_joint, name)
         self.name = name
         self.group = "{}_grp".format(self.name)
 
@@ -24,33 +19,16 @@ class LegRig(object):
         ik_control,
         pole_vector=None,
         global_scale_attr=None,
-        pivots=None,
         scale_stretch=True,
     ):
         if not cmds.objExists(self.group):
             self.group = cmds.createNode("transform", name=self.group)
 
-        # Create ik handles
-        self.ik_handle_ball = cmds.ikHandle(
-            name="{}_ball_ikh".format(self.name),
-            solver="ikSCsolver",
-            startJoint=self.two_bone_ik.end_joint,
-            endEffector=self.ball_joint,
-        )[0]
-        self.ik_handle_toe = cmds.ikHandle(
-            name="{}_toe_ikh".format(self.name),
-            solver="ikSCsolver",
-            startJoint=self.ball_joint,
-            endEffector=self.toe_joint,
-        )[0]
-        for node in [self.ik_handle_ball, self.ik_handle_toe]:
-            cmds.setAttr("{}.v".format(node), 0)
-
-        self.__create_pivots(ik_control, pivots)
+        # self.__create_pivots(ik_control, pivots)
         self.two_bone_ik.create(
             ik_control,
             pole_vector,
-            soft_ik_parent=self.hierarchy.heel_ctrl,
+            soft_ik_parent=ik_control,
             global_scale_attr=global_scale_attr,
             scale_stretch=scale_stretch,
         )
@@ -58,12 +36,6 @@ class LegRig(object):
 
         is_right_leg = "_r" in self.name.lower()
 
-        cmds.addAttr(ik_control, ln="ballPivot", keyable=True)
-        common.connect_attribute(
-            "{}.ballPivot".format(ik_control),
-            "{}.ry".format(self.hierarchy.ball_pivot),
-            negate=is_right_leg,
-        )
         # cmds.addAttr(ik_control, ln="footRoll", keyable=True)
         # common.connect_attribute(
         #     "{}.footRoll".format(ik_control),
@@ -74,19 +46,6 @@ class LegRig(object):
         # common.connect_attribute(
         #     "{}.raiseHeel".format(ik_control), "{}.rx".format(self.hierarchy.heel_ctrl)
         # )
-        cmds.addAttr(ik_control, ln="tilt", keyable=True)
-        common.connect_attribute(
-            "{}.tilt".format(ik_control),
-            "{}.rz".format(self.hierarchy.out_pivot),
-            clamp=[-90.0, 0.0] if not is_right_leg else [0.0, 90.0],
-            negate=is_right_leg,
-        )
-        common.connect_attribute(
-            "{}.tilt".format(ik_control),
-            "{}.rz".format(self.hierarchy.in_pivot),
-            clamp=[0.0, 90.0] if not is_right_leg else [-90.0, 0.0],
-            negate=is_right_leg,
-        )
 
     def __create_pivots(self, ik_control, pivots):
         """
