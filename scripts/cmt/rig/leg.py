@@ -26,10 +26,25 @@ class LegRig(object):
         global_scale_attr=None,
         pivots=None,
         scale_stretch=True,
+        parent=None,
     ):
         if not cmds.objExists(self.group):
             self.group = cmds.createNode("transform", name=self.group)
 
+        self.__create_ik(
+            ik_control, pole_vector, global_scale_attr, pivots, scale_stretch, parent
+        )
+        self.__create_fk()
+
+    def __create_ik(
+        self,
+        ik_control,
+        pole_vector=None,
+        global_scale_attr=None,
+        pivots=None,
+        scale_stretch=True,
+        parent=None,
+    ):
         # Create ik handles
         self.ik_handle_ball = cmds.ikHandle(
             name="{}_ball_ikh".format(self.name),
@@ -53,7 +68,10 @@ class LegRig(object):
             soft_ik_parent=self.hierarchy.heel_ctrl,
             global_scale_attr=global_scale_attr,
             scale_stretch=scale_stretch,
+            parent=parent,
         )
+        self.config_control = self.two_bone_ik.config_control
+        self.upper_fk_control = self.two_bone_ik.start_fk_control
         cmds.parent(self.two_bone_ik.start_loc, self.group)
 
         is_right_leg = "_r" in self.name.lower()
@@ -138,3 +156,22 @@ class LegRig(object):
         cmds.setAttr("{}.rotateOrder".format(hierarchy.heel_ctrl), 2)  # zxy
 
         self.hierarchy = hierarchy
+
+    def __create_fk(self):
+        ik_switch = cmds.listConnections(
+            "{}.ikBlend".format(self.two_bone_ik.ik_handle), d=False, plugs=True
+        )[0]
+        for ikh in [self.ik_handle_ball, self.ik_handle_toe]:
+            cmds.connectAttr(ik_switch, "{}.ikBlend".format(ikh))
+        self.ball_fk_ctrl = cmds.createNode(
+            "transform", name="{}_fk_ctrl".format(self.ball_joint)
+        )
+        common.snap_to(self.ball_fk_ctrl, self.ball_joint)
+        common.lock_and_hide(self.ball_fk_ctrl, "sv")
+        cmds.parent(self.ball_fk_ctrl, self.two_bone_ik.end_fk_control)
+        common.freeze_to_parent_offset(self.ball_fk_ctrl)
+        ori = cmds.orientConstraint(self.ball_fk_ctrl, self.ball_joint)[0]
+        cmds.connectAttr(
+            "{}.ikFk".format(self.two_bone_ik.config_control),
+            "{}.{}W0".format(ori, self.ball_fk_ctrl),
+        )

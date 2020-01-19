@@ -410,7 +410,7 @@ class DGParser(object):
         elif op == "=":
             destination = self.evaluate_stack(s)
             source = self.evaluate_stack(s)
-            cmds.connectAttr(source, destination)
+            cmds.connectAttr(source, destination, f=True)
         else:
             # try to evaluate as int first, then as float if int fails
             try:

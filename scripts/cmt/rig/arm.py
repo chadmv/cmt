@@ -20,6 +20,7 @@ class ArmRig(object):
         pole_vector=None,
         global_scale_attr=None,
         scale_stretch=True,
+        parent=None,
     ):
         if not cmds.objExists(self.group):
             self.group = cmds.createNode("transform", name=self.group)
@@ -31,21 +32,55 @@ class ArmRig(object):
             soft_ik_parent=ik_control,
             global_scale_attr=global_scale_attr,
             scale_stretch=scale_stretch,
+            parent=parent,
         )
+        self.config_control = self.two_bone_ik.config_control
+        self.upper_fk_control = self.two_bone_ik.start_fk_control
         cmds.parent(self.two_bone_ik.start_loc, self.group)
+        cmds.addAttr(
+            ik_control,
+            ln="localRotation",
+            minValue=0,
+            maxValue=1,
+            keyable=True,
+        )
+        self.local_rotation = "{}.localRotation".format(ik_control)
 
-        is_right_leg = "_r" in self.name.lower()
+        self.rotation_control = cmds.createNode(
+            "transform", name="{}_rotate_ctrl".format(self.two_bone_ik.end_joint)
+        )
 
-        # cmds.addAttr(ik_control, ln="footRoll", keyable=True)
-        # common.connect_attribute(
-        #     "{}.footRoll".format(ik_control),
-        #     "{}.rx".format(self.hierarchy.heel_pivot),
-        #     clamp=[-90.0, 0.0],
-        # )
-        # cmds.addAttr(ik_control, ln="raiseHeel", keyable=True)
-        # common.connect_attribute(
-        #     "{}.raiseHeel".format(ik_control), "{}.rx".format(self.hierarchy.heel_ctrl)
-        # )
+        common.snap_to(self.rotation_control, self.two_bone_ik.end_joint)
+        if parent:
+            cmds.parent(self.rotation_control, parent)
+            common.freeze_to_parent_offset(self.rotation_control)
+        common.opm_parent_constraint(
+            self.two_bone_ik.mid_joint, self.rotation_control, maintain_offset=True
+        )
+        common.lock_and_hide(self.rotation_control, "tsv")
+
+        # Drive the wrist joint
+        wrist_ori = cmds.createNode(
+            "transform", name="{}_orient".format(self.two_bone_ik.end_joint)
+        )
+        cmds.parent(wrist_ori, ik_control)
+        common.snap_to(wrist_ori, self.two_bone_ik.end_joint)
+        ori = cmds.orientConstraint(
+            wrist_ori, self.rotation_control, self.two_bone_ik.end_joint
+        )[0]
+        inv_ikfk = dge("1.0 - ikFk", ikFk="{}.ikFk".format(self.config_control))
+        dge(
+            "W1 = inv_ikfk * (1.0 - local)",
+            W1="{}.{}W1".format(ori, wrist_ori),
+            inv_ikfk=inv_ikfk,
+            local=self.local_rotation,
+        )
+        dge(
+            "W2 = inv_ikfk * local",
+            W2="{}.{}W2".format(ori, self.rotation_control),
+            inv_ikfk=inv_ikfk,
+            local=self.local_rotation,
+        )
 
     def __create_pivots(self, ik_control, pivots):
         """

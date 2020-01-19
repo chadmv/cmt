@@ -1,5 +1,6 @@
 """Two bone stretchy soft ik setup"""
 import maya.cmds as cmds
+import maya.api.OpenMaya as OpenMaya
 import cmt.shortcuts as shortcuts
 import cmt.rig.common as common
 from cmt.dge import dge
@@ -7,6 +8,7 @@ from cmt.dge import dge
 
 class TwoBoneIk(object):
     def __init__(self, start_joint, end_joint, name):
+        self.config_control = None
         self.ik_handle = None
         self.start_joint = start_joint
         self.mid_joint = cmds.listRelatives(end_joint, parent=True, path=True)[0]
@@ -20,6 +22,7 @@ class TwoBoneIk(object):
         soft_ik_parent,
         global_scale_attr=None,
         scale_stretch=True,
+        parent=None,
     ):
         """Create the two bone ik system.
 
@@ -28,7 +31,35 @@ class TwoBoneIk(object):
         :param soft_ik_parent: Name of the node to parent the soft ik transform to.
         :param global_scale_attr: Optional attribute containing global scale value.
         :param scale_stretch: True to stretch with scale, False to use translate.
+        :param parent: Optional parent node of the two bone ik
         """
+        self.__create_config_control(parent)
+
+        self.__create_ik(
+            ik_control, pole_vector, soft_ik_parent, global_scale_attr, scale_stretch
+        )
+        self.__create_fk(parent)
+
+    def __create_config_control(self, parent):
+        self.config_control = cmds.createNode(
+            "transform", name="{}_config_ctrl".format(self.name)
+        )
+        if parent:
+            cmds.parent(self.config_control, parent)
+        common.opm_parent_constraint(self.end_joint, self.config_control)
+        common.lock_and_hide(self.config_control, "trsv")
+        cmds.addAttr(
+            self.config_control,
+            ln="ikFk",
+            minValue=0.0,
+            maxValue=1.0,
+            defaultValue=0.0,
+            keyable=True,
+        )
+
+    def __create_ik(
+        self, ik_control, pole_vector, soft_ik_parent, global_scale_attr, scale_stretch
+    ):
         self.ik_handle = cmds.ikHandle(
             name="{}_ikh".format(self.name),
             solver="ikRPsolver",
@@ -37,6 +68,22 @@ class TwoBoneIk(object):
         )[0]
 
         cmds.setAttr("{}.v".format(self.ik_handle), 0)
+
+        # Drive visibility
+        ik_vis = dge("1.0 - ikFk", ikFk="{}.ikFk".format(self.config_control))
+        for node in [ik_control, pole_vector]:
+            vis = "{}.v".format(node)
+            locked = cmds.getAttr(vis, lock=True)
+            cmds.setAttr(vis, lock=False)
+            cmds.connectAttr(ik_vis, "{}.v".format(node))
+            if locked:
+                cmds.setAttr(vis, lock=True)
+
+        dge(
+            "ikBlend = 1.0 - ikFk",
+            ikBlend="{}.ikBlend".format(self.ik_handle),
+            ikFk="{}.ikFk".format(self.config_control),
+        )
 
         self.soft_ik = cmds.createNode("transform", name="{}_soft_ik".format(self.name))
         common.snap_to_position(self.soft_ik, self.end_joint)
@@ -135,9 +182,9 @@ class TwoBoneIk(object):
             stretch="{}.stretch".format(ik_control),
         )
         if scale_stretch:
-            inverse_scale = dge("1/scale", scale=scale)
             for node in [self.start_joint, self.mid_joint]:
                 cmds.connectAttr(scale, "{}.sx".format(node))
+                inverse_scale = dge("1/sx", sx="{}.sx".format(node))
                 cmds.connectAttr(inverse_scale, "{}.sy".format(node))
                 cmds.connectAttr(inverse_scale, "{}.sz".format(node))
         else:
@@ -169,7 +216,74 @@ class TwoBoneIk(object):
         for attr in ["Scale", "Shear", "Rotate"]:
             cmds.setAttr("{}.use{}".format(pick, attr), 0)
         cmds.connectAttr(
-            "{}.outputMatrix".format(pick),
-            "{}.offsetParentMatrix".format(self.soft_ik),
+            "{}.outputMatrix".format(pick), "{}.offsetParentMatrix".format(self.soft_ik)
         )
         cmds.setAttr("{}.t".format(self.soft_ik), 0, 0, 0)
+
+    def __create_fk(self, parent):
+        for name, joint in [
+            ("start_fk_control", self.start_joint),
+            ("mid_fk_control", self.mid_joint),
+            ("end_fk_control", self.end_joint),
+        ]:
+            control = cmds.createNode("transform", name="{}_fk_ctrl".format(joint))
+            common.snap_to(control, joint)
+            common.lock_and_hide(control, "sv")
+            setattr(self, name, control)
+            if parent:
+                cmds.parent(control, parent)
+            common.freeze_to_parent_offset(control)
+            parent = control
+            ori = cmds.orientConstraint(control, joint)[0]
+            cmds.connectAttr(
+                "{}.ikFk".format(self.config_control), "{}.{}W0".format(ori, control)
+            )
+
+            # Drive visibility
+            visibility = "{}.v".format(control)
+            locked = cmds.getAttr(visibility, lock=True)
+            cmds.setAttr(visibility, lock=False)
+            cmds.connectAttr("{}.ikFk".format(self.config_control), visibility)
+            if locked:
+                cmds.setAttr(visibility, lock=True)
+
+        for joint, node in [
+            (self.start_joint, self.start_fk_control),
+            (self.mid_joint, self.mid_fk_control),
+        ]:
+            cmds.addAttr(node, ln="length", minValue=0, defaultValue=1, keyable=True)
+            scale = cmds.listConnections("{}.sx".format(joint), d=False, plugs=True)[0]
+            dge(
+                "sx = lerp(scale, length, ikFk)",
+                sx="{}.sx".format(joint),
+                scale=scale,
+                length="{}.length".format(node),
+                ikFk="{}.ikFk".format(self.config_control),
+            )
+
+        for control in [self.mid_fk_control, self.end_fk_control]:
+            parent_control = cmds.listRelatives(control, parent=True, path=True)[0]
+            compose = cmds.createNode("composeMatrix")
+            offset = common.local_offset(control)
+            dge(
+                "x = (length - 1.0) * tx",
+                container="{}_length_offset".format(control),
+                x="{}.inputTranslateX".format(compose),
+                length="{}.length".format(parent_control),
+                tx=offset.getElement(3, 0),
+            )
+
+            mult = cmds.createNode("multMatrix")
+            cmds.connectAttr(
+                "{}.outputMatrix".format(compose), "{}.matrixIn[0]".format(mult)
+            )
+            cmds.setAttr(
+                "{}.matrixIn[1]".format(mult),
+                cmds.getAttr("{}.offsetParentMatrix".format(control)),
+                type="matrix",
+            )
+            cmds.connectAttr(
+                "{}.matrixSum".format(mult), "{}.offsetParentMatrix".format(control),
+            )
+
+

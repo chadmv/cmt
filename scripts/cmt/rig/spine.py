@@ -2,6 +2,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
 import cmt.shortcuts as shortcuts
 import cmt.rig.common as common
+from cmt.dge import dge
 
 
 class SpineRig(object):
@@ -19,6 +20,15 @@ class SpineRig(object):
         self.spline_chain = None
 
     def create(self, global_scale_attr=None):
+        cmds.addAttr(
+            self.end_control,
+            ln="stretch",
+            minValue=0.0,
+            maxValue=1.0,
+            defaultValue=0.0,
+            keyable=True,
+        )
+
         self.spline_chain, original_chain = common.duplicate_chain(
             self.start_joint, self.end_joint, prefix="ikSpine_"
         )
@@ -42,7 +52,7 @@ class SpineRig(object):
         start_parent = cmds.listRelatives(self.start_control, parent=True, path=True)
         if start_parent:
             cmds.parent(curve_start_joint, start_parent[0])
-        cmds.pointConstraint(self.start_control, curve_start_joint)
+        common.opm_point_constraint(self.start_control, curve_start_joint)
 
         curve_end_joint = cmds.duplicate(
             self.end_joint, parentOnly=True, name="{}CurveEnd_jnt".format(self.name)
@@ -62,24 +72,15 @@ class SpineRig(object):
 
         # Create stretch network
         curve_info = cmds.arclen(self.curve, constructionHistory=True)
-        scale_mdn = cmds.createNode(
-            "multiplyDivide", name="{}_global_scale_mdn".format(self.name)
-        )
-        cmds.connectAttr(
-            "{}.arcLength".format(curve_info), "{}.input1X".format(scale_mdn)
-        )
-        if global_scale_attr:
-            cmds.connectAttr(global_scale_attr, "{}.input2X".format(scale_mdn))
-        else:
-            cmds.setAttr("{}.input2X".format(scale_mdn), 1)
-        cmds.setAttr("{}.operation".format(scale_mdn), 2)  # Divide
 
-        mdn = cmds.createNode("multiplyDivide", name="{}Stretch_mdn".format(self.name))
-        cmds.connectAttr("{}.outputX".format(scale_mdn), "{}.input1X".format(mdn))
-        cmds.setAttr(
-            "{}.input2X".format(mdn), cmds.getAttr("{}.arcLength".format(curve_info))
+        scale = dge(
+            "lerp(1, arclength / (restLength * globalScale), stretch)",
+            container="{}_stretch_scale".format(self.name),
+            arclength="{}.arcLength".format(curve_info),
+            restLength=cmds.getAttr("{}.arcLength".format(curve_info)),
+            globalScale=global_scale_attr or 1.0,
+            stretch="{}.stretch".format(self.end_control),
         )
-        cmds.setAttr("{}.operation".format(mdn), 2)  # Divide
 
         # Connect to joints
         for joint in self.spline_chain[1:]:
@@ -88,7 +89,7 @@ class SpineRig(object):
                 "multDoubleLinear", name="{}Stretch_mdl".format(joint)
             )
             cmds.setAttr("{}.input1".format(mdl), tx)
-            cmds.connectAttr("{}.outputX".format(mdn), "{}.input2".format(mdl))
+            cmds.connectAttr(scale, "{}.input2".format(mdl))
             cmds.connectAttr("{}.output".format(mdl), "{}.translateX".format(joint))
 
         joint_up = OpenMaya.MVector(0.0, 1.0, 0.0)

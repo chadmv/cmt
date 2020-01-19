@@ -103,11 +103,6 @@ def create_menu():
     )
     cmds.menuItem(
         parent=utility_menu,
-        label="Run Script",
-        command="import cmt.pipeline.runscript; cmt.pipeline.runscript.show()",
-    )
-    cmds.menuItem(
-        parent=utility_menu,
         label="Unit Test Runner",
         command="import cmt.test.mayaunittestui; cmt.test.mayaunittestui.show()",
         imageOverlayLabel="Test",
@@ -123,6 +118,12 @@ def create_menu():
         label="Resource Browser",
         command="import maya.app.general.resourceBrowser as rb; rb.resourceBrowser().run()",
         imageOverlayLabel="name",
+    )
+
+    cmds.menuItem(
+        parent=menu,
+        label="Run Script",
+        command="import cmt.pipeline.runscript; cmt.pipeline.runscript.show()",
     )
 
     cmds.menuItem(parent=menu, divider=True, dividerLabel="About")
