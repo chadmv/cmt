@@ -67,7 +67,7 @@ def get_shape(node, intermediate=False):
         if not shapes:
             shapes = []
         for shape in shapes:
-            is_intermediate = cmds.getAttr("%s.intermediateObject" % shape)
+            is_intermediate = cmds.getAttr("{}.intermediateObject".format(shape))
             if (
                 intermediate
                 and is_intermediate
@@ -79,7 +79,7 @@ def get_shape(node, intermediate=False):
         if shapes:
             return shapes[0]
     elif cmds.nodeType(node) in ["mesh", "nurbsCurve", "nurbsSurface"]:
-        is_intermediate = cmds.getAttr("%s.intermediateObject" % node)
+        is_intermediate = cmds.getAttr("{}.intermediateObject".format(node))
         if is_intermediate and not intermediate:
             node = cmds.listRelatives(node, parent=True, path=True)[0]
             return get_shape(node)

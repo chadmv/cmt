@@ -122,6 +122,12 @@ def create_menu():
 
     cmds.menuItem(
         parent=menu,
+        label="Shapes UI",
+        command="import cmt.deform.shapesui; cmt.deform.shapesui.show()",
+    )
+
+    cmds.menuItem(
+        parent=menu,
         label="Run Script",
         command="import cmt.pipeline.runscript; cmt.pipeline.runscript.show()",
     )

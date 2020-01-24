@@ -76,6 +76,14 @@ class Mesh(object):
             points.append(OpenMaya.MPoint(p[0], p[1], p[2]))
         shortcuts.set_points(mesh, points)
 
+    def __sub__(self, other):
+        points = (self.points - other.points)
+        return Mesh(points)
+
+    def __add__(self, other):
+        points = (self.points + other.points)
+        return Mesh(points)
+
 
 def isolate_vector_direction(deltas, direction, axis):
     if direction < 0:

@@ -3,6 +3,7 @@ import maya.cmds as cmds
 
 from cmt.io.obj import import_obj, export_obj
 import cmt.shortcuts as shortcuts
+import cmt.deform.np_mesh as np_mesh
 
 
 def get_blendshape_node(geometry):
@@ -175,3 +176,20 @@ def transfer_shapes(source, destination, blendshape=None):
         )
     restore_weights(blendshape, connections)
     return new_blendshape
+
+
+def propagate_neutral_update(old_neutral, new_neutral, shapes):
+    """Propagate neutral update deltas to target shapes
+
+    :param old_neutral: The old neutral mesh
+    :param new_neutral: The new neutral mesh
+    :param shapes: The list of shapes to update
+    """
+    _old = np_mesh.Mesh.from_maya_mesh(old_neutral)
+    _new = np_mesh.Mesh.from_maya_mesh(new_neutral)
+    delta = _new - _old
+    for shape in shapes:
+        _shape = np_mesh.Mesh.from_maya_mesh(shape)
+        new_shape = _shape + delta
+        new_shape.to_maya_mesh(shape)
+

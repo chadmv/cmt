@@ -27,7 +27,7 @@ def export_obj(mesh, file_path):
     cmds.file(
         file_path,
         force=True,
-        options="groups=0;ptgroups=0;materials=0;smoothing=0;normals=1",
+        options="groups=0;ptgroups=0;materials=0;smoothing=0;normals=0",
         typ="OBJexport",
         es=True,
     )
