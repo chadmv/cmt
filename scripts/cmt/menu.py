@@ -55,13 +55,13 @@ def create_menu():
     item = cmds.menuItem(
         parent=rig_menu,
         label="Connect Twist Joint",
-        command="import cmt.rig.twistdecomposition as td; td.create_from_menu()",
+        command="import cmt.rig.swingtwist as st; st.create_from_menu()",
     )
     cmds.menuItem(
         parent=rig_menu,
         insertAfter=item,
         optionBox=True,
-        command="import cmt.rig.twistdecomposition as td; td.display_menu_options()",
+        command="import cmt.rig.swingtwist as st; st.display_menu_options()",
     )
     cmds.menuItem(parent=rig_menu, divider=True, dividerLabel="Animation Rig")
     cmds.menuItem(

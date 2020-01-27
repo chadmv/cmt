@@ -7,6 +7,6 @@ The cmt package contains the following rigging tools.
    :maxdepth: 1
 
    rig/spaceswitch
-   rig/twistdecomposition
+   rig/swingtwist
    rig/control
 

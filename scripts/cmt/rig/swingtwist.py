@@ -1,13 +1,25 @@
-"""Creates a node network to extract twist rotation of a transform to drive another
-transform.
+"""Creates a node network to extract swing/twist rotation of a transform to drive
+another transforms offsetParentMatrix.
 
-The network calculates the local rotation twist offset around a specified twist axis
-relative to the local rest orientation.  This allows users to specify how much
-twist they want to propagate to another transform.  Uses include driving an upper arm
-twist joint from the shoulder and driving forearm twist joints from the wrist.
+The network calculates the local rotation swing and twist offset around the specified
+twist axis relative to the local rest orientation.  This allows users to specify how
+much swing and twist they want to propagate to another transform.  Uses include driving
+an upper arm twist joint from the shoulder and driving forearm twist joints from the
+wrist.
 
-Since the network uses quaternions, partial twist values between 0.0 and 1.0 will see a
-flip when the driver transform rotates past 180 degrees.
+.. raw:: html
+
+    <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+      <iframe src="https://www.youtube.com/embed/12tyQc93Y7A" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border:0;" allowfullscreen title="YouTube Video"></iframe>
+    </div>
+
+
+Since the network uses quaternions, partial swing and twist values between 0.0 and 1.0
+will see a flip when the driver transform rotates past 180 degrees.
+
+The setup can either be made with several standard Maya nodes, or the compiled plug-in
+can be used to create a single node. Setting cmt.settings.ENABLE_PLUGINS to False will
+use vanilla Maya nodes. Otherwise, the compiled plug-in will be used.
 
 Example Usage
 =============
@@ -22,8 +34,8 @@ Twist child of shoulder::
       |- twist_joint2
       |- elbow
 
-    create_twist_decomposition(shoulder, twist_joint1, invert=True)
-    create_twist_decomposition(shoulder, twist_joint2, invert=True, twist_weight=0.5)
+    create_swing_twist(shoulder, twist_joint1, twist_weight=-1.0, swing_weight=0.0)
+    create_swing_twist(shoulder, twist_joint2, twist_weight=-0.5, swing_weight=0.0)
 
 Twist forearm from wrist::
 
@@ -32,8 +44,15 @@ Twist forearm from wrist::
       |- twist_joint2
       |- wrist
 
-    create_twist_decomposition(wrist, twist_joint1, invert=False, twist_weight=0.5)
-    create_twist_decomposition(wrist, twist_joint2, invert=False)
+    create_swing_twist(wrist, twist_joint1, twist_weight=0.5, swing_weight=0.0)
+    create_swing_twist(wrist, twist_joint2, twist_weight=1.0, swing_weight=0.0)
+
+Use no plugins::
+
+    import cmt.settings as settings
+    settings.ENABLE_PLUGINS = False
+    create_swing_twist(wrist, twist_joint1, twist_weight=0.5, swing_weight=0.0)
+    create_swing_twist(wrist, twist_joint2, twist_weight=1.0, swing_weight=0.0)
 """
 
 from __future__ import absolute_import
@@ -48,6 +67,7 @@ import maya.api.OpenMaya as OpenMaya
 
 from cmt.ui.optionbox import OptionBox
 from cmt.settings import DOCUMENTATION_ROOT
+import cmt.settings as settings
 from cmt.dge import dge
 import cmt.shortcuts as shortcuts
 import math
@@ -62,23 +82,30 @@ INV_TWIST_OUTPUT = "invertedTwistOutput"
 SWING_OUTPUT = "swingOutput"
 INV_SWING_OUTPUT = "invertedSwingOutput"
 
-HELP_URL = "{}/rig/twistdecomposition.html".format(DOCUMENTATION_ROOT)
+HELP_URL = "{}/rig/swingtwist.html".format(DOCUMENTATION_ROOT)
 
 
 def create_swing_twist(
     driver, driven, twist_weight=1.0, swing_weight=1.0, twist_axis=0
 ):
-    """Create a node network to drive a transforms rotation from the decomposed twist of
-    another transform.
+    """Create a node network to drive a transforms offsetParentMatrix from the
+    decomposed swing/twist of another transform.
+
+    Setting cmt.settings.ENABLE_PLUGINS to False will use vanilla Maya nodes. Otherwise,
+    the compiled plug-in will be used.
 
     :param driver: Driver transform
     :param driven: Driven transform
     :param twist_weight: -1 to 1 twist scalar
     :param swing_weight: -1 to 1 swing scalar
-    :param twist_axis: Local twist axis on driver such as (1.0, 0.0, 0.0).  If not
-        specified, the twist axis will be calculated as the vector to the first child.
-        If the driver has no children, the twist axis will be (1.0, 0.0, 0.0).
+    :param twist_axis: Local twist axis on driver (0: X, 1: Y, 2: Z)
     """
+    if settings.ENABLE_PLUGINS:
+        cmds.loadPlugin("cmt", qt=True)
+        cmds.swingTwist(
+            driver, driven, twist=twist_weight, swing=swing_weight, twistAxis=twist_axis
+        )
+        return
     for attr in [TWIST_OUTPUT, INV_TWIST_OUTPUT, SWING_OUTPUT, INV_SWING_OUTPUT]:
         if not cmds.objExists("{}.{}".format(driver, attr)):
             cmds.addAttr(driver, ln=attr, at="message")
@@ -251,18 +278,17 @@ def create_from_menu(*args, **kwargs):
         raise RuntimeError("Select driver transform then driven transform.")
     driver, driven = sel
     kwargs = Options.get_kwargs()
-    create_twist_decomposition(driver, driven, **kwargs)
+    create_swing_twist(driver, driven, **kwargs)
 
 
 def display_menu_options(*args, **kwargs):
-    options = Options("Twist Decomposition Options", HELP_URL)
+    options = Options("Swing Twist Options", HELP_URL)
     options.show()
 
 
 class Options(OptionBox):
-    INVERT_WIDGET = "cmt_twist_invert"
+    SWING_WEIGHT_WIDGET = "cmt_swing_weight"
     TWIST_WEIGHT_WIDGET = "cmt_twist_weight"
-    TWIST_AXIS_ENABLE_WIDGET = "cmt_twist_auto_axis"
     TWIST_AXIS_WIDGET = "cmt_twist_axis"
 
     @classmethod
@@ -282,27 +308,18 @@ class Options(OptionBox):
         else:
             kwargs["twist_weight"] = cmds.optionVar(q=Options.TWIST_WEIGHT_WIDGET)
 
-        if cmds.checkBoxGrp(Options.INVERT_WIDGET, exists=True):
-            value = cmds.checkBoxGrp(Options.INVERT_WIDGET, q=True, v1=True)
-            kwargs["invert"] = value
-            cmds.optionVar(iv=(Options.INVERT_WIDGET, value))
+        if cmds.floatSliderGrp(Options.SWING_WEIGHT_WIDGET, exists=True):
+            kwargs["swing_weight"] = cmds.floatSliderGrp(
+                Options.SWING_WEIGHT_WIDGET, q=True, value=True
+            )
+            cmds.optionVar(fv=(Options.SWING_WEIGHT_WIDGET, kwargs["swing_weight"]))
         else:
-            value = cmds.optionVar(q=Options.INVERT_WIDGET)
-            kwargs["invert"] = value
+            kwargs["twist_weight"] = cmds.optionVar(q=Options.TWIST_WEIGHT_WIDGET)
 
-        if cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, exists=True):
-            value = cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, q=True, v1=True)
-            if value:
-                x = cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, q=True, v1=True)
-                y = cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, q=True, v2=True)
-                z = cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, q=True, v3=True)
-                kwargs["twist_axis"] = (x, y, z)
-            else:
-                kwargs["twist_axis"] = None
-            cmds.optionVar(clearArray=Options.TWIST_AXIS_WIDGET)
-            if kwargs["twist_axis"]:
-                for v in kwargs["twist_axis"]:
-                    cmds.optionVar(floatValueAppend=[Options.TWIST_AXIS_WIDGET, v])
+        if cmds.optionMenuGrp(Options.TWIST_AXIS_WIDGET, exists=True):
+            value = cmds.optionMenuGrp(Options.TWIST_AXIS_WIDGET, q=True, sl=True)
+            kwargs["twist_axis"] = value - 1
+            cmds.optionVar(iv=(Options.TWIST_AXIS_WIDGET, kwargs["twist_axis"]))
         else:
             kwargs["twist_axis"] = cmds.optionVar(q=Options.TWIST_AXIS_WIDGET)
 
@@ -312,9 +329,8 @@ class Options(OptionBox):
         cmds.columnLayout(adj=True)
 
         for widget in [
-            Options.INVERT_WIDGET,
+            Options.SWING_WEIGHT_WIDGET,
             Options.TWIST_WEIGHT_WIDGET,
-            Options.TWIST_AXIS_ENABLE_WIDGET,
             Options.TWIST_AXIS_WIDGET,
         ]:
             # Delete the widgets so we don't create multiple controls with the same name
@@ -322,12 +338,19 @@ class Options(OptionBox):
                 cmds.deleteUI(widget, control=True)
             except RuntimeError:
                 pass
-        invert_twist = cmds.optionVar(q=Options.INVERT_WIDGET)
-        cmds.checkBoxGrp(
-            Options.INVERT_WIDGET,
-            numberOfCheckBoxes=1,
-            label="Invert twist",
-            v1=invert_twist,
+
+        swing_weight = cmds.optionVar(q=Options.SWING_WEIGHT_WIDGET)
+        cmds.floatSliderGrp(
+            Options.SWING_WEIGHT_WIDGET,
+            label="Swing weight",
+            field=True,
+            minValue=-1.0,
+            maxValue=1.0,
+            fieldMinValue=-1.0,
+            fieldMaxValue=1.0,
+            value=swing_weight,
+            step=0.1,
+            precision=2,
         )
 
         twist_weight = cmds.optionVar(q=Options.TWIST_WEIGHT_WIDGET)
@@ -335,48 +358,30 @@ class Options(OptionBox):
             Options.TWIST_WEIGHT_WIDGET,
             label="Twist weight",
             field=True,
-            minValue=0.0,
+            minValue=-1.0,
             maxValue=1.0,
-            fieldMinValue=0.0,
+            fieldMinValue=-1.0,
             fieldMaxValue=1.0,
             value=twist_weight,
             step=0.1,
             precision=2,
         )
 
-        specify_twist_axis = cmds.optionVar(q=Options.TWIST_AXIS_ENABLE_WIDGET)
-        cmds.checkBoxGrp(
-            Options.TWIST_AXIS_ENABLE_WIDGET,
-            numberOfCheckBoxes=1,
-            label="Specify twist axis ",
-            v1=specify_twist_axis,
-            cc=self.on_axis_enable_changed,
-        )
-
         twist_axis = cmds.optionVar(q=Options.TWIST_AXIS_WIDGET)
-        twist_axis = twist_axis if twist_axis else (1, 0, 0)
-        cmds.floatFieldGrp(
-            Options.TWIST_AXIS_WIDGET,
-            numberOfFields=3,
-            label="Twist axis ",
-            v1=twist_axis[0],
-            v2=twist_axis[1],
-            v3=twist_axis[2],
-            enable=specify_twist_axis,
-            precision=3,
-        )
-
-    def on_axis_enable_changed(self, value):
-        cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, e=True, enable=value)
+        twist_axis = 1 if not twist_axis else twist_axis + 1
+        cmds.optionMenuGrp(Options.TWIST_AXIS_WIDGET, l="Twist Axis")
+        cmds.menuItem(label="X")
+        cmds.menuItem(label="Y")
+        cmds.menuItem(label="Z")
+        cmds.optionMenuGrp(Options.TWIST_AXIS_WIDGET, e=True, sl=twist_axis)
 
     def on_apply(self):
         create_from_menu()
 
     def on_reset(self):
+        cmds.floatSliderGrp(Options.SWING_WEIGHT_WIDGET, e=True, value=1)
         cmds.floatSliderGrp(Options.TWIST_WEIGHT_WIDGET, e=True, value=1)
-        cmds.checkBoxGrp(Options.INVERT_WIDGET, e=True, v1=True)
-        cmds.checkBoxGrp(Options.TWIST_AXIS_ENABLE_WIDGET, e=True, v1=False)
-        cmds.floatFieldGrp(Options.TWIST_AXIS_WIDGET, e=True, v1=1.0, v2=0.0, v3=0.0)
+        cmds.optionMenuGrp(Options.TWIST_AXIS_WIDGET, e=True, sl=1)
 
     def on_save(self):
         Options.get_kwargs()
