@@ -61,7 +61,7 @@ def create_space_switch(
 
     # Get the current offset parent matrix.  This is used as the starting blend point
     m = OpenMaya.MMatrix(cmds.getAttr("{}.offsetParentMatrix".format(node)))
-    cmds.setAttr("{}.inputMatrix".format(blend), matrix_to_list(m), type="matrix")
+    cmds.setAttr("{}.inputMatrix".format(blend), list(m), type="matrix")
 
     parent = cmds.listRelatives(node, parent=True, path=True)
     to_parent_local = "{}.worldInverseMatrix[0]".format(parent[0]) if parent else None
@@ -103,32 +103,21 @@ def _connect_driver_matrix_network(blend, node, driver, index, to_parent_local):
         "multMatrix", name="spaceswitch_{}_to_{}".format(node, driver)
     )
 
-    offset = matrix_to_list(
+    offset = (
         OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(node)))
         * OpenMaya.MMatrix(cmds.getAttr("{}.matrix".format(node))).inverse()
         * OpenMaya.MMatrix(cmds.getAttr("{}.worldInverseMatrix[0]".format(driver)))
     )
-    cmds.setAttr("{}.matrixIn[0]".format(mult), offset, type="matrix")
+    cmds.setAttr("{}.matrixIn[0]".format(mult), list(offset), type="matrix")
 
     cmds.connectAttr("{}.worldMatrix[0]".format(driver), "{}.matrixIn[1]".format(mult))
 
     if to_parent_local:
-        # Using parentInverseMatrix seems to cause a cycle when driving
-        # offsetParentMatrix?
         cmds.connectAttr(to_parent_local, "{}.matrixIn[2]".format(mult))
 
     cmds.connectAttr(
         "{}.matrixSum".format(mult), "{}.target[{}].targetMatrix".format(blend, index)
     )
-
-
-def matrix_to_list(matrix):
-    """Convert an MMatrix to a list
-
-    :param matrix: MMatrix
-    :return: List
-    """
-    return [matrix[i] for i in range(16)]
 
 
 def switch_space(node, attribute, space, create_keys=False):

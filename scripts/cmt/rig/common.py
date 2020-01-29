@@ -58,6 +58,10 @@ def lock_and_hide(node, attributes):
     :param attributes:
     :return:
     """
+    if isinstance(node, list) or isinstance(node, tuple):
+        for n in node:
+            lock_and_hide(n, attributes)
+        return
     for attr in attributes:
         if attr in ["translate", "rotate", "scale"]:
             for x in "XYZ":
@@ -265,21 +269,23 @@ def place_pole_vector(start, mid, end, pole_vector, offset):
     cmds.xform(pole_vector, ws=True, t=list(pos))
 
 
-def opm_parent_constraint(driver, driven, maintain_offset=False, freeze=True):
+def opm_parent_constraint(
+    driver, driven, maintain_offset=False, freeze=True, segment_scale_compensate=True
+):
     """Create a parent constraint effect with offsetParentMatrix.
 
     :param driver: Target transforms
     :param driven: Transform to drive
     :param maintain_offset: True to maintain offset
     :param freeze: True to 0 out the local xforms
+    :param segment_scale_compensate: True to remove the resulting scale and shear
     """
     opm_constraint(
         driver,
         driven,
         maintain_offset=maintain_offset,
         freeze=freeze,
-        use_scale=False,
-        use_shear=False,
+        segment_scale_compensate=segment_scale_compensate,
     )
 
 
@@ -311,6 +317,7 @@ def opm_constraint(
     use_rotate=True,
     use_scale=True,
     use_shear=True,
+    segment_scale_compensate=True,
 ):
     """Create a parent constraint effect with offsetParentMatrix.
 
@@ -322,6 +329,7 @@ def opm_constraint(
     :param use_rotate: True to use the rotation of the driver matrix
     :param use_scale: True to use the scale of the driver matrix
     :param use_shear: True to use the shear of the driver matrix
+    :param segment_scale_compensate: True to remove the resulting scale and shear
     """
     mult = cmds.createNode("multMatrix")
 
@@ -349,6 +357,75 @@ def opm_constraint(
         cmds.connectAttr(
             "{}.worldInverseMatrix[0]".format(parent[0]), "{}.matrixIn[2]".format(mult)
         )
+    if freeze:
+        freeze_to_parent_offset(driven)
+
+    if segment_scale_compensate:
+        pick = cmds.createNode("pickMatrix")
+        cmds.setAttr("{}.useScale".format(pick), False)
+        cmds.setAttr("{}.useShear".format(pick), False)
+        cmds.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(pick))
+        output = "{}.outputMatrix".format(pick)
+    else:
+        output = "{}.matrixSum".format(mult)
+
+    cmds.connectAttr(output, "{}.offsetParentMatrix".format(driven))
+
+
+def opm_aim_constraint(
+    driver, driven, maintain_offset=False, freeze=True, aim_vector=None, up_vector=None
+):
+    """Create a parent constraint effect with offsetParentMatrix.
+
+    :param driver: Target transforms
+    :param driven: Transform to drive
+    :param maintain_offset: True to maintain offset
+    :param freeze: True to 0 out the local xforms
+    """
+    aim_vector = aim_vector or [1.0, 0.0, 0.0]
+    up_vector = up_vector or [0.0, 1.0, 0.0]
+
+    aim = cmds.createNode("aimMatrix")
+    cmds.setAttr("{}.primary.primaryInputAxis".format(aim), *aim_vector)
+    cmds.setAttr("{}.secondary.secondaryInputAxis".format(aim), *up_vector)
+
+    cmds.connectAttr(
+        "{}.worldMatrix[0]".format(driver), "{}.primary.primaryTargetMatrix".format(aim)
+    )
+
+    input_mult = cmds.createNode("multMatrix")
+    parent = cmds.listRelatives(driven, parent=True, path=True)
+    m = OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(driven)))
+    if parent:
+        pinv = OpenMaya.MMatrix(
+            cmds.getAttr("{}.worldInverseMatrix[0]".format(parent[0]))
+        )
+        m = m * pinv
+        cmds.connectAttr(
+            "{}.worldMatrix[0]".format(parent[0]), "{}.matrixIn[1]".format(input_mult)
+        )
+    cmds.setAttr("{}.matrixIn[0]".format(input_mult), list(m), type="matrix")
+    cmds.connectAttr("{}.matrixSum".format(input_mult), "{}.inputMatrix".format(aim))
+
+    mult = cmds.createNode("multMatrix")
+
+    if maintain_offset:
+        offset = OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(driven)))
+        if not freeze:
+            offset *= OpenMaya.MMatrix(
+                cmds.getAttr("{}.matrix".format(driven))
+            ).inverse()
+        offset *= OpenMaya.MMatrix(
+            cmds.getAttr("{}.worldInverseMatrix[0]".format(driver))
+        )
+        cmds.setAttr("{}.matrixIn[0]".format(mult), list(offset), type="matrix")
+
+    cmds.connectAttr("{}.outputMatrix".format(aim), "{}.matrixIn[1]".format(mult))
+    if parent:
+        cmds.connectAttr(
+            "{}.worldInverseMatrix[0]".format(parent[0]), "{}.matrixIn[2]".format(mult)
+        )
+
     if freeze:
         freeze_to_parent_offset(driven)
 
