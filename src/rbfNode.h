@@ -13,13 +13,6 @@
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
-struct Gaussian;
-struct ThinPlate;
-struct MultiQuadraticBiharmonic;
-struct InverseMultiQuadraticBiharmonic;
-struct BeckertWendlandC2Basis;
-
-
 class RBFNode : public MPxNode {
  public:
   RBFNode();
@@ -31,20 +24,70 @@ class RBFNode : public MPxNode {
   static MStatus initialize();
   static MTypeId id;
   static const MString kName;
-  static MObject aInputs;
-  static MObject aOutputs;
+  static MObject aOutputValues;
+  static MObject aOutputQuats;
+  static MObject aInputValues;
+  static MObject aInputQuats;
+  static MObject aInputValueCount;
+  static MObject aOutputValueCount;
   static MObject aRBFFunction;
   static MObject aRadius;
   static MObject aRegularization;
   static MObject aSamples;
-  static MObject aInputValues;
-  static MObject aOutputValues;
+  static MObject aSampleInputValues;
+  static MObject aSampleInputQuats;
+  static MObject aSampleOutputValues;
+  static MObject aSampleOutputQuats;
 
  private:
-  MStatus getGenericValues(MArrayDataHandle& hArray, std::vector<double>& values,
-                           std::vector<MQuaternion>& quaternions);
+  MStatus getDoubleValues(MArrayDataHandle& hArray, int count, VectorXd& values);
+  MStatus getQuaternionValues(MArrayDataHandle& hArray, int count,
+                              std::vector<MQuaternion>& quaternions);
   MatrixXd pseudoInverse(const MatrixXd& a,
                          double epsilon = std::numeric_limits<double>::epsilon());
+};
+
+struct Gaussian {
+  Gaussian(const double& radius) {
+    static const double kFalloff = 0.707;
+    r = radius > 0.0 ? radius : 0.001;
+    r *= kFalloff;
+  }
+  const double operator()(const double& x) const { return exp(-(x * x) / (2.0 * r * r)); }
+  double r;
+};
+
+struct ThinPlate {
+  ThinPlate(const double& radius) { r = radius > 0.0 ? radius : 0.001; }
+  const double operator()(const double& x) const {
+    double v = x / r;
+    v *= x;
+    return v > 0.0 ? v * log(x) : v;
+  }
+  double r;
+};
+
+struct MultiQuadraticBiharmonic {
+  MultiQuadraticBiharmonic(const double& radius) : r(radius) {}
+  const double operator()(const double& x) const { return sqrt((x * x) + (r * r)); }
+  double r;
+};
+
+struct InverseMultiQuadraticBiharmonic {
+  InverseMultiQuadraticBiharmonic(const double& radius) : r(radius) {}
+  const double operator()(const double& x) const { return 1.0 / sqrt((x * x) + (r * r)); }
+  double r;
+};
+
+struct BeckertWendlandC2Basis {
+  BeckertWendlandC2Basis(const double& radius) { r = radius > 0.0 ? radius : 0.001; }
+  const double operator()(const double& x) const {
+    double v = x / r;
+    double first = (1.0 - v > 0.0) ? pow(1.0 - v, 4) : 0.0;
+    double second = 4.0 * v + 1.0;
+    return first * second;
+  }
+  double r;
 };
 
 template <typename T>

@@ -9,14 +9,20 @@
 #include <maya/MQuaternion.h>
 
 MTypeId RBFNode::id(0x0011581A);
-MObject RBFNode::aInputs;
-MObject RBFNode::aOutputs;
+MObject RBFNode::aInputValues;
+MObject RBFNode::aInputQuats;
+MObject RBFNode::aInputValueCount;
+MObject RBFNode::aOutputValueCount;
+MObject RBFNode::aOutputValues;
+MObject RBFNode::aOutputQuats;
 MObject RBFNode::aRBFFunction;
 MObject RBFNode::aRadius;
 MObject RBFNode::aRegularization;
 MObject RBFNode::aSamples;
-MObject RBFNode::aInputValues;
-MObject RBFNode::aOutputValues;
+MObject RBFNode::aSampleInputValues;
+MObject RBFNode::aSampleInputQuats;
+MObject RBFNode::aSampleOutputValues;
+MObject RBFNode::aSampleOutputQuats;
 
 const MString RBFNode::kName("rbf");
 
@@ -28,22 +34,44 @@ MStatus RBFNode::initialize() {
   MFnEnumAttribute eAttr;
   MFnNumericAttribute nAttr;
 
-  aOutputs = gAttr.create("output", "output");
-  gAttr.setArray(true);
-  gAttr.setUsesArrayDataBuilder(true);
-  gAttr.setWritable(false);
-  gAttr.setStorable(false);
-  gAttr.addNumericDataAccept(MFnNumericData::kDouble);
-  gAttr.addNumericDataAccept(MFnNumericData::k4Double);
-  addAttribute(aOutputs);
+  aOutputValues = nAttr.create("outputValue", "outputValue", MFnNumericData::kDouble);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
+  nAttr.setWritable(false);
+  nAttr.setStorable(false);
+  addAttribute(aOutputValues);
 
-  aInputs = gAttr.create("input", "input");
-  gAttr.setArray(true);
-  gAttr.setUsesArrayDataBuilder(true);
-  gAttr.addNumericDataAccept(MFnNumericData::kDouble);
-  gAttr.addNumericDataAccept(MFnNumericData::k4Double);
-  addAttribute(aInputs);
-  attributeAffects(aInputs, aOutputs);
+  aOutputQuats = nAttr.create("outputQuat", "outputQuat", MFnNumericData::k4Double);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
+  nAttr.setWritable(false);
+  nAttr.setStorable(false);
+  addAttribute(aOutputQuats);
+
+  aInputValues = nAttr.create("inputValue", "inputValue", MFnNumericData::kDouble);
+  nAttr.setKeyable(true);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
+  addAttribute(aInputValues);
+  attributeAffects(aInputValues, aOutputValues);
+  attributeAffects(aInputValues, aOutputQuats);
+
+  aInputValueCount = nAttr.create("inputValueCount", "inputValueCount", MFnNumericData::kLong);
+  addAttribute(aInputValueCount);
+  attributeAffects(aInputValueCount, aOutputValues);
+  attributeAffects(aInputValueCount, aOutputQuats);
+
+  aOutputValueCount = nAttr.create("outputValueCount", "outputValueCount", MFnNumericData::kLong);
+  addAttribute(aOutputValueCount);
+  attributeAffects(aOutputValueCount, aOutputValues);
+  attributeAffects(aOutputValueCount, aOutputQuats);
+
+  aInputQuats = nAttr.create("inputQuat", "inputQuat", MFnNumericData::k4Double);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
+  addAttribute(aInputQuats);
+  attributeAffects(aInputQuats, aOutputValues);
+  attributeAffects(aInputQuats, aOutputQuats);
 
   aRBFFunction = eAttr.create("rbf", "rbf");
   eAttr.setKeyable(true);
@@ -54,43 +82,60 @@ MStatus RBFNode::initialize() {
   eAttr.addField("inv multi quadratic biharmonic", 4);
   eAttr.addField("beckert wendland c2 basis", 5);
   addAttribute(aRBFFunction);
-  attributeAffects(aRBFFunction, aOutputs);
+  attributeAffects(aRBFFunction, aOutputValues);
+  attributeAffects(aRBFFunction, aOutputQuats);
 
   aRadius = nAttr.create("radius", "radius", MFnNumericData::kDouble, 1.0);
   nAttr.setKeyable(true);
   nAttr.setMin(0.0);
   addAttribute(aRadius);
-  attributeAffects(aRadius, aOutputs);
+  attributeAffects(aRadius, aOutputValues);
+  attributeAffects(aRadius, aOutputQuats);
 
   aRegularization = nAttr.create("regularization", "regularization", MFnNumericData::kDouble, 0.0);
   nAttr.setKeyable(true);
   nAttr.setMin(0.0);
   addAttribute(aRegularization);
-  attributeAffects(aRegularization, aOutputs);
+  attributeAffects(aRegularization, aOutputValues);
+  attributeAffects(aRegularization, aOutputQuats);
 
-  aInputValues = gAttr.create("inputValues", "inputValues");
-  gAttr.setArray(true);
-  gAttr.setUsesArrayDataBuilder(true);
-  gAttr.addNumericDataAccept(MFnNumericData::kDouble);
-  gAttr.addNumericDataAccept(MFnNumericData::k4Double);
-  gAttr.addDataAccept(MFnData::kMatrix);
+  aSampleInputValues =
+      nAttr.create("sampleInputValue", "sampleInputValue", MFnNumericData::kDouble);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
 
-  aOutputValues = gAttr.create("outputValues", "outputValues");
-  gAttr.setArray(true);
-  gAttr.setUsesArrayDataBuilder(true);
-  gAttr.addNumericDataAccept(MFnNumericData::kDouble);
-  gAttr.addNumericDataAccept(MFnNumericData::k4Double);
-  addAttribute(aOutputs);
+  aSampleInputQuats = nAttr.create("sampleInputQuat", "sampleInputQuat", MFnNumericData::k4Double);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
+
+  aSampleOutputValues =
+      nAttr.create("sampleOutputValue", "sampleOutputValue", MFnNumericData::kDouble);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
+
+  aSampleOutputQuats =
+      nAttr.create("sampleOutputQuat", "sampleOutputQuat", MFnNumericData::k4Double);
+  nAttr.setArray(true);
+  nAttr.setUsesArrayDataBuilder(true);
 
   aSamples = cAttr.create("sample", "sample");
   cAttr.setArray(true);
   cAttr.setUsesArrayDataBuilder(true);
-  cAttr.addChild(aInputValues);
-  cAttr.addChild(aOutputValues);
+  cAttr.addChild(aSampleInputValues);
+  cAttr.addChild(aSampleInputQuats);
+  cAttr.addChild(aSampleOutputValues);
+  cAttr.addChild(aSampleOutputQuats);
   addAttribute(aSamples);
-  attributeAffects(aSamples, aOutputs);
-  attributeAffects(aInputValues, aOutputs);
-  attributeAffects(aOutputValues, aOutputs);
+  attributeAffects(aSamples, aOutputValues);
+  attributeAffects(aSamples, aOutputQuats);
+  attributeAffects(aSampleInputValues, aOutputValues);
+  attributeAffects(aSampleInputValues, aOutputQuats);
+  attributeAffects(aSampleInputQuats, aOutputValues);
+  attributeAffects(aSampleInputQuats, aOutputQuats);
+  attributeAffects(aSampleOutputValues, aOutputValues);
+  attributeAffects(aSampleOutputValues, aOutputQuats);
+  attributeAffects(aSampleOutputQuats, aOutputValues);
+  attributeAffects(aSampleOutputQuats, aOutputQuats);
 
   return MS::kSuccess;
 }
@@ -104,30 +149,30 @@ RBFNode::~RBFNode() {}
 MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   MStatus status;
 
-  if (plug != aOutputs) {
+  if (plug != aOutputValues && plug != aOutputQuats) {
     return MS::kUnknownParameter;
   }
 
   short rbf = data.inputValue(aRBFFunction).asShort();
   double regularization = data.inputValue(aRegularization).asDouble();
   double radius = data.inputValue(aRadius).asDouble();
+  int inputCount = data.inputValue(aInputValueCount).asLong();
+  int outputCount = data.inputValue(aOutputValueCount).asLong();
 
   // Get the inputs
-  MArrayDataHandle hInputs = data.inputArrayValue(aInputs);
-  unsigned int inputCount = hInputs.elementCount();
-  std::vector<double> values;
-  std::vector<MQuaternion> quaternions;
-  status = getGenericValues(hInputs, values, quaternions);
+  MArrayDataHandle hInputs = data.inputArrayValue(aInputValues);
+  VectorXd inputs;
+  status = getDoubleValues(hInputs, inputCount, inputs);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-  VectorXd inputs = VectorXd::Map(values.data(), values.size());
 
   // Build the feature matrix
   MArrayDataHandle hSamples = data.inputArrayValue(aSamples);
   unsigned int sampleCount = hSamples.elementCount();
   MatrixXd featureMatrix(sampleCount, inputCount);
-  /// TODO: support quaternion input/output
+  MatrixXd outputMatrix(sampleCount, outputCount);
+  // TODO: support quaternion input/output
+
   std::vector<std::vector<MQuaternion>> outputQuatMatrix;
-  std::vector<VectorXd> outputValueMatrix;
   for (unsigned int i = 0; i < sampleCount; ++i) {
     status = hSamples.jumpToArrayElement(i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -135,32 +180,17 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
     MDataHandle hSample = hSamples.inputValue(&status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    MArrayDataHandle hInputValues = hSample.child(aInputValues);
-    status = getGenericValues(hInputValues, values, quaternions);
+    MArrayDataHandle hInputValues = hSample.child(aSampleInputValues);
+    VectorXd values;
+    status = getDoubleValues(hInputValues, inputCount, values);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    VectorXd featureValues = VectorXd::Map(values.data(), values.size());
-    featureMatrix.row(i) = featureValues;
+    featureMatrix.row(i) = values;
 
-    MArrayDataHandle hOutputValues = hSample.child(aOutputValues);
-    status = getGenericValues(hOutputValues, values, quaternions);
+    MArrayDataHandle hOutputValues = hSample.child(aSampleOutputValues);
+    status = getDoubleValues(hOutputValues, outputCount, values);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    if (values.size()) {
-      VectorXd outputValues = VectorXd::Map(values.data(), values.size());
-      outputValueMatrix.push_back(outputValues);
-    }
-    if (quaternions.size()) {
-      outputQuatMatrix.push_back(quaternions);
-    }
+    outputMatrix.row(i) = values;
   }
-
-  MatrixXd outputMatrix;
-  if (outputValueMatrix.size()) {
-    outputMatrix.resize(outputValueMatrix.size(), outputValueMatrix[0].size());
-    for (size_t i = 0; i < outputValueMatrix.size(); ++i) {
-      outputMatrix.row(i) = outputValueMatrix[i];
-    }
-  }
-
   // Generate distance matrix from feature matrix
   // Generate distance vector from inputs
   MatrixXd m(sampleCount, sampleCount);
@@ -170,7 +200,7 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
     inputDistance[i] = (featureMatrix.row(i).transpose() - inputs).norm();
   }
 
-  /// TODO: Normalize each column separately
+  // TODO: Normalize each column separately
   double maxValue = m.maxCoeff();
   m /= maxValue;
   inputDistance /= maxValue;
@@ -185,49 +215,43 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   MatrixXd theta = (mat * outputMatrix).transpose();
   VectorXd output = theta * inputDistance;
 
-  MatrixXd thetaQuat;
-  if (outputQuatMatrix.size()) {
-    thetaQuat = mat.transpose();
-  }
-
   MDataHandle hOutput;
-  MArrayDataHandle hOutputs = data.outputArrayValue(aOutputs);
-  unsigned int outputCount = outputMatrix.cols();
+  MArrayDataHandle hOutputs = data.outputArrayValue(aOutputValues);
   for (unsigned int i = 0; i < outputCount; ++i) {
     status = JumpToElement(hOutputs, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     hOutput = hOutputs.outputValue();
-    hOutput.setGenericDouble(output[i], true);
+    hOutput.setDouble(output[i]);
   }
   hOutputs.setAllClean();
 
   return MS::kSuccess;
 }
 
-MStatus RBFNode::getGenericValues(MArrayDataHandle& hArray, std::vector<double>& values,
-                                  std::vector<MQuaternion>& quaternions) {
+MStatus RBFNode::getDoubleValues(MArrayDataHandle& hArray, int count, VectorXd& values) {
   MStatus status;
-  values.clear();
-  quaternions.clear();
-  unsigned int count = hArray.elementCount();
+  values.resize(count);
   for (int i = 0; i < count; ++i) {
     status = JumpToElement(hArray, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    MDataHandle hValue = hArray.inputValue();
-    bool isNumeric = false;
-    bool isNull = false;
-    hValue.isGeneric(isNumeric, isNull);
-    if (isNumeric) {
-      double v = hValue.asGenericDouble();
-      values.push_back(v);
-    } else {
-      MObject oData = hValue.data();
-      MFnNumericData fnData(oData, &status);
-      CHECK_MSTATUS_AND_RETURN_IT(status);
-      MQuaternion q;
-      fnData.getData4Double(q.x, q.y, q.z, q.w);
-      quaternions.push_back(q);
-    }
+    values[i] = hArray.inputValue().asDouble();
+  }
+  return MS::kSuccess;
+}
+
+MStatus RBFNode::getQuaternionValues(MArrayDataHandle& hArray, int count,
+                                     std::vector<MQuaternion>& quaternions) {
+  MStatus status;
+  quaternions.resize(count);
+  for (int i = 0; i < count; ++i) {
+    status = JumpToElement(hArray, i);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    MObject oData = hArray.inputValue().data();
+    MFnNumericData fnData(oData, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    MQuaternion q;
+    fnData.getData4Double(q.x, q.y, q.z, q.w);
+    quaternions[i] = q;
   }
   return MS::kSuccess;
 }
@@ -242,49 +266,6 @@ MatrixXd RBFNode::pseudoInverse(const MatrixXd& a, double epsilon) {
              .asDiagonal() *
          svd.matrixU().adjoint();
 }
-
-struct Gaussian {
-  Gaussian(const double& radius) {
-    static const double kFalloff = 0.707;
-    r = radius > 0.0 ? radius : 0.001;
-    r *= kFalloff;
-  }
-  const double operator()(const double& x) const { return exp(-(x * x) / (2.0 * r * r)); }
-  double r;
-};
-
-struct ThinPlate {
-  ThinPlate(const double& radius) { r = radius > 0.0 ? radius : 0.001; }
-  const double operator()(const double& x) const {
-    double v = x / r;
-    v *= x;
-    return v > 0.0 ? v * log(x) : v;
-  }
-  double r;
-};
-
-struct MultiQuadraticBiharmonic {
-  MultiQuadraticBiharmonic(const double& radius) : r(radius) {}
-  const double operator()(const double& x) const { return sqrt((x * x) + (r * r)); }
-  double r;
-};
-
-struct InverseMultiQuadraticBiharmonic {
-  InverseMultiQuadraticBiharmonic(const double& radius) : r(radius) {}
-  const double operator()(const double& x) const { return 1.0 / sqrt((x * x) + (r * r)); }
-  double r;
-};
-
-struct BeckertWendlandC2Basis {
-  BeckertWendlandC2Basis(const double& radius) { r = radius > 0.0 ? radius : 0.001; }
-  const double operator()(const double& x) const {
-    double v = x / r;
-    double first = (1.0 - v > 0.0) ? pow(1.0 - v, 4) : 0.0;
-    double second = 4.0 * v + 1.0;
-    return first * second;
-  }
-  double r;
-};
 
 /*
 for i in range(4):
