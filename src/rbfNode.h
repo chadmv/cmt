@@ -29,6 +29,7 @@ class RBFNode : public MPxNode {
   static MObject aInputValues;
   static MObject aInputQuats;
   static MObject aInputValueCount;
+  static MObject aInputQuatCount;
   static MObject aOutputValueCount;
   static MObject aRBFFunction;
   static MObject aRadius;
@@ -45,6 +46,17 @@ class RBFNode : public MPxNode {
                               std::vector<MQuaternion>& quaternions);
   MatrixXd pseudoInverse(const MatrixXd& a,
                          double epsilon = std::numeric_limits<double>::epsilon());
+
+  inline double quaternionDot(const MQuaternion& q1, const MQuaternion& q2) {
+    double dotValue = (q1.x * q2.x) + (q1.y * q2.y) + (q1.z * q2.z) + (q1.w * q2.w);
+    // Clamp any floating point error
+    if (dotValue < -1.0) {
+      dotValue = -1.0;
+    } else if (dotValue > 1.0) {
+      dotValue = 1.0;
+    }
+    return dotValue;
+  }
 };
 
 struct Gaussian {

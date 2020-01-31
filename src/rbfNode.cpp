@@ -12,6 +12,7 @@ MTypeId RBFNode::id(0x0011581A);
 MObject RBFNode::aInputValues;
 MObject RBFNode::aInputQuats;
 MObject RBFNode::aInputValueCount;
+MObject RBFNode::aInputQuatCount;
 MObject RBFNode::aOutputValueCount;
 MObject RBFNode::aOutputValues;
 MObject RBFNode::aOutputQuats;
@@ -56,22 +57,27 @@ MStatus RBFNode::initialize() {
   attributeAffects(aInputValues, aOutputValues);
   attributeAffects(aInputValues, aOutputQuats);
 
-  aInputValueCount = nAttr.create("inputValueCount", "inputValueCount", MFnNumericData::kLong);
-  addAttribute(aInputValueCount);
-  attributeAffects(aInputValueCount, aOutputValues);
-  attributeAffects(aInputValueCount, aOutputQuats);
-
-  aOutputValueCount = nAttr.create("outputValueCount", "outputValueCount", MFnNumericData::kLong);
-  addAttribute(aOutputValueCount);
-  attributeAffects(aOutputValueCount, aOutputValues);
-  attributeAffects(aOutputValueCount, aOutputQuats);
-
   aInputQuats = nAttr.create("inputQuat", "inputQuat", MFnNumericData::k4Double);
   nAttr.setArray(true);
   nAttr.setUsesArrayDataBuilder(true);
   addAttribute(aInputQuats);
   attributeAffects(aInputQuats, aOutputValues);
   attributeAffects(aInputQuats, aOutputQuats);
+
+  aInputValueCount = nAttr.create("inputValueCount", "inputValueCount", MFnNumericData::kLong);
+  addAttribute(aInputValueCount);
+  attributeAffects(aInputValueCount, aOutputValues);
+  attributeAffects(aInputValueCount, aOutputQuats);
+
+  aInputQuatCount = nAttr.create("inputQuatCount", "inputQuatCount", MFnNumericData::kLong);
+  addAttribute(aInputQuatCount);
+  attributeAffects(aInputQuatCount, aOutputValues);
+  attributeAffects(aInputQuatCount, aOutputQuats);
+
+  aOutputValueCount = nAttr.create("outputValueCount", "outputValueCount", MFnNumericData::kLong);
+  addAttribute(aOutputValueCount);
+  attributeAffects(aOutputValueCount, aOutputValues);
+  attributeAffects(aOutputValueCount, aOutputQuats);
 
   aRBFFunction = eAttr.create("rbf", "rbf");
   eAttr.setKeyable(true);
@@ -157,6 +163,7 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   double regularization = data.inputValue(aRegularization).asDouble();
   double radius = data.inputValue(aRadius).asDouble();
   int inputCount = data.inputValue(aInputValueCount).asLong();
+  int inputQuatCount = data.inputValue(aInputQuatCount).asLong();
   int outputCount = data.inputValue(aOutputValueCount).asLong();
 
   // Get the inputs
@@ -164,15 +171,19 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   VectorXd inputs;
   status = getDoubleValues(hInputs, inputCount, inputs);
   CHECK_MSTATUS_AND_RETURN_IT(status);
+  MArrayDataHandle hInputQuats = data.inputArrayValue(aInputQuats);
+  std::vector<MQuaternion> inputQuats;
+  status = getQuaternionValues(hInputQuats, inputQuatCount, inputQuats);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
 
   // Build the feature matrix
   MArrayDataHandle hSamples = data.inputArrayValue(aSamples);
   unsigned int sampleCount = hSamples.elementCount();
   MatrixXd featureMatrix(sampleCount, inputCount);
   MatrixXd outputMatrix(sampleCount, outputCount);
-  // TODO: support quaternion input/output
+  // TODO: support quaternion output
 
-  std::vector<std::vector<MQuaternion>> outputQuatMatrix;
+  std::vector<std::vector<MQuaternion>> featureQuatMatrix(sampleCount);
   for (unsigned int i = 0; i < sampleCount; ++i) {
     status = hSamples.jumpToArrayElement(i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -180,30 +191,94 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
     MDataHandle hSample = hSamples.inputValue(&status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    MArrayDataHandle hInputValues = hSample.child(aSampleInputValues);
-    VectorXd values;
-    status = getDoubleValues(hInputValues, inputCount, values);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    featureMatrix.row(i) = values;
+    if (inputCount) {
+      MArrayDataHandle hInputValues = hSample.child(aSampleInputValues);
+      VectorXd values;
+      status = getDoubleValues(hInputValues, inputCount, values);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+      featureMatrix.row(i) = values;
+    }
 
-    MArrayDataHandle hOutputValues = hSample.child(aSampleOutputValues);
-    status = getDoubleValues(hOutputValues, outputCount, values);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    outputMatrix.row(i) = values;
+    if (inputQuatCount) {
+      MArrayDataHandle hSampleInputQuats = hSample.child(aSampleInputQuats);
+      status = getQuaternionValues(hSampleInputQuats, inputQuatCount, featureQuatMatrix[i]);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+    }
+
+    if (outputCount) {
+      MArrayDataHandle hOutputValues = hSample.child(aSampleOutputValues);
+      VectorXd values;
+      status = getDoubleValues(hOutputValues, outputCount, values);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+      outputMatrix.row(i) = values;
+    }
   }
+
   // Generate distance matrix from feature matrix
   // Generate distance vector from inputs
-  MatrixXd m(sampleCount, sampleCount);
-  VectorXd inputDistance(sampleCount);
-  for (int i = 0; i < sampleCount; ++i) {
-    m.col(i) = (featureMatrix.rowwise() - featureMatrix.row(i)).matrix().rowwise().norm();
-    inputDistance[i] = (featureMatrix.row(i).transpose() - inputs).norm();
+  MatrixXd m = MatrixXd::Zero(sampleCount, sampleCount);
+  VectorXd inputDistance = VectorXd::Zero(sampleCount);
+  if (inputCount) {
+    for (int i = 0; i < sampleCount; ++i) {
+      m.col(i) = (featureMatrix.rowwise() - featureMatrix.row(i)).matrix().rowwise().norm();
+      inputDistance[i] = (featureMatrix.row(i).transpose() - inputs).norm();
+    }
+    // Normalize distances
+    double maxValue = m.maxCoeff();
+    m /= maxValue;
+    inputDistance /= maxValue;
   }
 
-  // TODO: Normalize each column separately
-  double maxValue = m.maxCoeff();
-  m /= maxValue;
-  inputDistance /= maxValue;
+  if (inputQuatCount) {
+    std::vector<MatrixXd> mQuat(inputQuatCount);
+    for (int i = 0; i < inputQuatCount; ++i) {
+      mQuat[i].resize(sampleCount, sampleCount);
+    }
+
+    // Calculate rotation distances
+    for (int s1 = 0; s1 < sampleCount; ++s1) {
+      for (int s2 = 0; s2 < sampleCount; ++s2) {
+        for (int i = 0; i < inputQuatCount; ++i) {
+          MQuaternion& q1 = featureQuatMatrix[s1][i];
+          MQuaternion& q2 = featureQuatMatrix[s2][i];
+          double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
+          mQuat[i](s1, s2) = distance;
+        }
+      }
+    }
+
+    // Add rotational distances to main distance
+    for (auto& rd : mQuat) {
+      m += rd;
+    }
+
+    // Generate rotational distance matrix from rotation inputs
+    MatrixXd inputQuatDistance = MatrixXd::Zero(sampleCount, inputQuatCount);
+    for (int i = 0; i < inputQuatCount; ++i) {
+      MQuaternion& q1 = inputQuats[i];
+      for (int s1 = 0; s1 < sampleCount; ++s1) {
+        for (int c = 0; c < inputQuatCount; ++c) {
+          MQuaternion& q2 = featureQuatMatrix[s1][c];
+          double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
+          inputQuatDistance(s1, c) = distance;
+        }
+      }
+    }
+
+    // Add rotational input distances to main distance
+    for (int i = 0; i < inputQuatCount; ++i) {
+      inputDistance += inputQuatDistance.col(i);
+    }
+
+    // Normalized float distance is 0-1, rotational distances are 0-1
+    // Added together they are 0-(inputQuatCount+1)
+    // Scale back to 0-1 range
+    double scalar = inputCount > 0 ? 1.0 / static_cast<double>(inputQuatCount + 1)
+                                   : 1.0 / static_cast<double>(inputQuatCount);
+    m *= scalar;
+    inputDistance *= scalar;
+  }
+
   applyRbf(m, rbf, radius);
   applyRbf(inputDistance, rbf, radius);
 
@@ -246,11 +321,10 @@ MStatus RBFNode::getQuaternionValues(MArrayDataHandle& hArray, int count,
   for (int i = 0; i < count; ++i) {
     status = JumpToElement(hArray, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    MObject oData = hArray.inputValue().data();
-    MFnNumericData fnData(oData, &status);
+    MDataHandle hQuaternion = hArray.inputValue(&status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    MQuaternion q;
-    fnData.getData4Double(q.x, q.y, q.z, q.w);
+    double4& values = hQuaternion.asDouble4();
+    MQuaternion q(values);
     quaternions[i] = q;
   }
   return MS::kSuccess;
@@ -266,17 +340,3 @@ MatrixXd RBFNode::pseudoInverse(const MatrixXd& a, double epsilon) {
              .asDiagonal() *
          svd.matrixU().adjoint();
 }
-
-/*
-for i in range(4):
-    cube = "pCube{}".format(i+1)
-    cmds.connectAttr("{}.tx".format(cube), "rbf1.sample[{}].inputValues[0]".format(i))
-    cmds.connectAttr("{}.ty".format(cube), "rbf1.sample[{}].inputValues[1]".format(i))
-    cmds.connectAttr("{}.tz".format(cube), "rbf1.sample[{}].inputValues[2]".format(i))
-    cmds.connectAttr("{}.sx".format(cube), "rbf1.sample[{}].outputValues[0]".format(i))
-    cmds.connectAttr("{}.sy".format(cube), "rbf1.sample[{}].outputValues[1]".format(i))
-    cmds.connectAttr("{}.sz".format(cube), "rbf1.sample[{}].outputValues[2]".format(i))
-cmds.connectAttr("rbf1.output[0]", "pCube5.sx")
-cmds.connectAttr("rbf1.output[1]", "pCube5.sy")
-cmds.connectAttr("rbf1.output[2]", "pCube5.sz")
-*/
