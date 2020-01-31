@@ -7,6 +7,21 @@ the tools in your own projects or just browse the code for inspiration or to sil
 
 Full documentation can be found here: https://chadmv.github.io/cmt
 
+# Plug-in Dependencies
+* [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)
+
+# Plug-in Compilation Instructions
+Download [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page) and extract into `third-party/Eigen`.
+
+The project is setup to use CMake to generate build files.
+
+### Windows
+```
+mkdir build.2020
+cd build.2020
+cmake -G "Visual Studio 15 2017 Win64" -DMAYA_VERSION=2020
+cmake --build . --target install --config Release
+```
 
 # Installation Instructions
 cmt is Maya module that can be installed like all other Maya modules.  You can do one of the following:
