@@ -19,6 +19,8 @@ class RBFNode : public MPxNode {
   virtual ~RBFNode();
   static void* creator();
 
+  virtual MStatus setDependentsDirty(const MPlug& plug, MPlugArray& affectedPlugs);
+  virtual MStatus preEvaluation(const MDGContext& context, const MEvaluationNode& evaluationNode);
   virtual MStatus compute(const MPlug& plug, MDataBlock& data);
 
   static MStatus initialize();
@@ -41,6 +43,8 @@ class RBFNode : public MPxNode {
   static MObject aSampleOutputQuats;
 
  private:
+  MStatus buildFeatureMatrix(MDataBlock& data, int inputCount, int outputCount, int inputQuatCount,
+                             short rbf, double radius);
   MStatus getDoubleValues(MArrayDataHandle& hArray, int count, VectorXd& values);
   MStatus getQuaternionValues(MArrayDataHandle& hArray, int count,
                               std::vector<MQuaternion>& quaternions);
@@ -57,6 +61,12 @@ class RBFNode : public MPxNode {
     }
     return dotValue;
   }
+
+  bool dirty_;
+  double maxValue_;
+  MatrixXd featureMatrix_;
+  std::vector<std::vector<MQuaternion>> featureQuatMatrix_;
+  MatrixXd theta_;
 };
 
 struct Gaussian {

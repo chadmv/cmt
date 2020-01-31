@@ -1,12 +1,12 @@
 #include "rbfNode.h"
 #include "common.h"
 
+#include <maya/MEvaluationNode.h>
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MFnEnumAttribute.h>
 #include <maya/MFnGenericAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnNumericData.h>
-#include <maya/MQuaternion.h>
 
 MTypeId RBFNode::id(0x0011581A);
 MObject RBFNode::aInputValues;
@@ -148,9 +148,42 @@ MStatus RBFNode::initialize() {
 
 void* RBFNode::creator() { return new RBFNode(); }
 
-RBFNode::RBFNode() {}
+RBFNode::RBFNode() : dirty_(true) {}
 
 RBFNode::~RBFNode() {}
+
+MStatus RBFNode::setDependentsDirty(const MPlug& plug, MPlugArray& affectedPlugs) {
+  if (plug == aInputValueCount || plug == aInputQuatCount || plug == aOutputValueCount ||
+      plug == aRBFFunction || plug == aRadius || plug == aRegularization || plug == aSamples ||
+      plug == aSampleInputValues || plug == aSampleInputQuats || plug == aSampleOutputValues ||
+      plug == aSampleOutputQuats) {
+    dirty_ = true;
+  }
+  return MPxNode::setDependentsDirty(plug, affectedPlugs);
+}
+
+MStatus RBFNode::preEvaluation(const MDGContext& context, const MEvaluationNode& evaluationNode) {
+  MStatus status;
+  // We use m_CachedValueIsValid only for normal context
+  if (!context.isNormal()) {
+    return MStatus::kFailure;
+  }
+
+  if ((evaluationNode.dirtyPlugExists(aInputValueCount, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aInputQuatCount, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aOutputValueCount, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aRBFFunction, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aRadius, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aRegularization, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aSamples, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aSampleInputValues, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aSampleInputQuats, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aSampleOutputValues, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aSampleOutputQuats, &status) && status)) {
+    dirty_ = true;
+  }
+  return MS::kSuccess;
+}
 
 MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   MStatus status;
@@ -160,7 +193,6 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   }
 
   short rbf = data.inputValue(aRBFFunction).asShort();
-  double regularization = data.inputValue(aRegularization).asDouble();
   double radius = data.inputValue(aRadius).asDouble();
   int inputCount = data.inputValue(aInputValueCount).asLong();
   int inputQuatCount = data.inputValue(aInputQuatCount).asLong();
@@ -176,89 +208,32 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   status = getQuaternionValues(hInputQuats, inputQuatCount, inputQuats);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
-  // Build the feature matrix
-  MArrayDataHandle hSamples = data.inputArrayValue(aSamples);
-  unsigned int sampleCount = hSamples.elementCount();
-  MatrixXd featureMatrix(sampleCount, inputCount);
-  MatrixXd outputMatrix(sampleCount, outputCount);
-  // TODO: support quaternion output
-
-  std::vector<std::vector<MQuaternion>> featureQuatMatrix(sampleCount);
-  for (unsigned int i = 0; i < sampleCount; ++i) {
-    status = hSamples.jumpToArrayElement(i);
+  if (dirty_) {
+    // Build the system coefficients
+    status = buildFeatureMatrix(data, inputCount, outputCount, inputQuatCount, rbf, radius);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    MDataHandle hSample = hSamples.inputValue(&status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    if (inputCount) {
-      MArrayDataHandle hInputValues = hSample.child(aSampleInputValues);
-      VectorXd values;
-      status = getDoubleValues(hInputValues, inputCount, values);
-      CHECK_MSTATUS_AND_RETURN_IT(status);
-      featureMatrix.row(i) = values;
-    }
-
-    if (inputQuatCount) {
-      MArrayDataHandle hSampleInputQuats = hSample.child(aSampleInputQuats);
-      status = getQuaternionValues(hSampleInputQuats, inputQuatCount, featureQuatMatrix[i]);
-      CHECK_MSTATUS_AND_RETURN_IT(status);
-    }
-
-    if (outputCount) {
-      MArrayDataHandle hOutputValues = hSample.child(aSampleOutputValues);
-      VectorXd values;
-      status = getDoubleValues(hOutputValues, outputCount, values);
-      CHECK_MSTATUS_AND_RETURN_IT(status);
-      outputMatrix.row(i) = values;
-    }
+    dirty_ = false;
   }
 
-  // Generate distance matrix from feature matrix
   // Generate distance vector from inputs
-  MatrixXd m = MatrixXd::Zero(sampleCount, sampleCount);
+  int sampleCount = featureMatrix_.rows();
   VectorXd inputDistance = VectorXd::Zero(sampleCount);
   if (inputCount) {
     for (int i = 0; i < sampleCount; ++i) {
-      m.col(i) = (featureMatrix.rowwise() - featureMatrix.row(i)).matrix().rowwise().norm();
-      inputDistance[i] = (featureMatrix.row(i).transpose() - inputs).norm();
+      inputDistance[i] = (featureMatrix_.row(i).transpose() - inputs).norm();
     }
     // Normalize distances
-    double maxValue = m.maxCoeff();
-    m /= maxValue;
-    inputDistance /= maxValue;
+    inputDistance /= maxValue_;
   }
 
   if (inputQuatCount) {
-    std::vector<MatrixXd> mQuat(inputQuatCount);
-    for (int i = 0; i < inputQuatCount; ++i) {
-      mQuat[i].resize(sampleCount, sampleCount);
-    }
-
-    // Calculate rotation distances
-    for (int s1 = 0; s1 < sampleCount; ++s1) {
-      for (int s2 = 0; s2 < sampleCount; ++s2) {
-        for (int i = 0; i < inputQuatCount; ++i) {
-          MQuaternion& q1 = featureQuatMatrix[s1][i];
-          MQuaternion& q2 = featureQuatMatrix[s2][i];
-          double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
-          mQuat[i](s1, s2) = distance;
-        }
-      }
-    }
-
-    // Add rotational distances to main distance
-    for (auto& rd : mQuat) {
-      m += rd;
-    }
-
     // Generate rotational distance matrix from rotation inputs
     MatrixXd inputQuatDistance = MatrixXd::Zero(sampleCount, inputQuatCount);
     for (int i = 0; i < inputQuatCount; ++i) {
       MQuaternion& q1 = inputQuats[i];
       for (int s1 = 0; s1 < sampleCount; ++s1) {
         for (int c = 0; c < inputQuatCount; ++c) {
-          MQuaternion& q2 = featureQuatMatrix[s1][c];
+          MQuaternion& q2 = featureQuatMatrix_[s1][c];
           double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
           inputQuatDistance(s1, c) = distance;
         }
@@ -275,20 +250,12 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
     // Scale back to 0-1 range
     double scalar = inputCount > 0 ? 1.0 / static_cast<double>(inputQuatCount + 1)
                                    : 1.0 / static_cast<double>(inputQuatCount);
-    m *= scalar;
     inputDistance *= scalar;
   }
 
-  applyRbf(m, rbf, radius);
   applyRbf(inputDistance, rbf, radius);
-
-  MatrixXd r = MatrixXd::Zero(sampleCount, sampleCount);
-  r.diagonal().array() = regularization;
-
-  MatrixXd tm = m.transpose();
-  MatrixXd mat = pseudoInverse(tm * m + r) * tm;
-  MatrixXd theta = (mat * outputMatrix).transpose();
-  VectorXd output = theta * inputDistance;
+ 
+  VectorXd output = theta_ * inputDistance;
 
   MDataHandle hOutput;
   MArrayDataHandle hOutputs = data.outputArrayValue(aOutputValues);
@@ -299,6 +266,102 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
     hOutput.setDouble(output[i]);
   }
   hOutputs.setAllClean();
+
+  return MS::kSuccess;
+}
+
+MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int outputCount,
+                                    int inputQuatCount, short rbf, double radius) {
+  MStatus status;
+  MArrayDataHandle hSamples = data.inputArrayValue(aSamples);
+  unsigned int sampleCount = hSamples.elementCount();
+  featureMatrix_.resize(sampleCount, inputCount);
+  MatrixXd outputMatrix(sampleCount, outputCount);
+  // TODO: support quaternion output
+
+  featureQuatMatrix_.resize(sampleCount);
+  for (unsigned int i = 0; i < sampleCount; ++i) {
+    status = hSamples.jumpToArrayElement(i);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    MDataHandle hSample = hSamples.inputValue(&status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    if (inputCount) {
+      MArrayDataHandle hInputValues = hSample.child(aSampleInputValues);
+      VectorXd values;
+      status = getDoubleValues(hInputValues, inputCount, values);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+      featureMatrix_.row(i) = values;
+    }
+
+    if (inputQuatCount) {
+      MArrayDataHandle hSampleInputQuats = hSample.child(aSampleInputQuats);
+      status = getQuaternionValues(hSampleInputQuats, inputQuatCount, featureQuatMatrix_[i]);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+    }
+
+    if (outputCount) {
+      MArrayDataHandle hOutputValues = hSample.child(aSampleOutputValues);
+      VectorXd values;
+      status = getDoubleValues(hOutputValues, outputCount, values);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+      outputMatrix.row(i) = values;
+    }
+  }
+
+  // Generate distance matrix from feature matrix
+  // Generate distance vector from inputs
+  MatrixXd m = MatrixXd::Zero(sampleCount, sampleCount);
+  if (inputCount) {
+    for (int i = 0; i < sampleCount; ++i) {
+      m.col(i) = (featureMatrix_.rowwise() - featureMatrix_.row(i)).matrix().rowwise().norm();
+    }
+    // Normalize distances
+    maxValue_ = m.maxCoeff();
+    m /= maxValue_;
+  }
+
+  if (inputQuatCount) {
+    std::vector<MatrixXd> mQuat(inputQuatCount);
+    for (int i = 0; i < inputQuatCount; ++i) {
+      mQuat[i].resize(sampleCount, sampleCount);
+    }
+
+    // Calculate rotation distances
+    for (int s1 = 0; s1 < sampleCount; ++s1) {
+      for (int s2 = 0; s2 < sampleCount; ++s2) {
+        for (int i = 0; i < inputQuatCount; ++i) {
+          MQuaternion& q1 = featureQuatMatrix_[s1][i];
+          MQuaternion& q2 = featureQuatMatrix_[s2][i];
+          double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
+          mQuat[i](s1, s2) = distance;
+        }
+      }
+    }
+
+    // Add rotational distances to main distance
+    for (auto& rd : mQuat) {
+      m += rd;
+    }
+
+    // Normalized float distance is 0-1, rotational distances are 0-1
+    // Added together they are 0-(inputQuatCount+1)
+    // Scale back to 0-1 range
+    double scalar = inputCount > 0 ? 1.0 / static_cast<double>(inputQuatCount + 1)
+                                   : 1.0 / static_cast<double>(inputQuatCount);
+    m *= scalar;
+  }
+
+  applyRbf(m, rbf, radius);
+
+  double regularization = data.inputValue(aRegularization).asDouble();
+  MatrixXd r = MatrixXd::Zero(sampleCount, sampleCount);
+  r.diagonal().array() = regularization;
+
+  MatrixXd tm = m.transpose();
+  MatrixXd mat = pseudoInverse(tm * m + r) * tm;
+  theta_ = (mat * outputMatrix).transpose();
 
   return MS::kSuccess;
 }
