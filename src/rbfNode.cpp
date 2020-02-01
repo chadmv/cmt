@@ -217,6 +217,9 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
 
   // Generate distance vector from inputs
   int sampleCount = featureMatrix_.rows();
+  if (sampleCount == 0) {
+    return MS::kSuccess;
+  }
   VectorXd inputDistance = VectorXd::Zero(sampleCount);
   if (inputCount) {
     for (int i = 0; i < sampleCount; ++i) {
@@ -276,6 +279,9 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
   MArrayDataHandle hSamples = data.inputArrayValue(aSamples);
   unsigned int sampleCount = hSamples.elementCount();
   featureMatrix_.resize(sampleCount, inputCount);
+  if (sampleCount == 0) {
+    return MS::kSuccess;
+  }
   MatrixXd outputMatrix(sampleCount, outputCount);
   // TODO: support quaternion output
 
