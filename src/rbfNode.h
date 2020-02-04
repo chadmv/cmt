@@ -50,6 +50,7 @@ class RBFNode : public MPxNode {
                               std::vector<MQuaternion>& quaternions);
   MatrixXd pseudoInverse(const MatrixXd& a,
                          double epsilon = std::numeric_limits<double>::epsilon());
+  double quaternionDistance(MQuaternion& q1, MQuaternion& q2);
 
   inline double quaternionDot(const MQuaternion& q1, const MQuaternion& q2) {
     double dotValue = (q1.x * q2.x) + (q1.y * q2.y) + (q1.z * q2.z) + (q1.w * q2.w);
@@ -63,7 +64,8 @@ class RBFNode : public MPxNode {
   }
 
   bool dirty_;
-  double maxValue_;
+  double distanceNorm_;
+  VectorXd featureNorms_;
   MatrixXd featureMatrix_;
   std::vector<std::vector<MQuaternion>> featureQuatMatrix_;
   MatrixXd theta_;
@@ -83,8 +85,7 @@ struct ThinPlate {
   ThinPlate(const double& radius) { r = radius > 0.0 ? radius : 0.001; }
   const double operator()(const double& x) const {
     double v = x / r;
-    v *= x;
-    return v > 0.0 ? v * log(x) : v;
+    return v > 0.0 ? v * v * log(v) : v;
   }
   double r;
 };

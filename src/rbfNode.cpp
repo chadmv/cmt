@@ -222,11 +222,16 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   }
   VectorXd inputDistance = VectorXd::Zero(sampleCount);
   if (inputCount) {
+    for (int i = 0; i < inputCount; ++i) {
+      if (featureNorms_[i] != 0.0) {
+        inputs[i] /= featureNorms_[i];
+      }
+    }
     for (int i = 0; i < sampleCount; ++i) {
       inputDistance[i] = (featureMatrix_.row(i).transpose() - inputs).norm();
     }
     // Normalize distances
-    inputDistance /= maxValue_;
+    inputDistance /= distanceNorm_;
   }
 
   if (inputQuatCount) {
@@ -237,7 +242,7 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
       for (int s1 = 0; s1 < sampleCount; ++s1) {
         for (int c = 0; c < inputQuatCount; ++c) {
           MQuaternion& q2 = featureQuatMatrix_[s1][c];
-          double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
+          double distance = quaternionDistance(q1, q2);
           inputQuatDistance(s1, c) = distance;
         }
       }
@@ -315,17 +320,26 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
       outputMatrix.row(i) = values;
     }
   }
-
   // Generate distance matrix from feature matrix
   // Generate distance vector from inputs
   MatrixXd m = MatrixXd::Zero(sampleCount, sampleCount);
   if (inputCount) {
+    featureNorms_.resize(inputCount);
+    // Normalize each column so each feature is in the same scale
+    for (int i = 0; i < inputCount; ++i) {
+      featureNorms_[i] = featureMatrix_.col(i).norm();
+      if (featureNorms_[i] != 0.0) {
+        featureMatrix_.col(i) /= featureNorms_[i];
+      }
+    }
+
     for (int i = 0; i < sampleCount; ++i) {
       m.col(i) = (featureMatrix_.rowwise() - featureMatrix_.row(i)).matrix().rowwise().norm();
     }
+
     // Normalize distances
-    maxValue_ = m.maxCoeff();
-    m /= maxValue_;
+    distanceNorm_ = m.norm();
+    m /= distanceNorm_;
   }
 
   if (inputQuatCount) {
@@ -340,7 +354,7 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
         for (int i = 0; i < inputQuatCount; ++i) {
           MQuaternion& q1 = featureQuatMatrix_[s1][i];
           MQuaternion& q2 = featureQuatMatrix_[s2][i];
-          double distance = -(quaternionDot(q1, q2) - 1.0) * 0.5;
+          double distance = quaternionDistance(q1, q2);
           mQuat[i](s1, s2) = distance;
         }
       }
@@ -408,4 +422,9 @@ MatrixXd RBFNode::pseudoInverse(const MatrixXd& a, double epsilon) {
              .matrix()
              .asDiagonal() *
          svd.matrixU().adjoint();
+}
+
+double RBFNode::quaternionDistance(MQuaternion& q1, MQuaternion& q2) { 
+  double dot = quaternionDot(q1, q2);
+  return acos(2.0 * dot * dot - 1.0) / M_PI;
 }

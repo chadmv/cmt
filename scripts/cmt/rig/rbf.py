@@ -1,15 +1,25 @@
 import maya.cmds as cmds
 
+
 class RBF(object):
     @classmethod
-    def create(cls, name=None, inputs=None, outputs=None, input_transforms=None):
+    def create(cls, name=None, inputs=None, outputs=None, input_transforms=None, add_neutral_sample=True):
         cmds.loadPlugin("cmt", qt=True)
         name = name or "rbf#"
         node = cmds.createNode("rbf", name=name)
         node = RBF(node)
+        if add_neutral_sample:
+            # Store the current output values because they may be different once
+            # connected
+            output_values = [cmds.getAttr(x) for x in outputs] if outputs else None
+
         node.set_inputs(inputs)
         node.set_outputs(outputs)
         node.set_input_transforms(input_transforms)
+
+        if add_neutral_sample:
+            node.add_sample(output_values=output_values)
+
         return node
 
     def __init__(self, name):
@@ -77,7 +87,7 @@ class RBF(object):
                 cmds.connectAttr(parent_inverse, "{}.matrixIn[1]".format(mult))
 
             rotation = cmds.createNode(
-                "decomposeMatrix", name="{}_rotation".format(driver)
+                "decomposeMatrix", name="{}_rotation".format(transform)
             )
             cmds.connectAttr(
                 "{}.matrixSum".format(mult), "{}.inputMatrix".format(rotation)
@@ -103,6 +113,7 @@ class RBF(object):
         input_count = cmds.getAttr("{}.inputQuatCount".format(self.name))
         if i >= input_count:
             raise RuntimeError("Invalid input index")
+        # Traverse connections to the transform
         # inputQuat <- decomposeMatrix <- multMatrix <- transform
         connection = cmds.listConnections(
             "{}.inputQuat[{}]".format(self.name, i), d=False
@@ -110,11 +121,14 @@ class RBF(object):
 
         if not connection or cmds.nodeType(connection[0]) != "decomposeMatrix":
             return None
-
-        connection = cmds.listConnections("{}.inputMatrix".format(self.name), d=False)
+        connection = cmds.listConnections(
+            "{}.inputMatrix".format(connection[0]), d=False
+        )
         if not connection or cmds.nodeType(connection[0]) != "multMatrix":
             return None
-        connection = cmds.listConnections("{}.matrixIn[0]".format(self.name), d=False)
+        connection = cmds.listConnections(
+            "{}.matrixIn[0]".format(connection[0]), d=False
+        )
         return connection[0] if connection else None
 
     def set_outputs(self, outputs):
@@ -174,6 +188,13 @@ class RBF(object):
                 cmds.getAttr("{}.inputQuat[{}]".format(self.name, i))[0]
                 for i in range(input_quat_count)
             ]
+
+        if input_values:
+            print("Input values: {}".format(input_values))
+        if output_values:
+            print("Output values: {}".format(output_values))
+        if input_quats:
+            print("Input quats: {}".format(input_quats))
 
         indices = cmds.getAttr("{}.sample".format(self.name), mi=True)
         idx = indices[-1] + 1 if indices else 0
