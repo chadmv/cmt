@@ -49,7 +49,7 @@ void EndProgress();
   @param[in] path A dag path.
   @return true if the path points to a shape node.
  */
-bool IsShapeNode(MDagPath& path);
+bool isShapeNode(MDagPath& path);
 
 
 /**
@@ -59,7 +59,7 @@ bool IsShapeNode(MDagPath& path);
   @param[in] intermediate true to get the intermediate shape.
   @return MStatus.
  */
-MStatus GetShapeNode(MDagPath& path, bool intermediate=false);
+MStatus getShapeNode(MDagPath& path, bool intermediate=false);
 
 
 /**
@@ -67,7 +67,14 @@ MStatus GetShapeNode(MDagPath& path, bool intermediate=false);
   @param[in] name Name of a dag node.
   @param[out] path Storage for the dag path.
  */
-MStatus GetDagPath(MString& name, MDagPath& path);
+MStatus getDagPath(const MString& name, MDagPath& path);
+
+/**
+  Get the MObject of an object.
+  @param[in] name Name of the node.
+  @param[out] oNode Storage for the MObject.
+ */
+MStatus getDependNode(const MString& name, MObject& oNode);
 
 
 /**

@@ -3,13 +3,12 @@
 #include <maya/MArrayDataBuilder.h>
 #include <maya/MArrayDataHandle.h>
 #include <maya/MDataHandle.h>
-#include <maya/MGlobal.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnMesh.h>
+#include <maya/MGlobal.h>
 #include <maya/MItMeshVertex.h>
 #include <maya/MSelectionList.h>
 #include <algorithm>
-
 
 MStatus JumpToElement(MArrayDataHandle& hArray, unsigned int index) {
   MStatus status;
@@ -27,7 +26,6 @@ MStatus JumpToElement(MArrayDataHandle& hArray, unsigned int index) {
   return status;
 }
 
-
 void StartProgress(const MString& title, unsigned int count) {
   if (MGlobal::mayaState() == MGlobal::kInteractive) {
     MString message = "progressBar -e -bp -ii true -st \"";
@@ -39,7 +37,6 @@ void StartProgress(const MString& title, unsigned int count) {
   }
 }
 
-
 void StepProgress(int step) {
   if (MGlobal::mayaState() == MGlobal::kInteractive) {
     MString message = "progressBar -e -s ";
@@ -48,7 +45,6 @@ void StepProgress(int step) {
     MGlobal::executeCommand(message);
   }
 }
-
 
 bool ProgressCancelled() {
   if (MGlobal::mayaState() == MGlobal::kInteractive) {
@@ -59,25 +55,21 @@ bool ProgressCancelled() {
   return false;
 }
 
-
 void EndProgress() {
   if (MGlobal::mayaState() == MGlobal::kInteractive) {
     MGlobal::executeCommand("progressBar -e -ep $gMainProgressBar;");
   }
 }
 
-
-bool IsShapeNode(MDagPath& path) {
-  return path.node().hasFn(MFn::kMesh) ||
-         path.node().hasFn(MFn::kNurbsCurve) ||
+bool isShapeNode(MDagPath& path) {
+  return path.node().hasFn(MFn::kMesh) || path.node().hasFn(MFn::kNurbsCurve) ||
          path.node().hasFn(MFn::kNurbsSurface);
 }
 
-
-MStatus GetShapeNode(MDagPath& path, bool intermediate) {
+MStatus getShapeNode(MDagPath& path, bool intermediate) {
   MStatus status;
 
-  if (IsShapeNode(path)) {
+  if (isShapeNode(path)) {
     // Start at the transform so we can honor the intermediate flag.
     path.pop();
   }
@@ -88,7 +80,7 @@ MStatus GetShapeNode(MDagPath& path, bool intermediate) {
     for (unsigned int i = 0; i < shapeCount; ++i) {
       status = path.push(path.child(i));
       CHECK_MSTATUS_AND_RETURN_IT(status);
-      if (!IsShapeNode(path)) {
+      if (!isShapeNode(path)) {
         path.pop();
         continue;
       }
@@ -108,8 +100,7 @@ MStatus GetShapeNode(MDagPath& path, bool intermediate) {
   return MS::kFailure;
 }
 
-
-MStatus GetDagPath(MString& name, MDagPath& path) {
+MStatus getDagPath(const MString& name, MDagPath& path) {
   MStatus status;
   MSelectionList list;
   status = MGlobal::getSelectionListByName(name, list);
@@ -119,10 +110,20 @@ MStatus GetDagPath(MString& name, MDagPath& path) {
   return MS::kSuccess;
 }
 
+MStatus getDependNode(const MString& name, MObject& oNode) {
+  MStatus status;
+  MSelectionList list;
+  status = MGlobal::getSelectionListByName(name, list);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  status = list.getDependNode(0, oNode);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  return MS::kSuccess;
+}
+
 MStatus DeleteIntermediateObjects(MDagPath& path) {
   MStatus status;
   MDagPath pathMesh(path);
-  while (GetShapeNode(pathMesh, true) == MS::kSuccess) {
+  while (getShapeNode(pathMesh, true) == MS::kSuccess) {
     status = MGlobal::executeCommand("delete " + pathMesh.partialPathName());
     CHECK_MSTATUS_AND_RETURN_IT(status);
     pathMesh = MDagPath(path);
