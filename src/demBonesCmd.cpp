@@ -1,14 +1,20 @@
 #include "demBonesCmd.h"
 #include "common.h"
+#ifndef DEM_BONES_MAT_BLOCKS
+#include "DemBones/MatBlocks.h"
+#define DEM_BONES_DEM_BONES_MAT_BLOCKS_UNDEFINED
+#endif
 
 #include <maya/MAnimControl.h>
 #include <maya/MDagPath.h>
+#include <maya/MEulerRotation.h>
 #include <maya/MFnAnimCurve.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnMatrixData.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnSet.h>
 #include <maya/MFnSkinCluster.h>
+#include <maya/MFnTransform.h>
 #include <maya/MMatrix.h>
 #include <maya/MPlug.h>
 #include <maya/MTime.h>
@@ -39,6 +45,8 @@ const char* DemBonesCmd::kStartFrameShort = "-sf";
 const char* DemBonesCmd::kStartFrameLong = "-startFrame";
 const char* DemBonesCmd::kEndFrameShort = "-ef";
 const char* DemBonesCmd::kEndFrameLong = "-endFrame";
+const char* DemBonesCmd::kExistingBonesShort = "-eb";
+const char* DemBonesCmd::kExistingBonesLong = "-existingBones";
 const MString DemBonesCmd::kName("demBones");
 
 void* DemBonesCmd::creator() { return new DemBonesCmd; }
@@ -61,6 +69,8 @@ MSyntax DemBonesCmd::newSyntax() {
   syntax.addFlag(kBonesShort, kBonesLong, MSyntax::kLong);
   syntax.addFlag(kStartFrameShort, kStartFrameLong, MSyntax::kDouble);
   syntax.addFlag(kEndFrameShort, kEndFrameLong, MSyntax::kDouble);
+  syntax.addFlag(kExistingBonesShort, kExistingBonesLong, MSyntax::kString);
+  syntax.makeFlagMultiUse(kExistingBonesShort);
 
   syntax.setObjectType(MSyntax::kSelectionList, 1, 1);
   syntax.useSelectionAsDefault(true);
@@ -94,6 +104,23 @@ MStatus DemBonesCmd::doIt(const MArgList& argList) {
   if (argData.isFlagSet(kEndFrameShort)) {
     endFrame = argData.flagArgumentDouble(kEndFrameShort, 0, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
+  }
+
+  if (argData.isFlagSet(kExistingBonesShort)) {
+    unsigned int count = argData.numberOfFlagUses(kExistingBonesShort);
+    pathBones_.setLength(count);
+    unsigned int pos;
+    for (unsigned int i = 0; i < count; ++i) {
+      MSelectionList slist;
+      status = argData.getFlagArgumentPosition(kExistingBonesShort, i, pos);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+      MArgList mArgs;
+      status = argData.getFlagArgumentList(kExistingBonesShort, i, mArgs);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+      MString boneName = mArgs.asString(0);
+      status = getDagPath(boneName, pathBones_[i]);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
+    }
   }
 
   status = readMeshSequence(startFrame, endFrame);
@@ -145,8 +172,6 @@ MStatus DemBonesCmd::doIt(const MArgList& argList) {
   }
 
   if (argData.isFlagSet(kBonesShort) && model_.nB > 0) {
-    model_.weightsSmoothStep = argData.flagArgumentDouble(kWeightsSmoothStepShort, 0, &status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
     int boneCount = argData.flagArgumentInt(kBonesShort, 0, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     model_.nB += (boneCount - model_.nB);
@@ -159,11 +184,12 @@ MStatus DemBonesCmd::doIt(const MArgList& argList) {
     }
 
     model_.nB = argData.flagArgumentInt(kBonesShort, 0, &status);
-    std::cerr << "Initializing bones: 1";
+    std::cout << "Initializing bones: 1";
     model_.init();
-    std::cerr << std::endl;
+    std::cout << std::endl;
   }
 
+  std::cout << "Computing Skinning Decomposition:\n";
   model_.compute();
 
   return redoIt();
@@ -181,10 +207,98 @@ MStatus DemBonesCmd::readMeshSequence(double startFrame, double endFrame) {
   model_.fTime.resize(model_.nF);
   model_.fStart.resize(model_.nS + 1);
   model_.fStart(0) = 0;
+  model_.nB = pathBones_.length();
+  model_.m.resize(model_.nF * 4, model_.nB * 4);
 
   int frameCount = static_cast<int>(endFrame - startFrame + 1);
 
+  // Get bone info
   MTime time = MAnimControl::currentTime();
+  time.setValue(0.0);
+  status = MAnimControl::setCurrentTime(time);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  model_.boneName.resize(model_.nB);
+  for (unsigned int i = 0; i < model_.nB; ++i) {
+    model_.boneName[i] = pathBones_[i].partialPathName().asChar();
+  }
+
+  model_.parent.resize(model_.nB);
+  model_.bind.resize(model_.nS * 4, model_.nB * 4);
+  model_.preMulInv.resize(model_.nS * 4, model_.nB * 4);
+  model_.rotOrder.resize(model_.nS * 3, model_.nB);
+  int s = 0;
+
+  for (int j = 0; j < model_.nB; j++) {
+    std::string nj = model_.boneName[j];
+
+    model_.parent(j) = -1;
+    MDagPath parent(pathBones_[j]);
+    status = parent.pop();
+    if (!MFAIL(status)) {
+      for (int k = 0; k < model_.nB; k++) {
+        if (model_.boneName[k] == parent.partialPathName().asChar()) {
+          model_.parent(j) = k;
+        }
+      }
+    }
+
+    model_.bind.blk4(s, j) = toMatrix4d(pathBones_[j].inclusiveMatrix());
+
+    MFnTransform fnTransform(pathBones_[j], &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    MEulerRotation rotation;
+    fnTransform.getRotation(rotation);
+    switch (rotation.order) {
+      case MEulerRotation::kXYZ:
+        model_.rotOrder.vec3(s, j) = Eigen::Vector3i(0, 1, 2);
+        break;
+      case MEulerRotation::kYZX:
+        model_.rotOrder.vec3(s, j) = Eigen::Vector3i(1, 2, 0);
+        break;
+      case MEulerRotation::kZXY:
+        model_.rotOrder.vec3(s, j) = Eigen::Vector3i(2, 0, 1);
+        break;
+      case MEulerRotation::kXZY:
+        model_.rotOrder.vec3(s, j) = Eigen::Vector3i(0, 2, 1);
+        break;
+      case MEulerRotation::kYXZ:
+        model_.rotOrder.vec3(s, j) = Eigen::Vector3i(1, 0, 2);
+        break;
+      case MEulerRotation::kZYX:
+        model_.rotOrder.vec3(s, j) = Eigen::Vector3i(2, 1, 0);
+        break;
+    }
+
+    MMatrix preMulInv;  // Seems to always be identity
+    /*MMatrix gp = pathBones_[j].exclusiveMatrix();
+    pathBones_[j].exclusiveMatrixInverse() *
+
+    if (jn[j].pParentJoint == NULL)
+      preMulInv = gp.inverse();
+    else {
+      Matrix4d gjp = Map<Matrix4d>((double*)(jn[j].pParentJoint->EvaluateGlobalTransform()));
+      preMulInv =  gp.inverse() * gjp;
+    }*/
+    model_.preMulInv.blk4(s, j) = toMatrix4d(preMulInv);
+
+  }
+
+  // TODO: Use existing bone weight
+  Eigen::MatrixXd wd(0, 0);
+  /*if (importer.wT.size() != 0) {
+    wd = MatrixXd::Zero(model.nB, model.nV);
+    for (int j = 0; j < model.nB; j++){
+      wd.row(j) = importer.wT[model.boneName[j]].transpose();
+    }
+  }*/
+
+  model_.w = (wd / model_.nS).sparseView(1, 1e-20);
+  bool hasKeyFrame = true;
+  if (!hasKeyFrame) {
+    model_.m.resize(0, 0);
+  }
+
+
   for (int s = 0; s < model_.nS; s++) {
     int start = model_.fStart(s);
     // Read vertex data each frame
@@ -197,13 +311,19 @@ MStatus DemBonesCmd::readMeshSequence(double startFrame, double endFrame) {
       MPointArray points;
       fnMesh.getPoints(points, MSpace::kWorld);
 
-      //#pragma omp parallel for
+#pragma omp parallel for
       for (int i = 0; i < model_.nV; i++) {
         model_.v.col(i).segment<3>((start + f) * 3) << points[i].x, points[i].y, points[i].z;
+      }
+
+      for (int j = 0; j < model_.nB; ++j) {
+        model_.m.blk4(f, j) = toMatrix4d(pathBones_[j].inclusiveMatrix()) * model_.bind.blk4(s, j).inverse();
       }
     }
     model_.fStart(s + 1) = model_.fStart(s) + model_.nF;
   }
+
+  model_.origM = model_.m;
 
   model_.subjectID.resize(model_.nF);
   for (int s = 0; s < model_.nS; s++) {
@@ -247,49 +367,6 @@ MStatus DemBonesCmd::readBindPose() {
     }
   }
 
-  model_.nB = 0;  // TODO: Use existing bones
-  // model_.boneName = importer.jointName;  // TODO: Use existing bones
-
-  model_.parent.resize(model_.nB);
-  model_.bind.resize(model_.nS * 4, model_.nB * 4);
-  model_.preMulInv.resize(model_.nS * 4, model_.nB * 4);
-  model_.rotOrder.resize(model_.nS * 3, model_.nB);
-
-  // TODO: Use existing bones
-  /*for (int j = 0; j < model_.nB; j++) {
-    std::string nj = model_.boneName[j];
-
-    model_.parent(j) = -1;
-    for (int k = 0; k < model_.nB; k++) {
-      if (model_.boneName[k] == importer.parent[nj]) {
-        model_.parent(j) = k;
-      }
-    }
-    model_.bind.blk4(s, j) = importer.bind[nj];
-    model_.preMulInv.blk4(s, j) = importer.preMulInv[nj];
-    model_.rotOrder.vec3(s, j) = importer.rotOrder[nj];
-  }*/
-
-  // TODO: Use existing bones
-  Eigen::MatrixXd wd(0, 0);
-  /*if (importer.wT.size() != 0) {
-    wd = MatrixXd::Zero(model.nB, model.nV);
-    for (int j = 0; j < model.nB; j++){
-      wd.row(j) = importer.wT[model.boneName[j]].transpose();
-    }
-  }*/
-
-  model_.m.resize(model_.nF * 4, model_.nB * 4);
-
-  model_.w = (wd / model_.nS).sparseView(1, 1e-20);
-  bool hasKeyFrame = false;
-  if (!hasKeyFrame) {
-    model_.m.resize(0, 0);
-  }
-
-  // TODO: Use existing bones
-  model_.origM = model_.m;
-
   return MS::kSuccess;
 }
 
@@ -316,10 +393,12 @@ MStatus DemBonesCmd::redoIt() {
 
     Eigen::VectorXd val;
     for (int j = 0; j < newBoneNames.size(); ++j) {
-      MString name(model_.boneName[j].c_str());
-      MGlobal::executeCommand("createNode \"joint\" -n \"" + name + "\"");
+      MString name(newBoneNames[j].c_str());
+      MString cmd("createNode \"joint\" -n \"" + name + "\"");
+      MGlobal::executeCommand(cmd);
     }
-    for (int j = 0; j < model_.boneName.size(); ++j) {
+    int startJointIdx = newBoneNames.size() == 0 ? 0 : model_.boneName.size() - newBoneNames.size();
+    for (int j = startJointIdx; j < model_.boneName.size(); ++j) {
       MDagPath pathJoint;
       status = getDagPath(model_.boneName[j].c_str(), pathJoint);
       CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -368,7 +447,8 @@ MStatus DemBonesCmd::setKeyframes(const Eigen::VectorXd& val, const Eigen::Vecto
   MPlug plug = fnNode.findPlug(attributeName, false, &status);
   CHECK_MSTATUS_AND_RETURN_IT(status);
   MFnAnimCurve fnCurve;
-  MObject oCurve = fnCurve.create(plug);
+  MObject oCurve = fnCurve.create(plug, nullptr, &status);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
   MTime time;
   MTimeArray timeArray(nFr, time);
   MDoubleArray values(nFr);
@@ -436,6 +516,14 @@ MStatus DemBonesCmd::setSkinCluster(const std::vector<std::string>& name,
   return MS::kSuccess;
 }
 
+Eigen::Matrix4d DemBonesCmd::toMatrix4d(const MMatrix& m) {
+  Eigen::Matrix4d mat;
+  mat << m[0][0], m[0][1], m[0][2], m[0][3], m[1][0], m[1][1], m[1][2], m[1][3], m[2][0], m[2][1],
+      m[2][2], m[2][3], m[3][0], m[3][1], m[3][2], m[3][3];
+  mat.transposeInPlace();
+  return mat;
+}
+
 MStatus DemBonesCmd::undoIt() {
   MStatus status;
 
@@ -444,3 +532,11 @@ MStatus DemBonesCmd::undoIt() {
 */
   return MS::kSuccess;
 }
+
+#ifdef DEM_BONES_DEM_BONES_MAT_BLOCKS_UNDEFINED
+#undef blk4
+#undef rotMat
+#undef transVec
+#undef vec3
+#undef DEM_BONES_MAT_BLOCKS
+#endif

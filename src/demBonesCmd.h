@@ -7,6 +7,7 @@
 #include <maya/MArgList.h>
 #include <maya/MDGModifier.h>
 #include <maya/MDagPath.h>
+#include <maya/MDagPathArray.h>
 #include <maya/MGlobal.h>
 #include <maya/MObject.h>
 #include <maya/MPxCommand.h>
@@ -77,6 +78,8 @@ class DemBonesCmd : public MPxCommand {
   static const char* kStartFrameLong;
   static const char* kEndFrameShort;
   static const char* kEndFrameLong;
+  static const char* kExistingBonesShort;
+  static const char* kExistingBonesLong;
 
  private:
   MStatus readMeshSequence(double startFrame, double endFrame);
@@ -84,11 +87,13 @@ class DemBonesCmd : public MPxCommand {
   MStatus setKeyframes(const Eigen::VectorXd& val, const Eigen::VectorXd& fTime,
                        const MDagPath& pathJoint, const MString& attributeName);
   MStatus setSkinCluster(const std::vector<std::string>& name, const Eigen::SparseMatrix<double>& w, const Eigen::MatrixXd& gb);
+  Eigen::Matrix4d toMatrix4d(const MMatrix& m);
 
   MyDemBones model_;
   MDGModifier dgMod_;
   MString name_;
   MDagPath pathMesh_;
+  MDagPathArray pathBones_;
 };
 
 #endif
