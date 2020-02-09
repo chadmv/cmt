@@ -190,7 +190,9 @@ MStatus DemBonesCmd::doIt(const MArgList& argList) {
   }
 
   std::cout << "Computing Skinning Decomposition:\n";
-  model_.compute();
+  if (!model_.compute()) {
+    return MS::kFailure;
+  }
 
   return redoIt();
 }
@@ -376,6 +378,8 @@ MStatus DemBonesCmd::redoIt() {
 
   bool needCreateJoints = (model_.boneName.size() != model_.nB);
   std::vector<std::string> newBoneNames;
+  MStringArray joints;
+
   if (needCreateJoints) {
     // model.boneName.resize(model.nB);
     int creationCount = model_.nB - static_cast<int>(model_.boneName.size());
@@ -384,9 +388,9 @@ MStatus DemBonesCmd::redoIt() {
       s << "dembones_joint" << j;
       model_.boneName.push_back(s.str());
       newBoneNames.push_back(s.str());
+      joints.append(s.str().c_str());
     }
   }
-
   for (int s = 0; s < model_.nS; ++s) {
     Eigen::MatrixXd lr, lt, gb, lbr, lbt;
     model_.computeRTB(s, lr, lt, gb, lbr, lbt, false);
@@ -428,7 +432,7 @@ MStatus DemBonesCmd::redoIt() {
     status = setSkinCluster(model_.boneName, model_.w, gb);
     CHECK_MSTATUS_AND_RETURN_IT(status);
   }
-
+  setResult(joints);
   /*status = dgMod_.doIt();
   CHECK_MSTATUS_AND_RETURN_IT(status);
 

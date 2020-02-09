@@ -175,7 +175,7 @@ public:
 			
 		This function is called at the begining of every compute update functions as a safeguard.
 	*/
-	void init() {
+	bool init() {
 		if (modelSize<0) modelSize=sqrt((u-(u.rowwise().sum()/nV).replicate(1, nV)).squaredNorm()/nV/nS);
 		if (laplacian.cols()!=nV) computeSmoothSolver();
 
@@ -186,7 +186,7 @@ public:
 				nB=m.cols() == 0 ? 1 : (int)m.cols() / 4;
 				label=Eigen::VectorXi::Zero(nV);
 				computeTransFromLabel();
-
+        auto prevNB = nB;
 				bool cont=true;
 				while (cont) {
 					cbInitSplitBegin();
@@ -198,6 +198,11 @@ public:
 						pruneBones(nnz);
 					}
 					cbInitSplitEnd();
+					if (prevNB == nB) {
+						std::cout << "Unable to initialize bone transforms." << std::endl;
+						return false;
+					}
+					prevNB = nB;
 				}
 				m.conservativeResize(nF*4, nB*4);
 				if (origM.rows() && m.cols() >= origM.cols()) {
@@ -210,6 +215,7 @@ public:
 				m=Matrix4::Identity().replicate(nF, nB);
 			}
 		}
+		return true;
 	}
 
 	/** @brief Update bone transformations by running #nTransIters iterations with #transAffine and #transAffineNorm regularizers
@@ -334,8 +340,10 @@ public:
 
 		Output: #w, #m. Missing #w and/or #m (with zero size) will be initialized by init().
 	*/
-	void compute() {
-		init();
+	bool compute() {
+		if (!init()) {
+			return false;
+		}
 
 		for (_iter=0; _iter<nIters; _iter++) {
 			cbIterBegin();
@@ -343,6 +351,7 @@ public:
 			computeWeights();
 			cbIterEnd();
 		}
+		return true;
 	}
 	
 	//! @return Root mean squared reconstruction error
@@ -576,7 +585,7 @@ private:
 			#pragma omp atomic
 			s(label(i))++;
 		}
-
+		auto current = nB;
 		Eigen::VectorXi newID(nB);
 		int countID=0;
 		for (int j=0; j<nB; j++)
@@ -591,6 +600,7 @@ private:
 		for (int i=0; i<nV; i++) label(i)=newID(label(i));
 
 		nB=countID;
+		std::cout << "Pruned from " << current << " to " << nB << std::endl;
 		m.conservativeResize(nF*4, nB*4);
 		computeLabel();
 	}
