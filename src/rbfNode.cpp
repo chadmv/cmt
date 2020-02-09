@@ -1,12 +1,16 @@
 #include "rbfNode.h"
 #include "common.h"
 
+#include <maya/MAngle.h>
+#include <maya/MEulerRotation.h>
 #include <maya/MEvaluationNode.h>
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MFnEnumAttribute.h>
 #include <maya/MFnGenericAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnNumericData.h>
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MQuaternion.h>
 
 MTypeId RBFNode::id(0x0011581A);
 MObject RBFNode::aInputValues;
@@ -14,8 +18,12 @@ MObject RBFNode::aInputQuats;
 MObject RBFNode::aInputValueCount;
 MObject RBFNode::aInputQuatCount;
 MObject RBFNode::aOutputValueCount;
+MObject RBFNode::aOutputQuatCount;
 MObject RBFNode::aOutputValues;
-MObject RBFNode::aOutputQuats;
+MObject RBFNode::aOutputRotateX;
+MObject RBFNode::aOutputRotateY;
+MObject RBFNode::aOutputRotateZ;
+MObject RBFNode::aOutputRotate;
 MObject RBFNode::aRBFFunction;
 MObject RBFNode::aRadius;
 MObject RBFNode::aRegularization;
@@ -34,6 +42,7 @@ MStatus RBFNode::initialize() {
   MFnGenericAttribute gAttr;
   MFnEnumAttribute eAttr;
   MFnNumericAttribute nAttr;
+  MFnUnitAttribute uAttr;
 
   aOutputValues = nAttr.create("outputValue", "outputValue", MFnNumericData::kDouble);
   nAttr.setArray(true);
@@ -42,42 +51,45 @@ MStatus RBFNode::initialize() {
   nAttr.setStorable(false);
   addAttribute(aOutputValues);
 
-  aOutputQuats = nAttr.create("outputQuat", "outputQuat", MFnNumericData::k4Double);
+  aOutputRotateX = uAttr.create("outputRotateX", "outputRotateX", MFnUnitAttribute::kAngle);
+  aOutputRotateY = uAttr.create("outputRotateY", "outputRotateY", MFnUnitAttribute::kAngle);
+  aOutputRotateZ = uAttr.create("outputRotateZ", "outputRotateZ", MFnUnitAttribute::kAngle);
+  aOutputRotate =
+      nAttr.create("outputRotate", "outputRotate", aOutputRotateX, aOutputRotateY, aOutputRotateZ);
   nAttr.setArray(true);
   nAttr.setUsesArrayDataBuilder(true);
   nAttr.setWritable(false);
   nAttr.setStorable(false);
-  addAttribute(aOutputQuats);
+  addAttribute(aOutputRotate);
 
   aInputValues = nAttr.create("inputValue", "inputValue", MFnNumericData::kDouble);
   nAttr.setKeyable(true);
   nAttr.setArray(true);
   nAttr.setUsesArrayDataBuilder(true);
   addAttribute(aInputValues);
-  attributeAffects(aInputValues, aOutputValues);
-  attributeAffects(aInputValues, aOutputQuats);
+  affects(aInputValues);
 
   aInputQuats = nAttr.create("inputQuat", "inputQuat", MFnNumericData::k4Double);
   nAttr.setArray(true);
   nAttr.setUsesArrayDataBuilder(true);
   addAttribute(aInputQuats);
-  attributeAffects(aInputQuats, aOutputValues);
-  attributeAffects(aInputQuats, aOutputQuats);
+  affects(aInputQuats);
 
   aInputValueCount = nAttr.create("inputValueCount", "inputValueCount", MFnNumericData::kLong);
   addAttribute(aInputValueCount);
-  attributeAffects(aInputValueCount, aOutputValues);
-  attributeAffects(aInputValueCount, aOutputQuats);
+  affects(aInputValueCount);
 
   aInputQuatCount = nAttr.create("inputQuatCount", "inputQuatCount", MFnNumericData::kLong);
   addAttribute(aInputQuatCount);
-  attributeAffects(aInputQuatCount, aOutputValues);
-  attributeAffects(aInputQuatCount, aOutputQuats);
+  affects(aInputQuatCount);
 
   aOutputValueCount = nAttr.create("outputValueCount", "outputValueCount", MFnNumericData::kLong);
   addAttribute(aOutputValueCount);
-  attributeAffects(aOutputValueCount, aOutputValues);
-  attributeAffects(aOutputValueCount, aOutputQuats);
+  affects(aOutputValueCount);
+
+  aOutputQuatCount = nAttr.create("outputQuatCount", "outputQuatCount", MFnNumericData::kLong);
+  addAttribute(aOutputQuatCount);
+  affects(aOutputQuatCount);
 
   aRBFFunction = eAttr.create("rbf", "rbf");
   eAttr.setKeyable(true);
@@ -88,22 +100,19 @@ MStatus RBFNode::initialize() {
   eAttr.addField("inv multi quadratic biharmonic", 4);
   eAttr.addField("beckert wendland c2 basis", 5);
   addAttribute(aRBFFunction);
-  attributeAffects(aRBFFunction, aOutputValues);
-  attributeAffects(aRBFFunction, aOutputQuats);
+  affects(aRBFFunction);
 
   aRadius = nAttr.create("radius", "radius", MFnNumericData::kDouble, 1.0);
   nAttr.setKeyable(true);
   nAttr.setMin(0.0);
   addAttribute(aRadius);
-  attributeAffects(aRadius, aOutputValues);
-  attributeAffects(aRadius, aOutputQuats);
+  affects(aRadius);
 
   aRegularization = nAttr.create("regularization", "regularization", MFnNumericData::kDouble, 0.0);
   nAttr.setKeyable(true);
   nAttr.setMin(0.0);
   addAttribute(aRegularization);
-  attributeAffects(aRegularization, aOutputValues);
-  attributeAffects(aRegularization, aOutputQuats);
+  affects(aRegularization);
 
   aSampleInputValues =
       nAttr.create("sampleInputValue", "sampleInputValue", MFnNumericData::kDouble);
@@ -132,18 +141,21 @@ MStatus RBFNode::initialize() {
   cAttr.addChild(aSampleOutputValues);
   cAttr.addChild(aSampleOutputQuats);
   addAttribute(aSamples);
-  attributeAffects(aSamples, aOutputValues);
-  attributeAffects(aSamples, aOutputQuats);
-  attributeAffects(aSampleInputValues, aOutputValues);
-  attributeAffects(aSampleInputValues, aOutputQuats);
-  attributeAffects(aSampleInputQuats, aOutputValues);
-  attributeAffects(aSampleInputQuats, aOutputQuats);
-  attributeAffects(aSampleOutputValues, aOutputValues);
-  attributeAffects(aSampleOutputValues, aOutputQuats);
-  attributeAffects(aSampleOutputQuats, aOutputValues);
-  attributeAffects(aSampleOutputQuats, aOutputQuats);
+  affects(aSamples);
+  affects(aSampleInputValues);
+  affects(aSampleInputQuats);
+  affects(aSampleOutputValues);
+  affects(aSampleOutputQuats);
 
   return MS::kSuccess;
+}
+
+void RBFNode::affects(const MObject& attribute) {
+  attributeAffects(attribute, aOutputValues);
+  attributeAffects(attribute, aOutputRotate);
+  attributeAffects(attribute, aOutputRotateX);
+  attributeAffects(attribute, aOutputRotateY);
+  attributeAffects(attribute, aOutputRotateZ);
 }
 
 void* RBFNode::creator() { return new RBFNode(); }
@@ -154,9 +166,9 @@ RBFNode::~RBFNode() {}
 
 MStatus RBFNode::setDependentsDirty(const MPlug& plug, MPlugArray& affectedPlugs) {
   if (plug == aInputValueCount || plug == aInputQuatCount || plug == aOutputValueCount ||
-      plug == aRBFFunction || plug == aRadius || plug == aRegularization || plug == aSamples ||
-      plug == aSampleInputValues || plug == aSampleInputQuats || plug == aSampleOutputValues ||
-      plug == aSampleOutputQuats) {
+      plug == aOutputQuatCount || plug == aRBFFunction || plug == aRadius ||
+      plug == aRegularization || plug == aSamples || plug == aSampleInputValues ||
+      plug == aSampleInputQuats || plug == aSampleOutputValues || plug == aSampleOutputQuats) {
     dirty_ = true;
   }
   return MPxNode::setDependentsDirty(plug, affectedPlugs);
@@ -172,6 +184,7 @@ MStatus RBFNode::preEvaluation(const MDGContext& context, const MEvaluationNode&
   if ((evaluationNode.dirtyPlugExists(aInputValueCount, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aInputQuatCount, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aOutputValueCount, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aOutputQuatCount, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aRBFFunction, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aRadius, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aRegularization, &status) && status) ||
@@ -185,10 +198,17 @@ MStatus RBFNode::preEvaluation(const MDGContext& context, const MEvaluationNode&
   return MS::kSuccess;
 }
 
+bool RBFNode::isPassiveOutput(const MPlug& plug) const {
+  if (plug == aOutputValues || plug == aOutputRotate || plug.parent() == aOutputRotate) {
+    return true;
+  }
+  return MPxNode::isPassiveOutput(plug);
+}
+
 MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   MStatus status;
 
-  if (plug != aOutputValues && plug != aOutputQuats) {
+  if (plug != aOutputValues && plug != aOutputRotate) {
     return MS::kUnknownParameter;
   }
 
@@ -197,6 +217,7 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   int inputCount = data.inputValue(aInputValueCount).asLong();
   int inputQuatCount = data.inputValue(aInputQuatCount).asLong();
   int outputCount = data.inputValue(aOutputValueCount).asLong();
+  int outputQuatCount = data.inputValue(aOutputQuatCount).asLong();
 
   // Get the inputs
   MArrayDataHandle hInputs = data.inputArrayValue(aInputValues);
@@ -210,7 +231,8 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
 
   if (dirty_) {
     // Build the system coefficients
-    status = buildFeatureMatrix(data, inputCount, outputCount, inputQuatCount, rbf, radius);
+    status = buildFeatureMatrix(data, inputCount, outputCount, inputQuatCount, outputQuatCount, rbf,
+                                radius);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     dirty_ = false;
   }
@@ -262,24 +284,70 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   }
 
   applyRbf(inputDistance, rbf, radius);
- 
+
   VectorXd output = theta_ * inputDistance;
 
   MDataHandle hOutput;
   MArrayDataHandle hOutputs = data.outputArrayValue(aOutputValues);
   for (unsigned int i = 0; i < outputCount; ++i) {
+    double v = output.dot(outputScalarMatrix_.col(i));
+
     status = JumpToElement(hOutputs, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     hOutput = hOutputs.outputValue();
-    hOutput.setDouble(output[i]);
+    hOutput.setDouble(v);
   }
   hOutputs.setAllClean();
+
+  MArrayDataHandle hOutputRotation = data.outputArrayValue(aOutputRotate);
+  MQuaternion rest;
+  for (unsigned int i = 0; i < outputQuatCount; ++i) {
+    MQuaternion totalTwist;
+    MVector twistAxis;
+    for (unsigned int j = 0; j < output.size(); ++j) {
+      MQuaternion& q = outputQuatMatrix_[j][i];
+      MQuaternion twist(q.x, 0.0, 0.0, q.w);
+      twist.normalizeIt();
+      MQuaternion swing = twist.inverse() * q;
+
+      totalTwist *= slerp(rest, twist, output[j]);
+      MMatrix swingMatrix = swing.asMatrix();
+      twistAxis += MVector(swingMatrix[0][0], swingMatrix[0][1], swingMatrix[0][2]) * output[j];
+    }
+    if (twistAxis.length() == 0.0) {
+      // If the twistAxis has been canceled out, no swing
+      twistAxis = MVector::xAxis;
+    }
+
+    MQuaternion totalSwing = MVector::xAxis.rotateTo(twistAxis.normal());
+    MQuaternion outQ = totalTwist * totalSwing;
+    MEulerRotation euler = outQ.asEulerRotation();
+
+    status = JumpToElement(hOutputRotation, i);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    hOutput = hOutputRotation.outputValue();
+
+    MAngle rx(euler.x);
+    MAngle ry(euler.y);
+    MAngle rz(euler.z);
+    MDataHandle hX = hOutput.child(aOutputRotateX);
+    MDataHandle hY = hOutput.child(aOutputRotateY);
+    MDataHandle hZ = hOutput.child(aOutputRotateZ);
+    hX.setMAngle(rx);
+    hY.setMAngle(ry);
+    hZ.setMAngle(rz);
+    hX.setClean();
+    hY.setClean();
+    hZ.setClean();
+  }
+  hOutputRotation.setAllClean();
 
   return MS::kSuccess;
 }
 
 MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int outputCount,
-                                    int inputQuatCount, short rbf, double radius) {
+                                    int inputQuatCount, int outputQuatCount, short rbf,
+                                    double radius) {
   MStatus status;
   MArrayDataHandle hSamples = data.inputArrayValue(aSamples);
   unsigned int sampleCount = hSamples.elementCount();
@@ -287,10 +355,15 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
   if (sampleCount == 0) {
     return MS::kSuccess;
   }
-  MatrixXd outputMatrix(sampleCount, outputCount);
-  // TODO: support quaternion output
+  // Rather than solve directly to the output values, we will store 0 or 1 pose values.
+  // This lets us calculate the output as a linear combination of the sample outputs and
+  // will make it easier to calculate output quaternions
+  MatrixXd outputMatrix = MatrixXd::Identity(sampleCount, sampleCount);
+
+  outputScalarMatrix_.resize(sampleCount, outputCount);
 
   featureQuatMatrix_.resize(sampleCount);
+  outputQuatMatrix_.resize(sampleCount);
   for (unsigned int i = 0; i < sampleCount; ++i) {
     status = hSamples.jumpToArrayElement(i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -317,7 +390,13 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
       VectorXd values;
       status = getDoubleValues(hOutputValues, outputCount, values);
       CHECK_MSTATUS_AND_RETURN_IT(status);
-      outputMatrix.row(i) = values;
+      outputScalarMatrix_.row(i) = values;
+    }
+
+    if (outputQuatCount) {
+      MArrayDataHandle hSampleOutputQuats = hSample.child(aSampleOutputQuats);
+      status = getQuaternionValues(hSampleOutputQuats, outputQuatCount, outputQuatMatrix_[i]);
+      CHECK_MSTATUS_AND_RETURN_IT(status);
     }
   }
   // Generate distance matrix from feature matrix
@@ -424,7 +503,7 @@ MatrixXd RBFNode::pseudoInverse(const MatrixXd& a, double epsilon) {
          svd.matrixU().adjoint();
 }
 
-double RBFNode::quaternionDistance(MQuaternion& q1, MQuaternion& q2) { 
+double RBFNode::quaternionDistance(MQuaternion& q1, MQuaternion& q2) {
   double dot = quaternionDot(q1, q2);
   return acos(2.0 * dot * dot - 1.0) / M_PI;
 }

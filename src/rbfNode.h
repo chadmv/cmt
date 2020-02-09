@@ -13,26 +13,32 @@
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
+
 class RBFNode : public MPxNode {
  public:
   RBFNode();
   virtual ~RBFNode();
   static void* creator();
 
-  virtual MStatus setDependentsDirty(const MPlug& plug, MPlugArray& affectedPlugs);
-  virtual MStatus preEvaluation(const MDGContext& context, const MEvaluationNode& evaluationNode);
-  virtual MStatus compute(const MPlug& plug, MDataBlock& data);
+  virtual MStatus setDependentsDirty(const MPlug& plug, MPlugArray& affectedPlugs) override;
+  virtual MStatus preEvaluation(const MDGContext& context, const MEvaluationNode& evaluationNode) override;
+  virtual MStatus compute(const MPlug& plug, MDataBlock& data) override;
+  virtual bool isPassiveOutput(const MPlug & plug) const override;
 
   static MStatus initialize();
   static MTypeId id;
   static const MString kName;
   static MObject aOutputValues;
-  static MObject aOutputQuats;
+  static MObject aOutputRotateX;
+  static MObject aOutputRotateY;
+  static MObject aOutputRotateZ;
+  static MObject aOutputRotate;
   static MObject aInputValues;
   static MObject aInputQuats;
   static MObject aInputValueCount;
   static MObject aInputQuatCount;
   static MObject aOutputValueCount;
+  static MObject aOutputQuatCount;
   static MObject aRBFFunction;
   static MObject aRadius;
   static MObject aRegularization;
@@ -43,8 +49,9 @@ class RBFNode : public MPxNode {
   static MObject aSampleOutputQuats;
 
  private:
-  MStatus buildFeatureMatrix(MDataBlock& data, int inputCount, int outputCount, int inputQuatCount,
-                             short rbf, double radius);
+   static void affects(const MObject& attribute);
+   MStatus buildFeatureMatrix(MDataBlock& data, int inputCount, int outputCount, int inputQuatCount,
+                             int outputQuatCount, short rbf, double radius);
   MStatus getDoubleValues(MArrayDataHandle& hArray, int count, VectorXd& values);
   MStatus getQuaternionValues(MArrayDataHandle& hArray, int count,
                               std::vector<MQuaternion>& quaternions);
@@ -68,6 +75,8 @@ class RBFNode : public MPxNode {
   VectorXd featureNorms_;
   MatrixXd featureMatrix_;
   std::vector<std::vector<MQuaternion>> featureQuatMatrix_;
+  MatrixXd outputScalarMatrix_;
+  std::vector<std::vector<MQuaternion>> outputQuatMatrix_;
   MatrixXd theta_;
 };
 
