@@ -73,3 +73,30 @@ class RBFTests(TestCase):
         cmds.setAttr("{}.ry".format(loc1), 0)
         s = cmds.getAttr("{}.s".format(loc2))[0]
         self.assertListAlmostEqual(s, [1.0, 1.0, 1.0])
+
+    def test_drive_rotation(self):
+        loc1 = cmds.spaceLocator()[0]
+        loc2 = cmds.spaceLocator()[0]
+        node = rbf.RBF.create(
+            inputs=["{}.t{}".format(loc1, x) for x in "xz"],
+            output_transforms=[loc2],
+            add_neutral_sample=False,
+        )
+        outputs = node.output_transforms()
+        self.assertEqual(outputs, [loc2])
+        node.add_sample(input_values=[-2, -2], output_rotations=[[-45, 0, 45]])
+        node.add_sample(input_values=[2, -2], output_rotations=[[-45, 0, -45]])
+        node.add_sample(input_values=[2, 2], output_rotations=[[45, 0, -45]])
+        node.add_sample(input_values=[-2, 2], output_rotations=[[45, 0, 45]])
+
+        cmds.setAttr("{}.t".format(loc1), -2, 0, -2)
+        r = cmds.getAttr("{}.r".format(loc2))[0]
+        self.assertListAlmostEqual(r, [-45.0, 0.0, 45])
+
+        cmds.setAttr("{}.t".format(loc1), 2, 0, 2)
+        r = cmds.getAttr("{}.r".format(loc2))[0]
+        self.assertListAlmostEqual(r, [45.0, 0.0, -45])
+
+        cmds.setAttr("{}.t".format(loc1), 0, 0, 0)
+        r = cmds.getAttr("{}.r".format(loc2))[0]
+        self.assertListAlmostEqual(r, [0.0, 0.0, 0.0])
