@@ -7,6 +7,8 @@
 #include <maya/MQuaternion.h>
 
 #include <Eigen/Dense>
+#include <Eigen/Eigenvalues> 
+
 #include <limits>
 #include <vector>
 
@@ -35,6 +37,7 @@ class RBFNode : public MPxNode {
   static MObject aOutputRotate;
   static MObject aInputValues;
   static MObject aInputQuats;
+  static MObject aInputRestQuats;
   static MObject aInputValueCount;
   static MObject aInputQuatCount;
   static MObject aOutputValueCount;
@@ -43,6 +46,7 @@ class RBFNode : public MPxNode {
   static MObject aRadius;
   static MObject aRegularization;
   static MObject aSamples;
+  static MObject aSampleRadius;
   static MObject aSampleInputValues;
   static MObject aSampleInputQuats;
   static MObject aSampleOutputValues;
@@ -51,12 +55,14 @@ class RBFNode : public MPxNode {
  private:
    static void affects(const MObject& attribute);
    MStatus buildFeatureMatrix(MDataBlock& data, int inputCount, int outputCount, int inputQuatCount,
-                             int outputQuatCount, short rbf, double radius);
+                             int outputQuatCount, short rbf, double radius, const std::vector<MQuaternion>& inputRestQuats);
   MStatus getDoubleValues(MArrayDataHandle& hArray, int count, VectorXd& values);
   MStatus getQuaternionValues(MArrayDataHandle& hArray, int count,
                               std::vector<MQuaternion>& quaternions);
   MatrixXd pseudoInverse(const MatrixXd& a,
                          double epsilon = std::numeric_limits<double>::epsilon());
+  void decomposeSwingTwist(const MQuaternion& q, MQuaternion& swing, MQuaternion& twist);
+  void swingTwistDistance(MQuaternion& q1, MQuaternion& q2, double& swingDistance, double& twistDistance);
   double quaternionDistance(MQuaternion& q1, MQuaternion& q2);
 
   inline double quaternionDot(const MQuaternion& q1, const MQuaternion& q2) {
@@ -72,17 +78,19 @@ class RBFNode : public MPxNode {
 
   bool dirty_;
   double distanceNorm_;
+  VectorXd sampleRadius_;
   VectorXd featureNorms_;
   MatrixXd featureMatrix_;
   std::vector<std::vector<MQuaternion>> featureQuatMatrix_;
   MatrixXd outputScalarMatrix_;
   std::vector<std::vector<MQuaternion>> outputQuatMatrix_;
+  std::vector<MatrixXd> outputQuats_;
   MatrixXd theta_;
 };
 
 struct Gaussian {
   Gaussian(const double& radius) {
-    static const double kFalloff = 0.707;
+    static const double kFalloff = 0.4;
     r = radius > 0.0 ? radius : 0.001;
     r *= kFalloff;
   }
