@@ -11,8 +11,7 @@
 
 MTypeId SwingTwistNode::id(0x00115819);
 MObject SwingTwistNode::aOutMatrix;
-MObject SwingTwistNode::aParentInverseMatrix;
-MObject SwingTwistNode::aInWorldMatrix;
+MObject SwingTwistNode::aInMatrix;
 MObject SwingTwistNode::aTargetRestMatrix;
 MObject SwingTwistNode::aRestMatrix;
 MObject SwingTwistNode::aTwistWeight;
@@ -34,13 +33,9 @@ MStatus SwingTwistNode::initialize() {
   mAttr.setStorable(false);
   addAttribute(aOutMatrix);
 
-  aParentInverseMatrix = mAttr.create("driverParentInverseMatrix", "driverParentInverseMatrix");
-  addAttribute(aParentInverseMatrix);
-  attributeAffects(aParentInverseMatrix, aOutMatrix);
-
-  aInWorldMatrix = mAttr.create("driverWorldMatrix", "driverWorldMatrix");
-  addAttribute(aInWorldMatrix);
-  attributeAffects(aInWorldMatrix, aOutMatrix);
+  aInMatrix = mAttr.create("driverMatrix", "driverMatrix");
+  addAttribute(aInMatrix);
+  attributeAffects(aInMatrix, aOutMatrix);
 
   aRestMatrix = mAttr.create("driverRestMatrix", "driverRestMatrix");
   addAttribute(aRestMatrix);
@@ -97,8 +92,7 @@ MStatus SwingTwistNode::compute(const MPlug &plug, MDataBlock &data) {
   }
 
   // Get the input data
-  MMatrix inWorldMatrix = data.inputValue(aInWorldMatrix).asMatrix();
-  MMatrix parentInverseMatrix = data.inputValue(aParentInverseMatrix).asMatrix();
+  MMatrix inMatrix = data.inputValue(aInMatrix).asMatrix();
   MMatrix targetRestMatrix = data.inputValue(aTargetRestMatrix).asMatrix();
   MMatrix restMatrix = data.inputValue(aRestMatrix).asMatrix();
   float twistWeight = data.inputValue(aTwistWeight).asFloat();
@@ -107,7 +101,7 @@ MStatus SwingTwistNode::compute(const MPlug &plug, MDataBlock &data) {
 
   // By calculating the local matrix with the world and parent inverse, we automatically
   // take in to account whether the joint uses joint orient or not.
-  MMatrix localMatrix = inWorldMatrix * parentInverseMatrix * restMatrix.inverse();
+  MMatrix localMatrix = inMatrix * restMatrix.inverse();
 
   // Get the input rotation quaternion
   MQuaternion rotation = MTransformationMatrix(localMatrix).rotation();

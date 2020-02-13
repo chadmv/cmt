@@ -66,20 +66,10 @@ MStatus SwingTwistCmd::doIt(const MArgList& argList) {
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
   // Connect the matrix
-  MPlug plugDriverWorldMatrix(oNode_, SwingTwistNode::aInWorldMatrix);
-  MPlug plugMatrix = fnDriver.findPlug("worldMatrix", false, &status);
+  MPlug plugDriverMatrix(oNode_, SwingTwistNode::aInMatrix);
+  MPlug plugMatrix = fnDriver.findPlug("matrix", false, &status);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-  status = plugMatrix.selectAncestorLogicalIndex(0);
-  CHECK_MSTATUS_AND_RETURN_IT(status);
-  dgMod_.connect(plugMatrix, plugDriverWorldMatrix);
-
-  // Connect the parent inverse matrix
-  MPlug plugDriverParentInverse(oNode_, SwingTwistNode::aParentInverseMatrix);
-  MPlug plugParentInverseMatrix = fnDriver.findPlug("parentInverseMatrix", false, &status);
-  CHECK_MSTATUS_AND_RETURN_IT(status);
-  status = plugParentInverseMatrix.selectAncestorLogicalIndex(0);
-  CHECK_MSTATUS_AND_RETURN_IT(status);
-  dgMod_.connect(plugParentInverseMatrix, plugDriverParentInverse);
+  dgMod_.connect(plugMatrix, plugDriverMatrix);
 
   // Set the driver rest matrix
   MMatrix driverRestMatrix = pathDriver.inclusiveMatrix() * pathDriver.exclusiveMatrixInverse();

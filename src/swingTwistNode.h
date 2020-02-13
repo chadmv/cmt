@@ -15,10 +15,9 @@ class SwingTwistNode : public MPxNode {
   static MTypeId id;
   static const MString kName;
   static MObject aOutMatrix;
-  static MObject aParentInverseMatrix;
   static MObject aRestMatrix;
   static MObject aTargetRestMatrix;
-  static MObject aInWorldMatrix;
+  static MObject aInMatrix;
   static MObject aTwistWeight;
   static MObject aSwingWeight;
   static MObject aTwistAxis;
