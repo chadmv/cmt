@@ -5,6 +5,8 @@ set(SOURCE_FILES
     "cmtConfig.h.in"
 	"common.h"
     "common.cpp"
+	"linearRegressionSolver.h"
+    "linearRegressionSolver.cpp"
     "swingTwistNode.h"
     "swingTwistNode.cpp"
     "swingTwistCmd.h"
