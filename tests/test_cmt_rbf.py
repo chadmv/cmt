@@ -69,6 +69,28 @@ class RBFTests(TestCase):
         s = cmds.getAttr("{}.s".format(loc2))[0]
         self.assertListAlmostEqual(s, [1.0, 1.0, 1.0])
 
+    def test_input_rotation_with_orient(self):
+        joint1 = cmds.createNode("joint")
+        cmds.setAttr("{}.jo".format(joint1), -27.291, 3.273, 9.352)
+        joint2 = cmds.createNode("joint")
+        node = rbf.RBF.create(
+            input_transforms=[joint1], outputs=["{}.s{}".format(joint2, x) for x in "xyz"]
+        )
+        node.add_sample(input_rotations=[[90, 45, 0]], output_values=[2, 1, 2])
+        node.add_sample(input_rotations=[[-90, -60, 0]], output_values=[0.5, 2, 3])
+        cmds.setAttr("{}.rx".format(joint1), 90)
+        cmds.setAttr("{}.ry".format(joint1), 45)
+        s = cmds.getAttr("{}.s".format(joint2))[0]
+        self.assertListAlmostEqual(s, [2.0, 1.0, 2.0])
+        cmds.setAttr("{}.rx".format(joint1), -90)
+        cmds.setAttr("{}.ry".format(joint1), -60)
+        s = cmds.getAttr("{}.s".format(joint2))[0]
+        self.assertListAlmostEqual(s, [0.5, 2.0, 3.0])
+        cmds.setAttr("{}.rx".format(joint1), 0)
+        cmds.setAttr("{}.ry".format(joint1), 0)
+        s = cmds.getAttr("{}.s".format(joint2))[0]
+        self.assertListAlmostEqual(s, [1.0, 1.0, 1.0])
+
     def test_output_rotation(self):
         loc1 = cmds.spaceLocator()[0]
         loc2 = cmds.spaceLocator()[0]

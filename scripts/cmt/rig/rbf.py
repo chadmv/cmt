@@ -365,5 +365,10 @@ def euler_to_quat(eulers, transforms):
         r = [math.radians(x) for x in v]
         euler = OpenMaya.MEulerRotation(r[0], r[1], r[2], rotate_order)
         q = euler.asQuaternion()
+        if cmds.nodeType(transforms[i]) == "joint":
+            jo = cmds.getAttr("{}.jo".format(transforms[i]))[0]
+            jo = [math.radians(x) for x in jo]
+            jo = OpenMaya.MEulerRotation(jo[0], jo[1], jo[2])
+            q *= jo.asQuaternion()
         quats.append([q.x, q.y, q.z, q.w])
     return quats
