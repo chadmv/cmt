@@ -35,22 +35,26 @@ inline double quaternionDot(const MQuaternion& q1, const MQuaternion& q2) {
 
 VectorXd averageQuaternion(const MatrixXd& inputQuats, const VectorXd& weights);
 
+enum class SolverSpace { Swing, Twist, SwingTwist };
+
 class LinearRegressionSolver {
  public:
+
   LinearRegressionSolver();
   virtual ~LinearRegressionSolver();
   void setFeatures(const MatrixXd& featureMatrix,
                    const std::vector<std::vector<MQuaternion>>& featureQuatMatrix,
                    const MatrixXd& outputScalarMatrix, const std::vector<MatrixXd>& outputQuats,
-                   short rbf, double radius, double regularization);
+                   short rbf, double radius, double regularization, SolverSpace space);
 
-  void solve(const VectorXd& inputs, const std::vector<MQuaternion>& inputQuats,
-             VectorXd& outputs, MatrixXd& outputQuats);
+  void solve(const VectorXd& inputs, const std::vector<MQuaternion>& inputQuats, VectorXd& outputs,
+             MatrixXd& outputQuats);
 
  private:
   double distanceNorm_;
   short rbf_;
   double radius_;
+  SolverSpace solverSpace_;
   VectorXd sampleRadius_;
   VectorXd featureNorms_;
   MatrixXd featureMatrix_;

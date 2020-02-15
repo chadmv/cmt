@@ -4,6 +4,10 @@ import math
 
 
 class RBF(object):
+    swing = 0
+    twist = 1
+    swing_twist = 2
+
     @classmethod
     def create(
         cls,
@@ -34,9 +38,12 @@ class RBF(object):
         node.set_output_transforms(output_transforms)
 
         if add_neutral_sample:
-            node.add_sample(
-                output_values=output_values, output_rotations=output_rotations
-            )
+            for i in range(3):
+                node.add_sample(
+                    output_values=output_values,
+                    output_rotations=output_rotations,
+                    rotation_type=i,
+                )
 
         return node
 
@@ -211,6 +218,7 @@ class RBF(object):
         output_values=None,
         input_rotations=None,
         output_rotations=None,
+        rotation_type=swing,
     ):
         """Add a new sample with the given values
 
@@ -236,33 +244,9 @@ class RBF(object):
         input_rotations = euler_to_quat(input_rotations, input_transforms)
 
         # See if a sample with these inputs already exists
-        indices = cmds.getAttr("{}.sample".format(self.name), mi=True) or []
-        if indices:
-            threshold = 0.0001
-            for idx in indices:
-                sample_is_same = True
-                for i, v1 in enumerate(input_values):
-                    v2 = cmds.getAttr(
-                        "{}.sample[{}].sampleInputValue[{}]".format(self.name, idx, i)
-                    )
-                    if math.fabs(v1 - v2) > threshold:
-                        sample_is_same = False
-                        break
-
-                for i, v1 in enumerate(input_rotations):
-                    v2 = cmds.getAttr(
-                        "{}.sample[{}].sampleInputQuat[{}]".format(self.name, idx, i)
-                    )[0]
-                    q1 = OpenMaya.MQuaternion(*v1)
-                    q2 = OpenMaya.MQuaternion(*v2)
-                    d = quaternion_distance(q1, q2)
-
-                    if d > threshold:
-                        sample_is_same = False
-                        break
-                if sample_is_same:
-                    print("Existing sample already exists. Skipping.")
-                    return None
+        if self._sample_already_exists(input_values, input_rotations, rotation_type):
+            print("Existing sample already exists. Skipping.")
+            return None
 
         if output_values is None:
             # Use existing values
@@ -276,7 +260,9 @@ class RBF(object):
             ]
         output_rotations = euler_to_quat(output_rotations, output_transforms)
 
+        indices = cmds.getAttr("{}.sample".format(self.name), mi=True) or []
         idx = indices[-1] + 1 if indices else 0
+        cmds.setAttr("{}.sample[{}].rotationType".format(self.name, idx), rotation_type)
         for i, v in enumerate(input_values):
             cmds.setAttr(
                 "{}.sample[{}].sampleInputValue[{}]".format(self.name, idx, i), v
@@ -299,6 +285,46 @@ class RBF(object):
             )
 
         return idx
+
+    def _sample_already_exists(self, input_values, input_rotations, rotation_type):
+        """Check if a sample with the given inputs already exists.
+
+        :param input_values: List of float values.
+        :param input_rotations: List of 4-tuples representing quaternions
+        :param rotation_type:
+        :return: True if the sample already exists.
+        """
+        indices = cmds.getAttr("{}.sample".format(self.name), mi=True) or []
+        if not indices:
+            return False
+        threshold = 0.0001
+        for idx in indices:
+            rt = cmds.getAttr("{}.sample[{}].rotationType".format(self.name, idx))
+            if rotation_type != rt:
+                continue
+            sample_is_same = True
+            for i, v1 in enumerate(input_values):
+                v2 = cmds.getAttr(
+                    "{}.sample[{}].sampleInputValue[{}]".format(self.name, idx, i)
+                )
+                if math.fabs(v1 - v2) > threshold:
+                    sample_is_same = False
+                    break
+
+            for i, v1 in enumerate(input_rotations):
+                v2 = cmds.getAttr(
+                    "{}.sample[{}].sampleInputQuat[{}]".format(self.name, idx, i)
+                )[0]
+                q1 = OpenMaya.MQuaternion(*v1)
+                q2 = OpenMaya.MQuaternion(*v2)
+                d = quaternion_distance(q1, q2)
+
+                if d > threshold:
+                    sample_is_same = False
+                    break
+            if sample_is_same:
+                return True
+        return False
 
     def remove_sample(self, i):
         """Remove the sample at index i

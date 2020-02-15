@@ -48,8 +48,7 @@ class RBFTests(TestCase):
         loc1 = cmds.spaceLocator()[0]
         loc2 = cmds.spaceLocator()[0]
         node = rbf.RBF.create(
-            input_transforms=[loc1],
-            outputs=["{}.s{}".format(loc2, x) for x in "xyz"],
+            input_transforms=[loc1], outputs=["{}.s{}".format(loc2, x) for x in "xyz"]
         )
         input_transforms = node.input_transforms()
         self.assertEqual(input_transforms, [loc1])
@@ -103,3 +102,57 @@ class RBFTests(TestCase):
         cmds.setAttr("{}.t".format(loc1), 0, 0, 0)
         r = cmds.getAttr("{}.r".format(loc2))[0]
         self.assertListAlmostEqual(r, [0.0, 0.0, 45.0])
+
+    def test_input_rotation_swing(self):
+        loc1 = cmds.spaceLocator()[0]
+        loc2 = cmds.spaceLocator()[0]
+        node = rbf.RBF.create(
+            input_transforms=[loc1], outputs=["{}.s{}".format(loc2, x) for x in "xyz"]
+        )
+        node.add_sample(
+            input_rotations=[[0, 0, 90]],
+            output_values=[2, 1, 2],
+            rotation_type=rbf.RBF.swing,
+        )
+        node.add_sample(
+            input_rotations=[[0, 0, -90]],
+            output_values=[0.5, 2, 3],
+            rotation_type=rbf.RBF.swing,
+        )
+        cmds.setAttr("{}.rx".format(loc1), 90)
+        s = cmds.getAttr("{}.s".format(loc2))[0]
+        self.assertListAlmostEqual(s, [1.0, 1.0, 1.0])
+        cmds.setAttr("{}.rx".format(loc1), 0)
+        cmds.setAttr("{}.rz".format(loc1), 90)
+        s = cmds.getAttr("{}.s".format(loc2))[0]
+        self.assertListAlmostEqual(s, [2, 1, 2])
+        cmds.setAttr("{}.rx".format(loc1), 90)
+        s = cmds.getAttr("{}.s".format(loc2))[0]
+        self.assertListAlmostEqual(s, [2, 1, 2])
+
+    def test_input_rotation_twist(self):
+        loc1 = cmds.spaceLocator()[0]
+        loc2 = cmds.spaceLocator()[0]
+        node = rbf.RBF.create(
+            input_transforms=[loc1], outputs=["{}.s{}".format(loc2, x) for x in "xyz"]
+        )
+        node.add_sample(
+            input_rotations=[[90, 0, 0]],
+            output_values=[2, 1, 2],
+            rotation_type=rbf.RBF.twist,
+        )
+        node.add_sample(
+            input_rotations=[[-90, 0, 0]],
+            output_values=[0.5, 2, 3],
+            rotation_type=rbf.RBF.twist,
+        )
+        cmds.setAttr("{}.ry".format(loc1), 90)
+        s = cmds.getAttr("{}.s".format(loc2))[0]
+        self.assertListAlmostEqual(s, [1.0, 1.0, 1.0])
+        cmds.setAttr("{}.ry".format(loc1), 0)
+        cmds.setAttr("{}.rx".format(loc1), 90)
+        s = cmds.getAttr("{}.s".format(loc2))[0]
+        self.assertListAlmostEqual(s, [2, 1, 2])
+        cmds.setAttr("{}.rz".format(loc1), 90)
+        s = cmds.getAttr("{}.s".format(loc2))[0]
+        self.assertListAlmostEqual(s, [2, 1, 2])

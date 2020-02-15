@@ -19,16 +19,17 @@ LinearRegressionSolver::~LinearRegressionSolver() {}
 void LinearRegressionSolver::setFeatures(
     const MatrixXd& featureMatrix, const std::vector<std::vector<MQuaternion>>& featureQuatMatrix,
     const MatrixXd& outputScalarMatrix, const std::vector<MatrixXd>& outputQuats, short rbf,
-    double radius, double regularization) {
+    double radius, double regularization, SolverSpace space) {
   featureMatrix_ = featureMatrix;
   featureQuatMatrix_ = featureQuatMatrix;
   outputScalarMatrix_ = outputScalarMatrix;
   outputQuats_ = outputQuats;
   rbf_ = rbf;
   radius_ = radius;
+  solverSpace_ = space;
 
   int sampleCount = featureMatrix_.rows() ? featureMatrix_.rows() : featureQuatMatrix_.size();
-  if (sampleCount == 0) {
+  if (sampleCount <= 1) {
     theta_.resize(0, 0);
     return;
   }
@@ -72,13 +73,17 @@ void LinearRegressionSolver::setFeatures(
     // Calculate rotation distances
     double minFalloff = std::numeric_limits<double>::max();
     double swingDistance, twistDistance;
-    double _r = 57.2958;
     for (int s1 = 0; s1 < sampleCount; ++s1) {
       for (int s2 = 0; s2 < sampleCount; ++s2) {
         for (int i = 0; i < inputQuatCount; ++i) {
           MQuaternion& q1 = featureQuatMatrix_[s1][i];
           MQuaternion& q2 = featureQuatMatrix_[s2][i];
           swingTwistDistance(q1, q2, swingDistance, twistDistance);
+          if (solverSpace_ == SolverSpace::Swing) {
+            twistDistance = 0.0;
+          } else if (solverSpace_ == SolverSpace::Twist) {
+            swingDistance = 0.0;
+          }
           // TODO: Each feature quat should have it's own radius
           if (swingDistance > 0.000001 && swingDistance < sampleRadius_[s1]) {
             sampleRadius_[s1] = swingDistance;
@@ -86,9 +91,11 @@ void LinearRegressionSolver::setFeatures(
           if (twistDistance > 0.000001 && twistDistance < sampleRadius_[s1]) {
             sampleRadius_[s1] = twistDistance;
           }
+          /*
+          double _r = 57.2958;
           auto e1 = q1.asEulerRotation();
           auto e2 = q2.asEulerRotation();
-          /*std::cout << s1 << ": (" << e1.x * _r << ", " << e1.y * _r << ", " << e1.z * _r
+          std::cout << s1 << ": (" << e1.x * _r << ", " << e1.y * _r << ", " << e1.z * _r
                     << ") <==> (" << e2.x * _r << ", " << e2.y * _r << ", " << e2.z * _r
                     << ") s : " << swingDistance << " t : " << twistDistance << std::endl;*/
 
@@ -97,7 +104,6 @@ void LinearRegressionSolver::setFeatures(
         }
       }
     }
-    std::cout << "radius = " << sampleRadius_ << std::endl;
     // Insert rotational distances to main distance matrix
     int quatIndex = 0;
     for (auto& rd : mQuat) {
@@ -113,6 +119,9 @@ void LinearRegressionSolver::setFeatures(
     }
   }
 
+  // Rather than solve directly to the output values, we will store 0 or 1 pose values.
+  // This lets us calculate the output as a linear combination of the sample outputs and
+  // will make it easier to calculate output quaternions
   MatrixXd outputMatrix = MatrixXd::Identity(sampleCount, sampleCount);
   MatrixXd r = MatrixXd::Zero(cols, cols);
   r.diagonal().array() = regularization;
@@ -125,12 +134,12 @@ void LinearRegressionSolver::setFeatures(
 void LinearRegressionSolver::solve(const VectorXd& inputValues,
                                    const std::vector<MQuaternion>& inputQuats, VectorXd& outputs,
                                    MatrixXd& outputQuats) {
-  if (theta_.size() == 0) {
+  int sampleCount = featureMatrix_.rows() ? featureMatrix_.rows() : featureQuatMatrix_.size();
+  if (sampleCount <= 1) {
     return;
   }
   VectorXd inputs = inputValues;
   int inputCount = inputs.size();
-  int sampleCount = featureMatrix_.rows() ? featureMatrix_.rows() : featureQuatMatrix_.size();
 
   VectorXd inputDistance = VectorXd::Zero(theta_.cols());
   if (inputCount) {
@@ -145,17 +154,11 @@ void LinearRegressionSolver::solve(const VectorXd& inputValues,
     // Normalize distances
     inputDistance /= distanceNorm_;
   }
-  std::cout << "inputDistance:" << std::endl;
-  for (int i = 0; i < inputDistance.size(); ++i) {
-    std::cout << "  " << i << ": " << inputDistance[i] << std::endl;
-  }
-  std::cout << std::endl;
   applyRbf(inputDistance, rbf_, radius_);
 
   if (featureQuatMatrix_.size()) {
     int inputQuatCount = featureQuatMatrix_[0].size();
     // Generate rotational distance matrix from rotation inputs
-    // MatrixXd inputQuatDistance = MatrixXd::Zero(sampleCount, inputQuatCount);
     double swingDistance, twistDistance;
     int idx = inputCount ? sampleCount : 0;
     for (int i = 0; i < inputQuatCount; ++i) {
@@ -165,6 +168,11 @@ void LinearRegressionSolver::solve(const VectorXd& inputValues,
         for (int c = 0; c < inputQuatCount; ++c) {
           MQuaternion& q2 = featureQuatMatrix_[s1][c];
           swingTwistDistance(q1, q2, swingDistance, twistDistance);
+          if (solverSpace_ == SolverSpace::Swing) {
+            twistDistance = 0.0;
+          } else if (solverSpace_ == SolverSpace::Twist) {
+            swingDistance = 0.0;
+          }
           inputDistance[idx++] = swingDistance;
           inputDistance[idx++] = twistDistance;
         }
