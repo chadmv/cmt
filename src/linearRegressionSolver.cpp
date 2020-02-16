@@ -108,9 +108,8 @@ void LinearRegressionSolver::setFeatures(
     int quatIndex = 0;
     for (auto& rd : mQuat) {
       // Apply rbf with per-pose radius to quaternion inputs
-      // std::cout << "rd before rbf = " << rd << std::endl;
       for (int i = 0; i < sampleCount; ++i) {
-        applyRbf(rd.block(0, i * 2, sampleCount, 2), rbf_, sampleRadius_[i]);
+        applyRbf(rd.block(0, i * 2, sampleCount, 2), rbf_, sampleRadius_[i] * radius_);
       }
       // std::cout << "rd after rbf = " << rd << std::endl;
 
@@ -131,12 +130,12 @@ void LinearRegressionSolver::setFeatures(
   theta_ = (mat * outputMatrix).transpose();
 }
 
-void LinearRegressionSolver::solve(const VectorXd& inputValues,
+VectorXd LinearRegressionSolver::solve(const VectorXd& inputValues,
                                    const std::vector<MQuaternion>& inputQuats, VectorXd& outputs,
                                    MatrixXd& outputQuats) {
   int sampleCount = featureMatrix_.rows() ? featureMatrix_.rows() : featureQuatMatrix_.size();
   if (sampleCount <= 1) {
-    return;
+    return VectorXd();
   }
   VectorXd inputs = inputValues;
   int inputCount = inputs.size();
@@ -194,6 +193,7 @@ void LinearRegressionSolver::solve(const VectorXd& inputValues,
   for (unsigned int i = 0; i < outputQuatCount; ++i) {
     outputQuats.col(i) = averageQuaternion(outputQuats_[i], output);
   }
+  return output;
 }
 
 MatrixXd pseudoInverse(const MatrixXd& a, double epsilon) {

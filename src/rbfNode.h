@@ -45,6 +45,7 @@ class RBFNode : public MPxNode {
   static MObject aInputQuatCount;
   static MObject aOutputValueCount;
   static MObject aOutputQuatCount;
+  static MObject aSampleOutputMode;
   static MObject aRBFFunction;
   static MObject aRadius;
   static MObject aRegularization;
@@ -67,6 +68,8 @@ class RBFNode : public MPxNode {
 
   bool dirty_;
   std::array<LinearRegressionSolver, 3> solvers_;
+  std::vector<MQuaternion> neutralQuats_;
+  VectorXd neutralValues_;
 };
 
 #endif

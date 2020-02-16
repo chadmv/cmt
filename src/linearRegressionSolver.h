@@ -47,8 +47,11 @@ class LinearRegressionSolver {
                    const MatrixXd& outputScalarMatrix, const std::vector<MatrixXd>& outputQuats,
                    short rbf, double radius, double regularization, SolverSpace space);
 
-  void solve(const VectorXd& inputs, const std::vector<MQuaternion>& inputQuats, VectorXd& outputs,
+  VectorXd solve(const VectorXd& inputs, const std::vector<MQuaternion>& inputQuats, VectorXd& outputs,
              MatrixXd& outputQuats);
+
+  const std::vector<MatrixXd>& outputQuats() const { return outputQuats_; }
+
 
  private:
   double distanceNorm_;
@@ -60,7 +63,6 @@ class LinearRegressionSolver {
   MatrixXd featureMatrix_;
   std::vector<std::vector<MQuaternion>> featureQuatMatrix_;
   MatrixXd outputScalarMatrix_;
-  std::vector<std::vector<MQuaternion>> outputQuatMatrix_;
   std::vector<MatrixXd> outputQuats_;
   MatrixXd theta_;
 };

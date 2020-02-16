@@ -25,6 +25,7 @@ MObject RBFNode::aOutputRotateX;
 MObject RBFNode::aOutputRotateY;
 MObject RBFNode::aOutputRotateZ;
 MObject RBFNode::aOutputRotate;
+MObject RBFNode::aSampleOutputMode;
 MObject RBFNode::aRBFFunction;
 MObject RBFNode::aRadius;
 MObject RBFNode::aRegularization;
@@ -101,6 +102,13 @@ MStatus RBFNode::initialize() {
   aOutputQuatCount = nAttr.create("outputQuatCount", "outputQuatCount", MFnNumericData::kLong);
   addAttribute(aOutputQuatCount);
   affects(aOutputQuatCount);
+
+  aSampleOutputMode = eAttr.create("sampleMode", "sampleMode");
+  eAttr.setKeyable(true);
+  eAttr.addField("absolute", 0);
+  eAttr.addField("relative", 1);
+  addAttribute(aSampleOutputMode);
+  affects(aSampleOutputMode);
 
   aRBFFunction = eAttr.create("rbf", "rbf");
   eAttr.setKeyable(true);
@@ -192,7 +200,7 @@ MStatus RBFNode::setDependentsDirty(const MPlug& plug, MPlugArray& affectedPlugs
       plug == aOutputQuatCount || plug == aRBFFunction || plug == aRadius ||
       plug == aRegularization || plug == aSamples || plug == aSampleInputValues ||
       plug == aSampleInputQuats || plug == aSampleOutputValues || plug == aSampleOutputQuats ||
-      plug == aSampleRadius || plug == aSampleRotationType) {
+      plug == aSampleRadius || plug == aSampleRotationType || plug == aSampleOutputMode) {
     dirty_ = true;
   }
   return MPxNode::setDependentsDirty(plug, affectedPlugs);
@@ -211,6 +219,7 @@ MStatus RBFNode::preEvaluation(const MDGContext& context, const MEvaluationNode&
       (evaluationNode.dirtyPlugExists(aOutputQuatCount, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aRBFFunction, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aRadius, &status) && status) ||
+      (evaluationNode.dirtyPlugExists(aSampleOutputMode, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aRegularization, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aSamples, &status) && status) ||
       (evaluationNode.dirtyPlugExists(aSampleRadius, &status) && status) ||
@@ -244,6 +253,7 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   int inputQuatCount = data.inputValue(aInputQuatCount).asLong();
   int outputCount = data.inputValue(aOutputValueCount).asLong();
   int outputQuatCount = data.inputValue(aOutputQuatCount).asLong();
+  short outputMode = data.inputValue(aSampleOutputMode).asShort();
 
   // Get the inputs
   MArrayDataHandle hInputs = data.inputArrayValue(aInputValues);
@@ -277,26 +287,104 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
   int quatCount = 0;
   std::vector<MVector> twistAxis(outputQuatCount);
   std::vector<MQuaternion> totalTwist(outputQuatCount);
+  std::array<VectorXd, 3> solveWeights;
+
+  // In absolute mode, store all the quaternions in a single matrix
+  // In relative mode, store the neutral quaternion (the first column) once, and then the rest
+  int cols = 0;
+  for (int i = 0; i < 3; ++i) {
+    const std::vector<MatrixXd>& outputQuats = solvers_[i].outputQuats();
+    if (outputQuats.size() && outputQuats[0].cols() > 1) {
+      int toAdd = outputMode == 0 ? outputQuats[0].cols() : outputQuats[0].cols() - 1;
+      cols += toAdd;
+    }
+  }
+  if (outputMode == 1) {
+    // Add the neutral in relative mode
+    ++cols;
+  }
+
+  std::vector<MatrixXd> allQuats(outputQuatCount);
+  int quatIndex = 0;
+  for (auto& quatMatrix : allQuats) {
+    quatMatrix.resize(4, cols);
+
+    int col = outputMode == 0 ? 0 : 1;
+    for (int i = 0; i < 3; ++i) {
+      const std::vector<MatrixXd>& outputQuats = solvers_[i].outputQuats();
+      if (outputQuats.size() && outputQuats[0].cols() > 1) {
+        if (outputMode == 1) {
+          // For each output quat, store them all in to a single column matrix.  The first column
+          // will contain the neutral quaternion which is assumed to be the first column of each
+          // solver outputQuat matrix
+          quatMatrix.col(0) = outputQuats[quatIndex].col(0);
+          int nonNeutralCount = outputQuats[quatIndex].cols() - 1;
+          if (nonNeutralCount) {
+            quatMatrix.block(0, col, 4, nonNeutralCount) =
+                outputQuats[quatIndex].block(0, 1, 4, nonNeutralCount);
+            col += nonNeutralCount;
+          }
+        } else {
+          // Absolute mode, copy the whole quaternion matrix
+          quatMatrix.block(0, col, 4, outputQuats[quatIndex].cols()) = outputQuats[quatIndex];
+          col += outputQuats[quatIndex].cols();
+        }
+      }
+    }
+    ++quatIndex;
+  }
+
+  VectorXd allWeights = VectorXd::Zero(cols);
+  int col = outputMode == 0 ? 0 : 1;
   for (int i = 0; i < 3; ++i) {
     VectorXd scalars;
     MatrixXd quats;
-    solvers_[i].solve(inputs, inputQuats, scalars, quats);
+    VectorXd weights = solvers_[i].solve(inputs, inputQuats, scalars, quats);
+    if (weights.size() && outputQuatCount) {
+      if (outputMode == 0) {
+        allWeights.segment(col, weights.size()) = weights;
+        col += weights.size();
+      } else {
+        int nonNeutralCount = weights.size() - 1;
+        allWeights.segment(col, nonNeutralCount) = weights.tail(nonNeutralCount);
+        col += nonNeutralCount;
+      }
+    }
+
     if (scalars.size()) {
       outputScalars.row(i) = scalars;
     }
 
-    for (int c = 0; c < quats.cols(); ++c) {
+    /*for (int c = 0; c < quats.cols(); ++c) {
       VectorXd col = quats.col(c);
       MQuaternion q(col.data());
+      if (neutralQuats_.size()) {
+        q = neutralQuats_[i] * q;
+      }
       MQuaternion swing;
       MQuaternion twist;
       decomposeSwingTwist(q, swing, twist);
       totalTwist[c] *= twist;
       MMatrix m = swing.asMatrix();
       twistAxis[c] += MVector(m[0][0], m[0][1], m[0][2]);
-    }
+    }*/
   }
+  if (outputQuatCount) {
+    if (outputMode == 1) {
+      double sum = allWeights.sum();
+      if (sum < 1.0) {
+        // Since the weights contain all the non neutral weight values, put any remaining weight
+        // into the neutral
+        allWeights[0] = 1.0 - sum;
+      }
+    }
+    allWeights.normalize();
+  }
+
   VectorXd outValues = outputScalars.colwise().sum();
+  if (neutralValues_.size()) {
+    outValues += neutralValues_;
+  }
 
   MDataHandle hOutput;
   MArrayDataHandle hOutputs = data.outputArrayValue(aOutputValues);
@@ -310,7 +398,12 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
 
   MArrayDataHandle hOutputRotation = data.outputArrayValue(aOutputRotate);
   for (unsigned int i = 0; i < outputQuatCount; ++i) {
-    MQuaternion q = totalTwist[i] * MVector::xAxis.rotateTo(twistAxis[i].normal());
+    VectorXd outQ = averageQuaternion(allQuats[i], allWeights);
+    MQuaternion q(outQ.data());
+    // MQuaternion q = totalTwist[i] * MVector::xAxis.rotateTo(twistAxis[i].normal());
+    if (neutralQuats_.size()) {
+      q = neutralQuats_[i] * q;
+    }
 
     MEulerRotation euler = q.asEulerRotation();
 
@@ -400,7 +493,9 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
   }
 
   double regularization = data.inputValue(aRegularization).asDouble();
-
+  short outputMode = data.inputValue(aSampleOutputMode).asShort();
+  neutralQuats_.clear();
+  neutralValues_.resize(0);
   // Convert inputs and outputs to matrices to store in regression solvers
   for (int i = 0; i < 3; ++i) {
     MatrixXd inputs;
@@ -414,16 +509,26 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
 
     MatrixXd outputs;
     if (outputScalars[i].size()) {
+      if (neutralValues_.size() == 0 && outputMode == 1) {
+        neutralValues_ = outputScalars[i][0];
+      }
       outputs.resize(outputScalars[i].size(), outputScalars[i][0].size());
       int row = 0;
       for (auto& v : outputScalars[i]) {
-        outputs.row(row++) = v;
+        if (outputMode == 0) {
+          outputs.row(row++) = v;
+        } else {
+          outputs.row(row++) = v - neutralValues_;
+        }
       }
     }
 
     // Store quats as column matrix so we can use weighted quaternion averaging
     std::vector<MatrixXd> outQuats;
     if (outputQuats[i].size()) {
+      if (neutralQuats_.size() == 0 && outputMode == 1) {
+        neutralQuats_ = outputQuats[i][0];
+      }
       outQuats.resize(outputQuatCount);
 
       for (int j = 0; j < outputQuatCount; ++j) {
@@ -432,7 +537,10 @@ MStatus RBFNode::buildFeatureMatrix(MDataBlock& data, int inputCount, int output
       int sampleIdx = 0;
       for (auto& sample : outputQuats[i]) {
         int quatIdx = 0;
-        for (auto& q : sample) {
+        for (auto q : sample) {
+          if (outputMode == 1) {
+            q = neutralQuats_[0].inverse() * q;
+          }
           outQuats[quatIdx](0, sampleIdx) = q.x;
           outQuats[quatIdx](1, sampleIdx) = q.y;
           outQuats[quatIdx](2, sampleIdx) = q.z;

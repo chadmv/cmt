@@ -74,7 +74,8 @@ class RBFTests(TestCase):
         cmds.setAttr("{}.jo".format(joint1), -27.291, 3.273, 9.352)
         joint2 = cmds.createNode("joint")
         node = rbf.RBF.create(
-            input_transforms=[joint1], outputs=["{}.s{}".format(joint2, x) for x in "xyz"]
+            input_transforms=[joint1],
+            outputs=["{}.s{}".format(joint2, x) for x in "xyz"],
         )
         node.add_sample(input_rotations=[[90, 45, 0]], output_values=[2, 1, 2])
         node.add_sample(input_rotations=[[-90, -60, 0]], output_values=[0.5, 2, 3])
@@ -178,3 +179,55 @@ class RBFTests(TestCase):
         cmds.setAttr("{}.rz".format(loc1), 90)
         s = cmds.getAttr("{}.s".format(loc2))[0]
         self.assertListAlmostEqual(s, [2, 1, 2])
+
+    def test_input_rotation_twist_with_orient(self):
+        parent = cmds.createNode("joint")
+        cmds.setAttr("{}.t".format(parent), 32.007, 124.970, 0.052)
+        cmds.setAttr("{}.jo".format(parent), 116.326, -13.544, -67.100)
+        joint1 = cmds.createNode("joint")
+        cmds.parent(joint1, parent)
+        cmds.setAttr("{}.jo".format(joint1), -27.291, 3.273, 9.352)
+        cmds.setAttr("{}.t".format(joint1), 28.424, 0, 0)
+        joint2 = cmds.createNode("joint")
+        cmds.setAttr("{}.t".format(joint2), 41.465, 108.325, 6.714)
+        node = rbf.RBF.create(
+            input_transforms=[joint1],
+            outputs=["{}.t{}".format(joint2, x) for x in "xyz"],
+            output_transforms=[joint2],
+        )
+        node.add_sample(
+            input_rotations=[[-90, 0, 0]],
+            output_values=[42.303, 108.277, 4.090],
+            output_rotations=[[-24.665, 48.300, -21.075]],
+            rotation_type=rbf.RBF.twist,
+        )
+        node.add_sample(
+            input_rotations=[[90, 0, 0]],
+            output_values=[39.146, 107.559, 7.016],
+            output_rotations=[[18.226, -43.161, -1.089]],
+            rotation_type=rbf.RBF.twist,
+        )
+
+        cmds.setAttr("{}.sampleMode".format(node.name), 0)
+        cmds.setAttr("{}.rx".format(joint1), 0)
+        r = cmds.getAttr("{}.r".format(joint2))[0]
+        self.assertListAlmostEqual(r, [0.0, 0.0, 0.0], places=6)
+        cmds.setAttr("{}.sampleMode".format(node.name), 1)
+        r = cmds.getAttr("{}.r".format(joint2))[0]
+        self.assertListAlmostEqual(r, [0.0, 0.0, 0.0], places=6)
+
+        cmds.setAttr("{}.sampleMode".format(node.name), 0)
+        cmds.setAttr("{}.rx".format(joint1), -90)
+        r = cmds.getAttr("{}.r".format(joint2))[0]
+        self.assertListAlmostEqual(r, [-24.665, 48.300, -21.075], places=6)
+        cmds.setAttr("{}.sampleMode".format(node.name), 1)
+        r = cmds.getAttr("{}.r".format(joint2))[0]
+        self.assertListAlmostEqual(r, [-24.665, 48.300, -21.075], places=6)
+
+        cmds.setAttr("{}.sampleMode".format(node.name), 0)
+        cmds.setAttr("{}.rx".format(joint1), 90)
+        r = cmds.getAttr("{}.r".format(joint2))[0]
+        self.assertListAlmostEqual(r, [18.226, -43.161, -1.089], places=6)
+        cmds.setAttr("{}.sampleMode".format(node.name), 1)
+        r = cmds.getAttr("{}.r".format(joint2))[0]
+        self.assertListAlmostEqual(r, [18.226, -43.161, -1.089], places=6)
