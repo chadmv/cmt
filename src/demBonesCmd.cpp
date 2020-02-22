@@ -174,7 +174,7 @@ MStatus DemBonesCmd::doIt(const MArgList& argList) {
   if (argData.isFlagSet(kBonesShort) && model_.nB > 0) {
     int boneCount = argData.flagArgumentInt(kBonesShort, 0, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    model_.nB += (boneCount - model_.nB);
+    model_.nB += boneCount;
   }
 
   if (model_.nB == 0) {
