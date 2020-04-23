@@ -16,10 +16,12 @@ Download [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page) and extra
 The project is setup to use CMake to generate build files.
 
 ### Windows
+The build.bat included will build for 2018, 2019 and 2020. Or:
+
 ```
 mkdir build.2020
 cd build.2020
-cmake -G "Visual Studio 15 2017 Win64" -DMAYA_VERSION=2020
+cmake -A x64 -T v141 -DMAYA_VERSION=2020 ../
 cmake --build . --target install --config Release
 ```
 
