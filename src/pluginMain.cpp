@@ -1,6 +1,8 @@
 
 #include <maya/MFnPlugin.h>
+
 #include "demBonesCmd.h"
+#include "ikRigNode.h"
 #include "rbfNode.h"
 #include "swingTwistCmd.h"
 #include "swingTwistNode.h"
@@ -21,13 +23,18 @@ MStatus initializePlugin(MObject obj) {
   status = plugin.registerCommand(DemBonesCmd::kName, DemBonesCmd::creator, DemBonesCmd::newSyntax);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
+  status = plugin.registerNode(IKRigNode::kName, IKRigNode::id, IKRigNode::creator,
+                               IKRigNode::initialize);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+
   return status;
 }
 
 MStatus uninitializePlugin(MObject obj) {
   MStatus status;
   MFnPlugin plugin(obj);
-
+  status = plugin.deregisterNode(IKRigNode::id);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
   status = plugin.deregisterCommand(DemBonesCmd::kName);
   CHECK_MSTATUS_AND_RETURN_IT(status);
   status = plugin.deregisterNode(RBFNode::id);
