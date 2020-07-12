@@ -49,3 +49,76 @@ def create():
         cmds.setAttr("{}Shape.localScale".format(loc), 5, 5, 5)
 
     return node
+
+"""
+import maya.api.OpenMaya as OpenMaya
+import cmt.shortcuts as shortcuts
+import math
+
+
+def clamp(v, minv, maxv):
+    return max(min(v, maxv), minv)
+
+
+def two_bone_ik(a, b, c, d, t, pv, a_gr, b_gr):
+    eps = 0.001
+    lab = (b - a).length()
+    lcb = (b - c).length()
+    lat = clamp((t - a).length(), eps, lab + lcb - eps)
+
+    # Get current interior angles of start and mid
+    ac_ab_0 = math.acos(clamp((c - a).normal() * (b - a).normal(), -1.0, 1.0))
+    ba_bc_0 = math.acos(clamp((a - b).normal() * (c - b).normal(), -1.0, 1.0))
+    ac_at_0 = math.acos(clamp((c - a).normal() * (t - a).normal(), -1.0, 1.0))
+
+    # Get desired interior angles
+    ac_ab_1 = math.acos(clamp((lcb * lcb - lab * lab - lat * lat) / (-2.0 * lab * lat), -1.0, 1.0))
+    ba_bc_1 = math.acos(clamp((lat * lat - lab * lab - lcb * lcb) / (-2.0 * lab * lcb), -1.0, 1.0))
+
+    # axis0 = ((c - a) ^ (b - a)).normal()
+    axis0 = ((c - a) ^ d).normal()
+    axis1 = ((c - a) ^ (t - a)).normal()
+
+    r0 = OpenMaya.MQuaternion(ac_ab_1 - ac_ab_0, axis0)
+    r1 = OpenMaya.MQuaternion(ba_bc_1 - ba_bc_0, axis0)
+    r2 = OpenMaya.MQuaternion(ac_at_0, axis1)
+
+    # pole vector
+    n1 = ((c - a) ^ (b - a)).normal().rotateBy(r0).rotateBy(r2)
+    n2 = ((t - a) ^ (pv - a)).normal()
+    r3 = n1.rotateTo(n2)
+
+    a_gr *= r0 * r2 * r3
+    b_gr *= r1
+    b_gr *= r0 * r2 * r3
+    return a_gr, b_gr
+
+
+path_hip = shortcuts.get_dag_path2("hip")
+path_knee = shortcuts.get_dag_path2("knee")
+hip = OpenMaya.MFnTransform(path_hip)
+knee = OpenMaya.MFnTransform(path_knee)
+foot = OpenMaya.MFnTransform(shortcuts.get_dag_path2("foot"))
+pole = OpenMaya.MFnTransform(shortcuts.get_dag_path2("pv"))
+target = OpenMaya.MFnTransform(shortcuts.get_dag_path2("target"))
+
+local_knee = path_knee.inclusiveMatrix() * path_hip.inclusiveMatrixInverse()
+
+space = OpenMaya.MSpace.kWorld
+a = hip.translation(space)
+b = knee.translation(space)
+c = foot.translation(space)
+t = target.translation(space)
+pv = pole.translation(space)
+# d = pv - ((a + t) * 0.5)
+d = OpenMaya.MVector(0.0, 0.0, 1.0).normal()
+a_gr = hip.rotation(space, asQuaternion=True)
+b_gr = knee.rotation(space, asQuaternion=True)
+a_gr, b_gr = two_bone_ik(a, b, c, d, t, pv, a_gr, b_gr)
+
+hip.setRotation(a_gr, space)
+knee.setRotation(b_gr, space)
+knee_pos = local_knee * path_hip.inclusiveMatrix()
+knee_pos = OpenMaya.MVector(knee_pos.getElement(3, 0), knee_pos.getElement(3, 1), knee_pos.getElement(3, 2))
+knee.setTranslation(knee_pos, space)
+"""

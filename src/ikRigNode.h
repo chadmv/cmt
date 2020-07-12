@@ -51,6 +51,7 @@ class IKRigNode : public MPxNode {
   static MObject aInMatrix;
   static MObject aInBindPreMatrix;
   static MObject aTargetRestMatrix;
+  static MObject aLeftLegTwistOffset;
 
  private:
   static void affects(const MObject& attribute);
@@ -61,7 +62,7 @@ class IKRigNode : public MPxNode {
                     unsigned int bodyPart, const MMatrix& matrix);
 
   void twoBoneIk(const MVector& a, const MVector& b, const MVector& c,
-                 const MVector& d, const MVector& t,
+                 const MVector& d, const MVector& t, const MVector& pv, float twist,
                  MQuaternion& a_gr, MQuaternion& b_gr);
 
   float clamp(float inValue, float minValue, float maxValue) {
