@@ -8,7 +8,6 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MMatrix.h>
-#include <maya/MMatrixArray.h>
 #include <maya/MQuaternion.h>
 #include <maya/MTransformationMatrix.h>
 
@@ -24,6 +23,7 @@ MObject IKRigNode::aInMatrix;
 MObject IKRigNode::aInBindPreMatrix;
 MObject IKRigNode::aTargetRestMatrix;
 MObject IKRigNode::aLeftLegTwistOffset;
+MObject IKRigNode::aRightLegTwistOffset;
 
 const MString IKRigNode::kName("ikRig");
 
@@ -67,6 +67,12 @@ MStatus IKRigNode::initialize() {
   addAttribute(aLeftLegTwistOffset);
   affects(aLeftLegTwistOffset);
 
+  aRightLegTwistOffset =
+      nAttr.create("rightLegTwistOffset", "rightLegTwistOffset", MFnNumericData::kFloat, 0.0);
+  nAttr.setKeyable(true);
+  addAttribute(aRightLegTwistOffset);
+  affects(aRightLegTwistOffset);
+
   MATRIX_INPUT(aInMatrix, "inMatrix");
   MATRIX_INPUT(aInBindPreMatrix, "inBindPreMatrix");
   MATRIX_INPUT(aTargetRestMatrix, "targetRestMatrix");
@@ -84,7 +90,12 @@ void IKRigNode::affects(const MObject& attribute) {
 
 void* IKRigNode::creator() { return new IKRigNode(); }
 
-IKRigNode::IKRigNode() {}
+IKRigNode::IKRigNode() {
+  inputMatrix_.setLength(IKRig_Count);
+  inputBindPreMatrix_.setLength(IKRig_Count);
+  targetRestMatrix_.setLength(IKRig_Count);
+  outputDelta_.setLength(IKRig_Count);
+}
 
 IKRigNode::~IKRigNode() {}
 
@@ -96,30 +107,26 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   }
 
   // Get the input skeleton
-  MMatrixArray inputMatrix(IKRig_Count);
-  MMatrixArray inputBindPreMatrix(IKRig_Count);
-  MMatrixArray targetRestMatrix(IKRig_Count);
   MArrayDataHandle hInputMatrices = data.inputArrayValue(aInMatrix);
   MArrayDataHandle hInputBindPreMatrices = data.inputArrayValue(aInBindPreMatrix);
   MArrayDataHandle hOutputBindPreMatrices = data.inputArrayValue(aTargetRestMatrix);
   for (unsigned int i = 0; i < IKRig_Count; ++i) {
     status = JumpToElement(hInputMatrices, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    inputMatrix[i] = hInputMatrices.inputValue().asMatrix();
+    inputMatrix_[i] = hInputMatrices.inputValue().asMatrix();
 
     status = JumpToElement(hInputBindPreMatrices, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    inputBindPreMatrix[i] = hInputBindPreMatrices.inputValue().asMatrix();
+    inputBindPreMatrix_[i] = hInputBindPreMatrices.inputValue().asMatrix();
 
     status = JumpToElement(hOutputBindPreMatrices, i);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    targetRestMatrix[i] = hOutputBindPreMatrices.inputValue().asMatrix();
+    targetRestMatrix_[i] = hOutputBindPreMatrices.inputValue().asMatrix();
   }
 
   // Calculate outputs
-  MMatrixArray outputDelta(IKRig_Count);
   for (unsigned int i = 0; i < IKRig_Count; ++i) {
-    outputDelta[i] = inputBindPreMatrix[i] * inputMatrix[i];
+    outputDelta_[i] = inputBindPreMatrix_[i] * inputMatrix_[i];
   }
 
   // Set outputs
@@ -127,85 +134,127 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   MArrayDataHandle hOutputRotate = data.outputArrayValue(aOutRotate);
 
   // Hips
-  float hipScale = position(targetRestMatrix[IKRig_Hips]).y /
-                   position(inputBindPreMatrix[IKRig_Hips].inverse()).y;
-  outputDelta[IKRig_Hips][3][0] *= hipScale;
-  outputDelta[IKRig_Hips][3][1] *= hipScale;
-  outputDelta[IKRig_Hips][3][2] *= hipScale;
-  MMatrix hips = targetRestMatrix[IKRig_Hips] * outputDelta[IKRig_Hips];
-  hips[3][0] = inputMatrix[IKRig_Hips][3][0];
-  hips[3][1] = inputMatrix[IKRig_Hips][3][1] * hipScale;
-  hips[3][2] = inputMatrix[IKRig_Hips][3][2];
+  float hipScale = position(targetRestMatrix_[IKRig_Hips]).y /
+                   position(inputBindPreMatrix_[IKRig_Hips].inverse()).y;
+  outputDelta_[IKRig_Hips][3][0] *= hipScale;
+  outputDelta_[IKRig_Hips][3][1] *= hipScale;
+  outputDelta_[IKRig_Hips][3][2] *= hipScale;
+  MMatrix hips = targetRestMatrix_[IKRig_Hips] * outputDelta_[IKRig_Hips];
+  hips[3][0] = inputMatrix_[IKRig_Hips][3][0];
+  hips[3][1] = inputMatrix_[IKRig_Hips][3][1] * hipScale;
+  hips[3][2] = inputMatrix_[IKRig_Hips][3][2];
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Hips, hips);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
-  // Left leg
-  MMatrix leftUpLeg =
-      targetRestMatrix[IKRig_LeftUpLeg] * targetRestMatrix[IKRig_Hips].inverse() * hips;
-  MMatrix leftLoLeg =
-      targetRestMatrix[IKRig_LeftLoLeg] * targetRestMatrix[IKRig_LeftUpLeg].inverse() * leftUpLeg;
-  MMatrix leftFoot =
-      targetRestMatrix[IKRig_LeftFoot] * targetRestMatrix[IKRig_LeftLoLeg].inverse() * leftLoLeg;
-
-  // Left foot target
-  float leftAnkleHeightDelta = position(targetRestMatrix[IKRig_LeftFoot]).y -
-                               position(inputBindPreMatrix[IKRig_LeftFoot].inverse()).y;
-  MMatrix leftFootTarget;
-  leftFootTarget[3][1] = leftAnkleHeightDelta;
-  leftFootTarget =
-      inputBindPreMatrix[IKRig_LeftFoot].inverse() * leftFootTarget * outputDelta[IKRig_LeftFoot];
-
-  // Calculate left leg ik
-  MVector a = position(leftUpLeg);
-  MVector b = position(leftLoLeg);
-  MVector c = position(leftFoot);
-  MVector t = position(leftFootTarget);
-  MQuaternion a_gr = MTransformationMatrix(leftUpLeg).rotation();
-  MQuaternion b_gr = MTransformationMatrix(leftLoLeg).rotation();
-  MVector ac = (c - a).normal();
-  MVector d = (b - (a + (ac * ((b - a) * ac)))).normal();
-  // MVector pv = a + d * outputDelta[IKRig_LeftUpLeg];
-  // MVector pv = position(inputMatrix[IKRig_LeftLoLeg]);
-
-  MVector ia = position(inputBindPreMatrix[IKRig_LeftUpLeg].inverse());
-  MVector ib = position(inputBindPreMatrix[IKRig_LeftLoLeg].inverse());
-  MVector ic = position(inputBindPreMatrix[IKRig_LeftFoot].inverse());
-  MVector iac = (ic - ia).normal();
-  MVector pv = a + (ib - (ia + (iac * ((ib - ia) * iac)))).normal() * outputDelta[IKRig_LeftUpLeg];
-
-  std::cerr << "d = " << d << std::endl;
-  std::cerr << "pv = " << pv << std::endl;
-
-  MVector inputKnee = position(inputMatrix[IKRig_LeftLoLeg]);
-  /*MVector d = (inputKnee - projectedPosition).normal();
-  d = (inputKnee + d) - a;*/
   float leftLegTwistOffset = data.inputValue(aLeftLegTwistOffset).asFloat();
-  twoBoneIk(a, b, c, d, t, pv, leftLegTwistOffset, a_gr, b_gr);
-
-  leftUpLeg = a_gr.asMatrix();
-  leftUpLeg[3][0] = a.x;
-  leftUpLeg[3][1] = a.y;
-  leftUpLeg[3][2] = a.z;
-  MMatrix leftKnee = b_gr.asMatrix();
-  MMatrix leftkneePos =
-      targetRestMatrix[IKRig_LeftLoLeg] * targetRestMatrix[IKRig_LeftUpLeg].inverse() * leftUpLeg;
-  leftKnee[3][0] = leftkneePos[3][0];
-  leftKnee[3][1] = leftkneePos[3][1];
-  leftKnee[3][2] = leftkneePos[3][2];
-
-  leftFoot =
-      targetRestMatrix[IKRig_LeftFoot] * targetRestMatrix[IKRig_LeftLoLeg].inverse() * leftKnee;
-
-  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftUpLeg, leftUpLeg);
+  status = calculateLegIk(IKRig_LeftUpLeg, IKRig_LeftLoLeg, IKRig_LeftFoot, hips,
+                          leftLegTwistOffset, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftLoLeg, leftKnee);
+
+  float rightLegTwistOffset = data.inputValue(aRightLegTwistOffset).asFloat();
+  status = calculateLegIk(IKRig_RightUpLeg, IKRig_RightLoLeg, IKRig_RightFoot, hips,
+                          rightLegTwistOffset, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftFoot, leftFoot);
-  CHECK_MSTATUS_AND_RETURN_IT(status);
+
+
+  //// Left leg
+  //MMatrix leftUpLeg =
+  //    targetRestMatrix[IKRig_LeftUpLeg] * targetRestMatrix[IKRig_Hips].inverse() * hips;
+  //MMatrix leftLoLeg =
+  //    targetRestMatrix[IKRig_LeftLoLeg] * targetRestMatrix[IKRig_LeftUpLeg].inverse() * leftUpLeg;
+  //MMatrix leftFoot =
+  //    targetRestMatrix[IKRig_LeftFoot] * targetRestMatrix[IKRig_LeftLoLeg].inverse() * leftLoLeg;
+
+  //// Left foot target
+  //float leftAnkleHeightDelta = position(targetRestMatrix[IKRig_LeftFoot]).y -
+  //                             position(inputBindPreMatrix[IKRig_LeftFoot].inverse()).y;
+  //MMatrix leftFootTarget;
+  //leftFootTarget[3][1] = leftAnkleHeightDelta;
+  //leftFootTarget =
+  //    inputBindPreMatrix[IKRig_LeftFoot].inverse() * leftFootTarget * outputDelta[IKRig_LeftFoot];
+
+  //// Calculate left leg ik
+  //float leftLegTwistOffset = data.inputValue(aLeftLegTwistOffset).asFloat();
+  //MVector ia = position(inputBindPreMatrix[IKRig_LeftUpLeg].inverse());
+  //MVector ib = position(inputBindPreMatrix[IKRig_LeftLoLeg].inverse());
+  //MVector ic = position(inputBindPreMatrix[IKRig_LeftFoot].inverse());
+  //MVector iac = (ic - ia).normal();
+  //MVector pv = position(leftUpLeg) +
+  //             (ib - (ia + (iac * ((ib - ia) * iac)))).normal() * outputDelta[IKRig_LeftUpLeg];
+  //MMatrix ikLeftUpLeg, ikLeftLoLeg;
+  //calculateTwoBoneIk(leftUpLeg, leftLoLeg, leftFoot, leftFootTarget, pv, leftLegTwistOffset,
+  //                   ikLeftUpLeg, ikLeftLoLeg);
+
+  //MQuaternion leftFootRotOffset =
+  //    MTransformationMatrix(targetRestMatrix[IKRig_LeftFoot] * inputBindPreMatrix[IKRig_LeftFoot])
+  //        .rotation();
+  //MQuaternion leftFootInputRot = MTransformationMatrix(inputMatrix[IKRig_LeftFoot]).rotation();
+  //leftFootRotOffset *= leftFootInputRot;
+  //MMatrix ikLeftFootPos =
+  //    targetRestMatrix[IKRig_LeftFoot] * targetRestMatrix[IKRig_LeftLoLeg].inverse() * ikLeftLoLeg;
+  //MTransformationMatrix tIkLeftFoot(ikLeftFootPos);
+  //tIkLeftFoot.setRotationQuaternion(leftFootRotOffset.x, leftFootRotOffset.y, leftFootRotOffset.z,
+  //                                  leftFootRotOffset.w);
+  //MMatrix ikLeftFoot = tIkLeftFoot.asMatrix();
+
+  //status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftUpLeg, ikLeftUpLeg);
+  //CHECK_MSTATUS_AND_RETURN_IT(status);
+  //status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftLoLeg, ikLeftLoLeg);
+  //CHECK_MSTATUS_AND_RETURN_IT(status);
+  //status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftFoot, ikLeftFoot);
+  //CHECK_MSTATUS_AND_RETURN_IT(status);
 
   hOutputTranslate.setAllClean();
   hOutputRotate.setAllClean();
 
+  return MS::kSuccess;
+}
+
+MStatus IKRigNode::calculateLegIk(unsigned int upLeg, unsigned int loLeg, unsigned int foot,
+                                  const MMatrix& hips, float twist, MArrayDataHandle& hOutputTranslate,
+                                  MArrayDataHandle& hOutputRotate) {
+  MStatus status;
+
+  MMatrix leftUpLeg = targetRestMatrix_[upLeg] * targetRestMatrix_[IKRig_Hips].inverse() * hips;
+  MMatrix leftLoLeg = targetRestMatrix_[loLeg] * targetRestMatrix_[upLeg].inverse() * leftUpLeg;
+  MMatrix leftFoot = targetRestMatrix_[foot] * targetRestMatrix_[loLeg].inverse() * leftLoLeg;
+
+  // Foot target
+  // Account for differences in ankle height to help with ground contact
+  float leftAnkleHeightDelta =
+      position(targetRestMatrix_[foot]).y - position(inputBindPreMatrix_[foot].inverse()).y;
+  MMatrix leftFootTarget;
+  leftFootTarget[3][1] = leftAnkleHeightDelta;
+  leftFootTarget = inputBindPreMatrix_[foot].inverse() * leftFootTarget * outputDelta_[foot];
+
+  // Calculate leg ik
+  MVector ia = position(inputBindPreMatrix_[upLeg].inverse());
+  MVector ib = position(inputBindPreMatrix_[loLeg].inverse());
+  MVector ic = position(inputBindPreMatrix_[foot].inverse());
+  MVector iac = (ic - ia).normal();
+  MVector pv =
+      position(leftUpLeg) + (ib - (ia + (iac * ((ib - ia) * iac)))).normal() * outputDelta_[upLeg];
+  MMatrix ikLeftUpLeg, ikLeftLoLeg;
+  calculateTwoBoneIk(leftUpLeg, leftLoLeg, leftFoot, leftFootTarget, pv, twist,
+                     ikLeftUpLeg, ikLeftLoLeg);
+
+  MQuaternion leftFootRotOffset =
+      MTransformationMatrix(targetRestMatrix_[foot] * inputBindPreMatrix_[foot]).rotation();
+  MQuaternion leftFootInputRot = MTransformationMatrix(inputMatrix_[foot]).rotation();
+  leftFootRotOffset *= leftFootInputRot;
+  MMatrix ikLeftFootPos =
+      targetRestMatrix_[foot] * targetRestMatrix_[loLeg].inverse() * ikLeftLoLeg;
+  MTransformationMatrix tIkLeftFoot(ikLeftFootPos);
+  tIkLeftFoot.setRotationQuaternion(leftFootRotOffset.x, leftFootRotOffset.y, leftFootRotOffset.z,
+                                    leftFootRotOffset.w);
+  MMatrix ikLeftFoot = tIkLeftFoot.asMatrix();
+
+  status = setOutput(hOutputTranslate, hOutputRotate, upLeg, ikLeftUpLeg);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  status = setOutput(hOutputTranslate, hOutputRotate, loLeg, ikLeftLoLeg);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  status = setOutput(hOutputTranslate, hOutputRotate, foot, ikLeftFoot);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
   return MS::kSuccess;
 }
 
@@ -238,6 +287,35 @@ MStatus IKRigNode::setOutput(MArrayDataHandle& hOutputTranslate, MArrayDataHandl
   hZ.setClean();
 
   return MStatus::kSuccess;
+}
+
+void IKRigNode::calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
+                                   const MMatrix& target, const MVector& pv, float twist,
+                                   MMatrix& ikA, MMatrix& ikB) {
+  MVector a = position(root);
+  MVector b = position(mid);
+  MVector c = position(effector);
+  MVector t = position(target);
+  MQuaternion a_gr = MTransformationMatrix(root).rotation();
+  MQuaternion b_gr = MTransformationMatrix(mid).rotation();
+  MVector ac = (c - a).normal();
+  MVector d = (b - (a + (ac * ((b - a) * ac)))).normal();
+  // MVector pv = a + d * outputDelta[IKRig_LeftUpLeg];
+  // MVector pv = position(inputMatrix[IKRig_LeftLoLeg]);
+
+  /*MVector d = (inputKnee - projectedPosition).normal();
+  d = (inputKnee + d) - a;*/
+  twoBoneIk(a, b, c, d, t, pv, twist, a_gr, b_gr);
+
+  ikA = a_gr.asMatrix();
+  ikA[3][0] = a.x;
+  ikA[3][1] = a.y;
+  ikA[3][2] = a.z;
+  ikB = b_gr.asMatrix();
+  MMatrix leftkneePos = mid * root.inverse() * ikA;
+  ikB[3][0] = leftkneePos[3][0];
+  ikB[3][1] = leftkneePos[3][1];
+  ikB[3][2] = leftkneePos[3][2];
 }
 
 // http://theorangeduck.com/page/simple-two-joint

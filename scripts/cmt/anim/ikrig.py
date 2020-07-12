@@ -32,6 +32,7 @@ def create():
                   'thigh_l', 'calf_l', 'foot_l', 'clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r', 'thigh_r',
                   'calf_r', 'foot_r']
 
+    locs = []
     for i, j in enumerate(joints):
         cmds.connectAttr("{}.worldMatrix[0]".format(j), "{}.inMatrix[{}]".format(node, i))
         path = shortcuts.get_dag_path2(j)
@@ -47,7 +48,11 @@ def create():
         cmds.connectAttr("{}.outputRotate[{}]".format(node, i), "{}.r".format(loc))
 
         cmds.setAttr("{}Shape.localScale".format(loc), 5, 5, 5)
+        locs.append(loc)
 
+    for loc, joint in zip(locs, out_joints):
+        if joint in ["pelvis", "thigh_l", "calf_l", "foot_l", "thigh_r", "calf_r", "foot_r"]:
+            cmds.parentConstraint(loc, joint)
     return node
 
 """

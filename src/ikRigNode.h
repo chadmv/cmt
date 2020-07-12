@@ -4,6 +4,7 @@
 #include <maya/MArrayDataHandle.h>
 #include <maya/MFloatVector.h>
 #include <maya/MMatrix.h>
+#include <maya/MMatrixArray.h>
 #include <maya/MPoint.h>
 #include <maya/MPxNode.h>
 #include <maya/MQuaternion.h>
@@ -52,15 +53,23 @@ class IKRigNode : public MPxNode {
   static MObject aInBindPreMatrix;
   static MObject aTargetRestMatrix;
   static MObject aLeftLegTwistOffset;
+  static MObject aRightLegTwistOffset;
 
  private:
   static void affects(const MObject& attribute);
+
+  MStatus calculateLegIk(unsigned int upLeg, unsigned int loLeg, unsigned int foot,
+                         const MMatrix& hips,
+                         float twist,
+                         MArrayDataHandle& hOutputTranslate,
+                      MArrayDataHandle& hOutputRotate);
 
   MVector position(const MMatrix& m) { return MVector(m[3][0], m[3][1], m[3][2]); }
 
   MStatus setOutput(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate,
                     unsigned int bodyPart, const MMatrix& matrix);
-
+  void calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector, const MMatrix& target,
+                 const MVector& pv, float twist, MMatrix& ikA, MMatrix& ikB);
   void twoBoneIk(const MVector& a, const MVector& b, const MVector& c,
                  const MVector& d, const MVector& t, const MVector& pv, float twist,
                  MQuaternion& a_gr, MQuaternion& b_gr);
@@ -74,6 +83,11 @@ class IKRigNode : public MPxNode {
     }
     return inValue;
   }
+
+  MMatrixArray inputMatrix_;
+  MMatrixArray inputBindPreMatrix_;
+  MMatrixArray targetRestMatrix_;
+  MMatrixArray outputDelta_;
 };
 
 #endif
