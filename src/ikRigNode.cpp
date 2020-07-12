@@ -146,63 +146,17 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Hips, hips);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
+  // Left leg
   float leftLegTwistOffset = data.inputValue(aLeftLegTwistOffset).asFloat();
   status = calculateLegIk(IKRig_LeftUpLeg, IKRig_LeftLoLeg, IKRig_LeftFoot, hips,
                           leftLegTwistOffset, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
+  // Right leg
   float rightLegTwistOffset = data.inputValue(aRightLegTwistOffset).asFloat();
   status = calculateLegIk(IKRig_RightUpLeg, IKRig_RightLoLeg, IKRig_RightFoot, hips,
                           rightLegTwistOffset, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-
-
-  //// Left leg
-  //MMatrix leftUpLeg =
-  //    targetRestMatrix[IKRig_LeftUpLeg] * targetRestMatrix[IKRig_Hips].inverse() * hips;
-  //MMatrix leftLoLeg =
-  //    targetRestMatrix[IKRig_LeftLoLeg] * targetRestMatrix[IKRig_LeftUpLeg].inverse() * leftUpLeg;
-  //MMatrix leftFoot =
-  //    targetRestMatrix[IKRig_LeftFoot] * targetRestMatrix[IKRig_LeftLoLeg].inverse() * leftLoLeg;
-
-  //// Left foot target
-  //float leftAnkleHeightDelta = position(targetRestMatrix[IKRig_LeftFoot]).y -
-  //                             position(inputBindPreMatrix[IKRig_LeftFoot].inverse()).y;
-  //MMatrix leftFootTarget;
-  //leftFootTarget[3][1] = leftAnkleHeightDelta;
-  //leftFootTarget =
-  //    inputBindPreMatrix[IKRig_LeftFoot].inverse() * leftFootTarget * outputDelta[IKRig_LeftFoot];
-
-  //// Calculate left leg ik
-  //float leftLegTwistOffset = data.inputValue(aLeftLegTwistOffset).asFloat();
-  //MVector ia = position(inputBindPreMatrix[IKRig_LeftUpLeg].inverse());
-  //MVector ib = position(inputBindPreMatrix[IKRig_LeftLoLeg].inverse());
-  //MVector ic = position(inputBindPreMatrix[IKRig_LeftFoot].inverse());
-  //MVector iac = (ic - ia).normal();
-  //MVector pv = position(leftUpLeg) +
-  //             (ib - (ia + (iac * ((ib - ia) * iac)))).normal() * outputDelta[IKRig_LeftUpLeg];
-  //MMatrix ikLeftUpLeg, ikLeftLoLeg;
-  //calculateTwoBoneIk(leftUpLeg, leftLoLeg, leftFoot, leftFootTarget, pv, leftLegTwistOffset,
-  //                   ikLeftUpLeg, ikLeftLoLeg);
-
-  //MQuaternion leftFootRotOffset =
-  //    MTransformationMatrix(targetRestMatrix[IKRig_LeftFoot] * inputBindPreMatrix[IKRig_LeftFoot])
-  //        .rotation();
-  //MQuaternion leftFootInputRot = MTransformationMatrix(inputMatrix[IKRig_LeftFoot]).rotation();
-  //leftFootRotOffset *= leftFootInputRot;
-  //MMatrix ikLeftFootPos =
-  //    targetRestMatrix[IKRig_LeftFoot] * targetRestMatrix[IKRig_LeftLoLeg].inverse() * ikLeftLoLeg;
-  //MTransformationMatrix tIkLeftFoot(ikLeftFootPos);
-  //tIkLeftFoot.setRotationQuaternion(leftFootRotOffset.x, leftFootRotOffset.y, leftFootRotOffset.z,
-  //                                  leftFootRotOffset.w);
-  //MMatrix ikLeftFoot = tIkLeftFoot.asMatrix();
-
-  //status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftUpLeg, ikLeftUpLeg);
-  //CHECK_MSTATUS_AND_RETURN_IT(status);
-  //status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftLoLeg, ikLeftLoLeg);
-  //CHECK_MSTATUS_AND_RETURN_IT(status);
-  //status = setOutput(hOutputTranslate, hOutputRotate, IKRig_LeftFoot, ikLeftFoot);
-  //CHECK_MSTATUS_AND_RETURN_IT(status);
 
   hOutputTranslate.setAllClean();
   hOutputRotate.setAllClean();
@@ -210,52 +164,120 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   return MS::kSuccess;
 }
 
-MStatus IKRigNode::calculateLegIk(unsigned int upLeg, unsigned int loLeg, unsigned int foot,
-                                  const MMatrix& hips, float twist, MArrayDataHandle& hOutputTranslate,
+MStatus IKRigNode::calculateLegIk(unsigned int upLegIdx, unsigned int loLegIdx,
+                                  unsigned int footIdx, const MMatrix& hips, float twist,
+                                  MArrayDataHandle& hOutputTranslate,
                                   MArrayDataHandle& hOutputRotate) {
   MStatus status;
 
-  MMatrix leftUpLeg = targetRestMatrix_[upLeg] * targetRestMatrix_[IKRig_Hips].inverse() * hips;
-  MMatrix leftLoLeg = targetRestMatrix_[loLeg] * targetRestMatrix_[upLeg].inverse() * leftUpLeg;
-  MMatrix leftFoot = targetRestMatrix_[foot] * targetRestMatrix_[loLeg].inverse() * leftLoLeg;
+  MMatrix upLeg = targetRestMatrix_[upLegIdx] * targetRestMatrix_[IKRig_Hips].inverse() * hips;
+  MMatrix loLeg = targetRestMatrix_[loLegIdx] * targetRestMatrix_[upLegIdx].inverse() * upLeg;
+  MMatrix foot = targetRestMatrix_[footIdx] * targetRestMatrix_[loLegIdx].inverse() * loLeg;
 
   // Foot target
   // Account for differences in ankle height to help with ground contact
-  float leftAnkleHeightDelta =
-      position(targetRestMatrix_[foot]).y - position(inputBindPreMatrix_[foot].inverse()).y;
-  MMatrix leftFootTarget;
-  leftFootTarget[3][1] = leftAnkleHeightDelta;
-  leftFootTarget = inputBindPreMatrix_[foot].inverse() * leftFootTarget * outputDelta_[foot];
+  float ankleHeightDelta =
+      position(targetRestMatrix_[footIdx]).y - position(inputBindPreMatrix_[footIdx].inverse()).y;
+  MMatrix footTarget;
+  footTarget[3][1] = ankleHeightDelta;
+  footTarget = inputBindPreMatrix_[footIdx].inverse() * footTarget * outputDelta_[footIdx];
 
   // Calculate leg ik
-  MVector ia = position(inputBindPreMatrix_[upLeg].inverse());
-  MVector ib = position(inputBindPreMatrix_[loLeg].inverse());
-  MVector ic = position(inputBindPreMatrix_[foot].inverse());
+  MVector ia = position(inputBindPreMatrix_[upLegIdx].inverse());
+  MVector ib = position(inputBindPreMatrix_[loLegIdx].inverse());
+  MVector ic = position(inputBindPreMatrix_[footIdx].inverse());
   MVector iac = (ic - ia).normal();
-  MVector pv =
-      position(leftUpLeg) + (ib - (ia + (iac * ((ib - ia) * iac)))).normal() * outputDelta_[upLeg];
+  MVector twistAxis = position(footTarget) - position(upLeg);
+  MVector pv = (ib - (ia + (iac * ((ib - ia) * iac)))).normal() * outputDelta_[upLegIdx];
+  // Apply any twist offset
+  MQuaternion tw(twist * 0.0174533, twistAxis);
+  pv = pv.rotateBy(tw);
+  pv += position(upLeg);
   MMatrix ikLeftUpLeg, ikLeftLoLeg;
-  calculateTwoBoneIk(leftUpLeg, leftLoLeg, leftFoot, leftFootTarget, pv, twist,
-                     ikLeftUpLeg, ikLeftLoLeg);
+  calculateTwoBoneIk(upLeg, loLeg, foot, footTarget, pv, ikLeftUpLeg, ikLeftLoLeg);
 
   MQuaternion leftFootRotOffset =
-      MTransformationMatrix(targetRestMatrix_[foot] * inputBindPreMatrix_[foot]).rotation();
-  MQuaternion leftFootInputRot = MTransformationMatrix(inputMatrix_[foot]).rotation();
+      MTransformationMatrix(targetRestMatrix_[footIdx] * inputBindPreMatrix_[footIdx]).rotation();
+  MQuaternion leftFootInputRot = MTransformationMatrix(inputMatrix_[footIdx]).rotation();
   leftFootRotOffset *= leftFootInputRot;
   MMatrix ikLeftFootPos =
-      targetRestMatrix_[foot] * targetRestMatrix_[loLeg].inverse() * ikLeftLoLeg;
+      targetRestMatrix_[footIdx] * targetRestMatrix_[loLegIdx].inverse() * ikLeftLoLeg;
   MTransformationMatrix tIkLeftFoot(ikLeftFootPos);
   tIkLeftFoot.setRotationQuaternion(leftFootRotOffset.x, leftFootRotOffset.y, leftFootRotOffset.z,
                                     leftFootRotOffset.w);
   MMatrix ikLeftFoot = tIkLeftFoot.asMatrix();
 
-  status = setOutput(hOutputTranslate, hOutputRotate, upLeg, ikLeftUpLeg);
+  status = setOutput(hOutputTranslate, hOutputRotate, upLegIdx, ikLeftUpLeg);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-  status = setOutput(hOutputTranslate, hOutputRotate, loLeg, ikLeftLoLeg);
+  status = setOutput(hOutputTranslate, hOutputRotate, loLegIdx, ikLeftLoLeg);
   CHECK_MSTATUS_AND_RETURN_IT(status);
-  status = setOutput(hOutputTranslate, hOutputRotate, foot, ikLeftFoot);
+  status = setOutput(hOutputTranslate, hOutputRotate, footIdx, ikLeftFoot);
   CHECK_MSTATUS_AND_RETURN_IT(status);
   return MS::kSuccess;
+}
+
+void IKRigNode::calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
+                                   const MMatrix& target, const MVector& pv, MMatrix& ikA,
+                                   MMatrix& ikB) {
+  MVector a = position(root);
+  MVector b = position(mid);
+  MVector c = position(effector);
+  MVector t = position(target);
+  MQuaternion a_gr = MTransformationMatrix(root).rotation();
+  MQuaternion b_gr = MTransformationMatrix(mid).rotation();
+  MVector ac = (c - a).normal();
+  MVector d = (b - (a + (ac * ((b - a) * ac)))).normal();
+
+  twoBoneIk(a, b, c, d, t, pv, a_gr, b_gr);
+
+  ikA = a_gr.asMatrix();
+  ikA[3][0] = a.x;
+  ikA[3][1] = a.y;
+  ikA[3][2] = a.z;
+  ikB = b_gr.asMatrix();
+  MMatrix midPos = mid * root.inverse() * ikA;
+  ikB[3][0] = midPos[3][0];
+  ikB[3][1] = midPos[3][1];
+  ikB[3][2] = midPos[3][2];
+}
+
+// http://theorangeduck.com/page/simple-two-joint
+void IKRigNode::twoBoneIk(const MVector& a, const MVector& b, const MVector& c, const MVector& d,
+                          const MVector& t, const MVector& pv, MQuaternion& a_gr,
+                          MQuaternion& b_gr) {
+  float eps = 0.001f;
+  float lab = (b - a).length();
+  float lcb = (b - c).length();
+  float lat = clamp((t - a).length(), eps, lab + lcb - eps);
+
+  // Get current interior angles of start and mid
+  float ac_ab_0 = acos(clamp((c - a).normal() * (b - a).normal(), -1.0f, 1.0f));
+  float ba_bc_0 = acos(clamp((a - b).normal() * (c - b).normal(), -1.0f, 1.0f));
+  float ac_at_0 = acos(clamp((c - a).normal() * (t - a).normal(), -1.0f, 1.0f));
+
+  // Get desired interior angles
+  float ac_ab_1 =
+      acos(clamp((lcb * lcb - lab * lab - lat * lat) / (-2.0f * lab * lat), -1.0f, 1.0f));
+  float ba_bc_1 =
+      acos(clamp((lat * lat - lab * lab - lcb * lcb) / (-2.0f * lab * lcb), -1.0f, 1.0f));
+  MVector axis0 = ((c - a) ^ d).normal();
+  MVector axis1 = ((c - a) ^ (t - a)).normal();
+
+  MQuaternion r0(ac_ab_1 - ac_ab_0, axis0);
+  MQuaternion r1(ba_bc_1 - ba_bc_0, axis0);
+  MQuaternion r2(ac_at_0, axis1);
+
+  // Pole vector rotation
+  // Determine the rotation used to rotate the normal of the triangle formed by
+  // a.b.c post r0*r2 rotation to the normal of the triangle formed by triangle a.pv.t
+  MVector n1 = ((c - a) ^ (b - a)).normal().rotateBy(r0).rotateBy(r2);
+  MVector n2 = ((t - a) ^ (pv - a)).normal();
+  MQuaternion r3 = n1.rotateTo(n2);
+
+  a_gr *= r0 * r2 * r3;
+  b_gr *= r1;
+  // Since we are calculating in world space, apply the start rotations to the mid
+  b_gr *= r0 * r2 * r3;
 }
 
 MStatus IKRigNode::setOutput(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate,
@@ -287,77 +309,4 @@ MStatus IKRigNode::setOutput(MArrayDataHandle& hOutputTranslate, MArrayDataHandl
   hZ.setClean();
 
   return MStatus::kSuccess;
-}
-
-void IKRigNode::calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
-                                   const MMatrix& target, const MVector& pv, float twist,
-                                   MMatrix& ikA, MMatrix& ikB) {
-  MVector a = position(root);
-  MVector b = position(mid);
-  MVector c = position(effector);
-  MVector t = position(target);
-  MQuaternion a_gr = MTransformationMatrix(root).rotation();
-  MQuaternion b_gr = MTransformationMatrix(mid).rotation();
-  MVector ac = (c - a).normal();
-  MVector d = (b - (a + (ac * ((b - a) * ac)))).normal();
-  // MVector pv = a + d * outputDelta[IKRig_LeftUpLeg];
-  // MVector pv = position(inputMatrix[IKRig_LeftLoLeg]);
-
-  /*MVector d = (inputKnee - projectedPosition).normal();
-  d = (inputKnee + d) - a;*/
-  twoBoneIk(a, b, c, d, t, pv, twist, a_gr, b_gr);
-
-  ikA = a_gr.asMatrix();
-  ikA[3][0] = a.x;
-  ikA[3][1] = a.y;
-  ikA[3][2] = a.z;
-  ikB = b_gr.asMatrix();
-  MMatrix leftkneePos = mid * root.inverse() * ikA;
-  ikB[3][0] = leftkneePos[3][0];
-  ikB[3][1] = leftkneePos[3][1];
-  ikB[3][2] = leftkneePos[3][2];
-}
-
-// http://theorangeduck.com/page/simple-two-joint
-void IKRigNode::twoBoneIk(const MVector& a, const MVector& b, const MVector& c, const MVector& d,
-                          const MVector& t, const MVector& pv, float twist, MQuaternion& a_gr,
-                          MQuaternion& b_gr) {
-  float eps = 0.001f;
-  float lab = (b - a).length();
-  float lcb = (b - c).length();
-  float lat = clamp((t - a).length(), eps, lab + lcb - eps);
-
-  // Get current interior angles of start and mid
-  float ac_ab_0 = acos(clamp((c - a).normal() * (b - a).normal(), -1.0f, 1.0f));
-  float ba_bc_0 = acos(clamp((a - b).normal() * (c - b).normal(), -1.0f, 1.0f));
-  float ac_at_0 = acos(clamp((c - a).normal() * (t - a).normal(), -1.0f, 1.0f));
-
-  // Get desired interior angles
-  float ac_ab_1 =
-      acos(clamp((lcb * lcb - lab * lab - lat * lat) / (-2.0f * lab * lat), -1.0f, 1.0f));
-  float ba_bc_1 =
-      acos(clamp((lat * lat - lab * lab - lcb * lcb) / (-2.0f * lab * lcb), -1.0f, 1.0f));
-  // MVector axis0 = ((c - a) ^ (b - a)).normal();
-  MVector axis0 = ((c - a) ^ d).normal();
-  MVector axis1 = ((c - a) ^ (t - a)).normal();
-
-  MQuaternion r0(ac_ab_1 - ac_ab_0, axis0);
-  MQuaternion r1(ba_bc_1 - ba_bc_0, axis0);
-  MQuaternion r2(ac_at_0, axis1);
-
-  // Pole vector rotation
-  // Determine the rotation used to rotate the normal of the triangle formed by
-  // a.b.c post r0*r2 rotation to the normal of the triangle formed by triangle a.pv.t
-  MVector n1 = ((c - a) ^ (b - a)).normal().rotateBy(r0).rotateBy(r2);
-  MVector n2 = ((t - a) ^ (pv - a)).normal();
-  MQuaternion r3 = n1.rotateTo(n2);
-  MVector twistAxis;
-  double theta;
-  r3.getAxisAngle(twistAxis, theta);
-  r3 *= MQuaternion(twist * 0.0174533, twistAxis);
-
-  a_gr *= r0 * r2 * r3;
-  b_gr *= r1;
-  // Since we are calculating in world space, apply the start rotations to the mid
-  b_gr *= r0 * r2 * r3;
 }
