@@ -11,6 +11,8 @@
 #include <maya/MQuaternion.h>
 #include <maya/MTransformationMatrix.h>
 
+#include <array>
+
 #include "common.h"
 
 MTypeId IKRigNode::id(0x0011581B);
@@ -19,6 +21,7 @@ MObject IKRigNode::aOutRotate;
 MObject IKRigNode::aOutRotateX;
 MObject IKRigNode::aOutRotateY;
 MObject IKRigNode::aOutRotateZ;
+MObject IKRigNode::aOutRootMotion;
 MObject IKRigNode::aInMatrix;
 MObject IKRigNode::aInBindPreMatrix;
 MObject IKRigNode::aTargetRestMatrix;
@@ -61,6 +64,11 @@ MStatus IKRigNode::initialize() {
   nAttr.setStorable(false);
   addAttribute(aOutRotate);
 
+  aOutRootMotion = mAttr.create("rootMotion", "rootMotion");
+  mAttr.setWritable(false);
+  mAttr.setStorable(false);
+  addAttribute(aOutRootMotion);
+
   aLeftLegTwistOffset =
       nAttr.create("leftLegTwistOffset", "leftLegTwistOffset", MFnNumericData::kFloat, 0.0);
   nAttr.setKeyable(true);
@@ -86,6 +94,7 @@ void IKRigNode::affects(const MObject& attribute) {
   attributeAffects(attribute, aOutRotateX);
   attributeAffects(attribute, aOutRotateY);
   attributeAffects(attribute, aOutRotateZ);
+  attributeAffects(attribute, aOutRootMotion);
 }
 
 void* IKRigNode::creator() { return new IKRigNode(); }
@@ -95,6 +104,8 @@ IKRigNode::IKRigNode() {
   inputBindPreMatrix_.setLength(IKRig_Count);
   targetRestMatrix_.setLength(IKRig_Count);
   outputDelta_.setLength(IKRig_Count);
+  prevForward_.push(MVector::zAxis);
+  prevForward_.push(MVector::zAxis);
 }
 
 IKRigNode::~IKRigNode() {}
@@ -102,7 +113,7 @@ IKRigNode::~IKRigNode() {}
 MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   MStatus status;
 
-  if (plug != aOutTranslate && plug != aOutRotate) {
+  if (plug != aOutTranslate && plug != aOutRotate && plug != aOutRootMotion) {
     return MS::kUnknownParameter;
   }
 
@@ -129,6 +140,12 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
     outputDelta_[i] = inputBindPreMatrix_[i] * inputMatrix_[i];
   }
 
+  // Calculate Root Motion
+  rootMotion_ = calculateRootMotion();
+  MDataHandle hRootMotion = data.outputValue(aOutRootMotion);
+  hRootMotion.setMMatrix(rootMotion_);
+  hRootMotion.setClean();
+
   // Set outputs
   MArrayDataHandle hOutputTranslate = data.outputArrayValue(aOutTranslate);
   MArrayDataHandle hOutputRotate = data.outputArrayValue(aOutRotate);
@@ -136,9 +153,9 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   // Hips
   float hipScale = position(targetRestMatrix_[IKRig_Hips]).y /
                    position(inputBindPreMatrix_[IKRig_Hips].inverse()).y;
-  outputDelta_[IKRig_Hips][3][0] *= hipScale;
+  outputDelta_[IKRig_Hips][3][0];
   outputDelta_[IKRig_Hips][3][1] *= hipScale;
-  outputDelta_[IKRig_Hips][3][2] *= hipScale;
+  outputDelta_[IKRig_Hips][3][2];
   MMatrix hips = targetRestMatrix_[IKRig_Hips] * outputDelta_[IKRig_Hips];
   hips[3][0] = inputMatrix_[IKRig_Hips][3][0];
   hips[3][1] = inputMatrix_[IKRig_Hips][3][1] * hipScale;
@@ -162,6 +179,48 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   hOutputRotate.setAllClean();
 
   return MS::kSuccess;
+}
+
+MMatrix IKRigNode::calculateRootMotion() {
+  std::array<int, 4> rootInfluenceIndex = {IKRig_Hips, IKRig_Chest, IKRig_LeftUpLeg,
+                                           IKRig_RightUpLeg};
+  double weights[] = {0.5, 0.3, 0.1, 0.1};
+  MVector rootMotionTranslate;
+  int col = 0;
+  MVector forward;
+  for (const auto& i : rootInfluenceIndex) {
+    MQuaternion q = MTransformationMatrix(outputDelta_[i]).rotation();
+    forward += MVector::zAxis.rotateBy(q) * weights[col];
+
+    rootMotionTranslate +=
+        MTransformationMatrix(inputMatrix_[i]).translation(MSpace::kWorld) * weights[col];
+    ++col;
+  }
+  forward.y = 0.0;
+  forward.normalize();
+
+  // Average with previous two forward vectors
+  forward += prevForward_.front();
+  prevForward_.pop();
+  forward += prevForward_.front();
+  forward.normalize();
+  prevForward_.push(forward);
+
+  MVector x = forward ^ MVector::yAxis;
+  MMatrix m;
+  m[0][0] = x.x;
+  m[0][1] = x.y;
+  m[0][2] = x.z;
+  m[1][0] = 0.0;
+  m[1][1] = 1.0;
+  m[1][2] = 0.0;
+  m[2][0] = forward.x;
+  m[2][1] = forward.y;
+  m[2][2] = forward.z;
+  m[3][0] = rootMotionTranslate.x;
+  m[3][1] = 0.0;
+  m[3][2] = rootMotionTranslate.z;
+  return m;
 }
 
 MStatus IKRigNode::calculateLegIk(unsigned int upLegIdx, unsigned int loLegIdx,

@@ -8,6 +8,9 @@
 #include <maya/MPoint.h>
 #include <maya/MPxNode.h>
 #include <maya/MQuaternion.h>
+#include <maya/MVectorArray.h>
+
+#include <queue>
 
 class IKRigNode : public MPxNode {
  public:
@@ -47,6 +50,7 @@ class IKRigNode : public MPxNode {
   static MObject aOutRotateX;
   static MObject aOutRotateY;
   static MObject aOutRotateZ;
+  static MObject aOutRootMotion;
 
   // Input Skeleton
   static MObject aInMatrix;
@@ -58,6 +62,8 @@ class IKRigNode : public MPxNode {
  private:
   static void affects(const MObject& attribute);
 
+  MMatrix calculateRootMotion();
+
   MStatus calculateLegIk(unsigned int upLeg, unsigned int loLeg, unsigned int foot,
                          const MMatrix& hips, float twist, MArrayDataHandle& hOutputTranslate,
                          MArrayDataHandle& hOutputRotate);
@@ -65,11 +71,9 @@ class IKRigNode : public MPxNode {
   MVector position(const MMatrix& m) { return MVector(m[3][0], m[3][1], m[3][2]); }
 
   void calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
-                          const MMatrix& target, const MVector& pv, MMatrix& ikA,
-                          MMatrix& ikB);
+                          const MMatrix& target, const MVector& pv, MMatrix& ikA, MMatrix& ikB);
   void twoBoneIk(const MVector& a, const MVector& b, const MVector& c, const MVector& d,
-                 const MVector& t, const MVector& pv, MQuaternion& a_gr,
-                 MQuaternion& b_gr);
+                 const MVector& t, const MVector& pv, MQuaternion& a_gr, MQuaternion& b_gr);
   MStatus setOutput(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate,
                     unsigned int bodyPart, const MMatrix& matrix);
   float clamp(float inValue, float minValue, float maxValue) {
@@ -86,6 +90,8 @@ class IKRigNode : public MPxNode {
   MMatrixArray inputBindPreMatrix_;
   MMatrixArray targetRestMatrix_;
   MMatrixArray outputDelta_;
+  MMatrix rootMotion_;
+  std::queue<MVector> prevForward_;
 };
 
 #endif
