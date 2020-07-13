@@ -51,8 +51,10 @@ def create():
         locs.append(loc)
 
     for loc, joint in zip(locs, out_joints):
-        if joint in ["pelvis", "thigh_l", "calf_l", "foot_l", "thigh_r", "calf_r", "foot_r"]:
+        if joint not in ["neck_01", "head"]:
             cmds.parentConstraint(loc, joint)
+    loc = cmds.spaceLocator(name="rootMotion")[0]
+    cmds.connectAttr("{}.rootMotion".format(node), "{}.opm".format(loc))
     return node
 
 """

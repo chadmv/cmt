@@ -15,6 +15,8 @@ set(SOURCE_FILES
     "demBonesCmd.cpp"
     "rbfNode.h"
     "rbfNode.cpp"
+    "ikRigNode.h"
+    "ikRigNode.cpp"
 )
 
 SET(DEMBONES_SOURCE

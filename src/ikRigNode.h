@@ -58,6 +58,7 @@ class IKRigNode : public MPxNode {
   static MObject aTargetRestMatrix;
   static MObject aLeftLegTwistOffset;
   static MObject aRightLegTwistOffset;
+  static MObject aStrideScale;
 
  private:
   static void affects(const MObject& attribute);
@@ -66,6 +67,11 @@ class IKRigNode : public MPxNode {
 
   MStatus calculateLegIk(unsigned int upLeg, unsigned int loLeg, unsigned int foot,
                          const MMatrix& hips, float twist, MArrayDataHandle& hOutputTranslate,
+                         MArrayDataHandle& hOutputRotate);
+
+  MStatus calculateArmIk(unsigned int clavicleIdx, unsigned int upArm, unsigned int loArm,
+                         unsigned int hand, const MMatrix& chest, float twist,
+                         MArrayDataHandle& hOutputTranslate,
                          MArrayDataHandle& hOutputRotate);
 
   MVector position(const MMatrix& m) { return MVector(m[3][0], m[3][1], m[3][2]); }
@@ -91,6 +97,9 @@ class IKRigNode : public MPxNode {
   MMatrixArray targetRestMatrix_;
   MMatrixArray outputDelta_;
   MMatrix rootMotion_;
+  double hipScale_;
+  double spineScale_;
+  double strideScale_;
   std::queue<MVector> prevForward_;
 };
 
