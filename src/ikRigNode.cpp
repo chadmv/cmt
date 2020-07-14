@@ -285,14 +285,19 @@ MStatus IKRigNode::calculateLegIk(unsigned int upLegIdx, unsigned int loLegIdx,
   // Account for differences in ankle height to help with ground contact
   float ankleHeightDelta =
       position(targetRestMatrix_[footIdx]).y - position(inputBindPreMatrix_[footIdx].inverse()).y;
+  MMatrix footRest = inputBindPreMatrix_[footIdx].inverse();
+  MMatrix flatFootBindMatrix;
+  flatFootBindMatrix[3][0] = footRest[3][0];
+  flatFootBindMatrix[3][2] = footRest[3][2];
+
   MMatrix footTarget;
   footTarget[3][1] = ankleHeightDelta;
   footTarget = inputBindPreMatrix_[footIdx].inverse() * footTarget * outputDelta_[footIdx];
-  footTarget *= rootMotion_.inverse();
-  footTarget[3][0] *= hipScale_ * strideScale_;
+  footTarget *= rootMotion_.inverse() * flatFootBindMatrix;
+  footTarget[3][0] *= hipScale_ * strideScale_ * rootMotionScale_;
   footTarget[3][1] *= hipScale_;
-  footTarget[3][2] *= hipScale_ * strideScale_;
-  footTarget *= rootMotion_;
+  footTarget[3][2] *= hipScale_ * strideScale_ * rootMotionScale_;
+  footTarget *= flatFootBindMatrix.inverse() * rootMotion_;
 
   // Calculate leg ik
   MVector ia = position(inputBindPreMatrix_[upLegIdx].inverse());
