@@ -98,6 +98,8 @@ class IKRigNode : public MPxNode {
   MMatrixArray targetRestMatrix_;
   MMatrixArray outputDelta_;
   MMatrix rootMotion_;
+  MMatrix scaledRootMotion_;
+  MMatrix toScaledRootMotion_;
   double hipScale_;
   double spineScale_;
   double strideScale_;
