@@ -28,6 +28,7 @@ MObject IKRigNode::aTargetRestMatrix;
 MObject IKRigNode::aLeftLegTwistOffset;
 MObject IKRigNode::aRightLegTwistOffset;
 MObject IKRigNode::aStrideScale;
+MObject IKRigNode::aRootMotionScale;
 
 const MString IKRigNode::kName("ikRig");
 
@@ -88,6 +89,12 @@ MStatus IKRigNode::initialize() {
   addAttribute(aStrideScale);
   affects(aStrideScale);
 
+  aRootMotionScale = nAttr.create("rootMotionScale", "rootMotionScale", MFnNumericData::kFloat, 1.0);
+  nAttr.setKeyable(true);
+  nAttr.setMin(0.0);
+  addAttribute(aRootMotionScale);
+  affects(aRootMotionScale);
+
   MATRIX_INPUT(aInMatrix, "inMatrix");
   MATRIX_INPUT(aInBindPreMatrix, "inBindPreMatrix");
   MATRIX_INPUT(aTargetRestMatrix, "targetRestMatrix");
@@ -142,6 +149,9 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
     targetRestMatrix_[i] = hOutputBindPreMatrices.inputValue().asMatrix();
   }
 
+  rootMotionScale_ = data.inputValue(aRootMotionScale).asFloat();
+  strideScale_ = data.inputValue(aStrideScale).asFloat();
+
   // Calculate outputs
   for (unsigned int i = 0; i < IKRig_Count; ++i) {
     outputDelta_[i] = inputBindPreMatrix_[i] * inputMatrix_[i];
@@ -157,18 +167,12 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   MArrayDataHandle hOutputTranslate = data.outputArrayValue(aOutTranslate);
   MArrayDataHandle hOutputRotate = data.outputArrayValue(aOutRotate);
 
-  strideScale_ = data.inputValue(aStrideScale).asFloat();
 
   // Hips
   hipScale_ = position(targetRestMatrix_[IKRig_Hips]).y /
               position(inputBindPreMatrix_[IKRig_Hips].inverse()).y;
-  outputDelta_[IKRig_Hips][3][0];
   outputDelta_[IKRig_Hips][3][1] *= hipScale_;
-  outputDelta_[IKRig_Hips][3][2];
   MMatrix hips = targetRestMatrix_[IKRig_Hips] * outputDelta_[IKRig_Hips];
-  hips[3][0] = inputMatrix_[IKRig_Hips][3][0];
-  hips[3][1] = inputMatrix_[IKRig_Hips][3][1] * hipScale_;
-  hips[3][2] = inputMatrix_[IKRig_Hips][3][2];
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Hips, hips);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -186,24 +190,31 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
 
   // Chest
   float targetSpineLength =
-      (position(targetRestMatrix_[IKRig_Chest]) - position(targetRestMatrix_[IKRig_Hips])).length();
-  float inputSpineLength = (position(inputBindPreMatrix_[IKRig_Chest].inverse()) -
-                            position(inputBindPreMatrix_[IKRig_Hips].inverse()))
-                               .length();
+      position(targetRestMatrix_[IKRig_Chest]).y - position(targetRestMatrix_[IKRig_Hips]).y;
+  float inputSpineLength = position(inputBindPreMatrix_[IKRig_Chest].inverse()).y -
+                           position(inputBindPreMatrix_[IKRig_Hips].inverse()).y;
+  // Scale the local xform translation delta of the of the chest based on the spine length ratio
   spineScale_ = targetSpineLength / inputSpineLength;
-  MVector spineOffset =
-      (position(inputMatrix_[IKRig_Chest]) - position(inputMatrix_[IKRig_Hips])) * spineScale_;
+  MMatrix inputRestLocalChest =
+      inputBindPreMatrix_[IKRig_Chest].inverse() * inputBindPreMatrix_[IKRig_Hips];
+  MMatrix inputCurrentLocalChest = inputMatrix_[IKRig_Chest] * inputMatrix_[IKRig_Hips].inverse();
+  MMatrix localDelta = inputRestLocalChest.inverse() * inputCurrentLocalChest;
+  localDelta[3][0] *= spineScale_;
+  localDelta[3][1] *= spineScale_;
+  localDelta[3][2] *= spineScale_;
+  outputDelta_[IKRig_Chest] = inputBindPreMatrix_[IKRig_Chest] * inputRestLocalChest * localDelta *
+                              inputMatrix_[IKRig_Hips];
+ 
   MMatrix chest = targetRestMatrix_[IKRig_Chest] * outputDelta_[IKRig_Chest];
-  chest[3][0] = hips[3][0] + spineOffset.x;
-  chest[3][1] = hips[3][1] + spineOffset.y;
-  chest[3][2] = hips[3][2] + spineOffset.z;
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Chest, chest);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
-  // Clavicles
+  // Left arm
   status = calculateArmIk(IKRig_LeftClavicle, IKRig_LeftShoulder, IKRig_LeftElbow, IKRig_LeftHand,
                           chest, 0.0f, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
+
+  // Right arm
   status = calculateArmIk(IKRig_RightClavicle, IKRig_RightShoulder, IKRig_RightElbow,
                           IKRig_RightHand, chest, 0.0f, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);

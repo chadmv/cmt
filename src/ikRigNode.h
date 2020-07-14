@@ -59,6 +59,7 @@ class IKRigNode : public MPxNode {
   static MObject aLeftLegTwistOffset;
   static MObject aRightLegTwistOffset;
   static MObject aStrideScale;
+  static MObject aRootMotionScale;
 
  private:
   static void affects(const MObject& attribute);
@@ -100,6 +101,7 @@ class IKRigNode : public MPxNode {
   double hipScale_;
   double spineScale_;
   double strideScale_;
+  double rootMotionScale_;
   std::queue<MVector> prevForward_;
 };
 
