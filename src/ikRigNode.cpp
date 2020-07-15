@@ -223,6 +223,9 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
                           IKRig_RightHand, chest, 0.0f, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
+  status = calculateHeadIk(chest, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+
   hOutputTranslate.setAllClean();
   hOutputRotate.setAllClean();
 
@@ -478,6 +481,45 @@ MStatus IKRigNode::calculateArmIk(unsigned int clavicleIdx, unsigned int upArmId
   CHECK_MSTATUS_AND_RETURN_IT(status);
   status = setOutput(hOutputTranslate, hOutputRotate, handIdx, ikHand);
   CHECK_MSTATUS_AND_RETURN_IT(status);
+  return MS::kSuccess;
+}
+
+MStatus IKRigNode::calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutputTranslate,
+                                   MArrayDataHandle& hOutputRotate) {
+  MStatus status;
+  float targetNeckLength =
+      position(targetRestMatrix_[IKRig_Head]).y - position(targetRestMatrix_[IKRig_Neck]).y;
+  float inputNeckLength = position(inputBindPreMatrix_[IKRig_Head].inverse()).y -
+                          position(inputBindPreMatrix_[IKRig_Neck].inverse()).y;
+  // Scale the local xform translation delta of the of the chest based on the spine length ratio
+  neckScale_ = targetNeckLength / inputNeckLength;
+  MMatrix inputRestLocalHead =
+      inputBindPreMatrix_[IKRig_Head].inverse() * inputBindPreMatrix_[IKRig_Neck];
+  MMatrix inputCurrentLocalHead = inputMatrix_[IKRig_Head] * inputMatrix_[IKRig_Neck].inverse();
+  MMatrix localDelta = inputRestLocalHead.inverse() * inputCurrentLocalHead;
+  localDelta[3][0] *= neckScale_;
+  localDelta[3][1] *= neckScale_;
+  localDelta[3][2] *= neckScale_;
+  outputDelta_[IKRig_Head] =
+      inputBindPreMatrix_[IKRig_Head] * inputRestLocalHead * localDelta * inputMatrix_[IKRig_Neck];
+
+  MMatrix head = targetRestMatrix_[IKRig_Head] * outputDelta_[IKRig_Head];
+  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Head, head * toScaledRootMotion_);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+
+  // Neck rotation
+  MQuaternion neckOffset = MTransformationMatrix(targetRestMatrix_[IKRig_Neck]).rotation() *
+                           MTransformationMatrix(inputBindPreMatrix_[IKRig_Neck]).rotation();
+  MQuaternion neckRotation =
+      neckOffset * MTransformationMatrix(inputMatrix_[IKRig_Neck]).rotation();
+  MMatrix ikNeckPos =
+      targetRestMatrix_[IKRig_Neck] * targetRestMatrix_[IKRig_Chest].inverse() * chest;
+  MTransformationMatrix tIkNeck(ikNeckPos);
+  tIkNeck.setRotationQuaternion(neckRotation.x, neckRotation.y, neckRotation.z, neckRotation.w);
+  MMatrix ikNeck = tIkNeck.asMatrix();
+  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Neck, ikNeck * toScaledRootMotion_);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+
   return MS::kSuccess;
 }
 

@@ -72,7 +72,9 @@ class IKRigNode : public MPxNode {
 
   MStatus calculateArmIk(unsigned int clavicleIdx, unsigned int upArm, unsigned int loArm,
                          unsigned int hand, const MMatrix& chest, float twist,
-                         MArrayDataHandle& hOutputTranslate,
+                         MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
+
+  MStatus calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutputTranslate,
                          MArrayDataHandle& hOutputRotate);
 
   MVector position(const MMatrix& m) { return MVector(m[3][0], m[3][1], m[3][2]); }
@@ -102,6 +104,7 @@ class IKRigNode : public MPxNode {
   MMatrix toScaledRootMotion_;
   double hipScale_;
   double spineScale_;
+  double neckScale_;
   double strideScale_;
   double rootMotionScale_;
   std::queue<MVector> prevForward_;

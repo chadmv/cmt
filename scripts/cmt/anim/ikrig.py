@@ -51,8 +51,7 @@ def create():
         locs.append(loc)
 
     for loc, joint in zip(locs, out_joints):
-        if joint not in ["neck_01", "head"]:
-            cmds.parentConstraint(loc, joint)
+        cmds.parentConstraint(loc, joint)
     loc = cmds.spaceLocator(name="rootMotion")[0]
     cmds.connectAttr("{}.rootMotion".format(node), "{}.opm".format(loc))
     return node
