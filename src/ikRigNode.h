@@ -60,6 +60,7 @@ class IKRigNode : public MPxNode {
   static MObject aRightLegTwistOffset;
   static MObject aStrideScale;
   static MObject aRootMotionScale;
+  static MObject aCharacterScale;
 
  private:
   static void affects(const MObject& attribute);
@@ -70,14 +71,18 @@ class IKRigNode : public MPxNode {
                          const MMatrix& hips, float twist, MArrayDataHandle& hOutputTranslate,
                          MArrayDataHandle& hOutputRotate);
 
+  MStatus calculateChestIk(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
+
   MStatus calculateArmIk(unsigned int clavicleIdx, unsigned int upArm, unsigned int loArm,
                          unsigned int hand, const MMatrix& chest, float twist,
                          MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
 
   MStatus calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutputTranslate,
-                         MArrayDataHandle& hOutputRotate);
+                          MArrayDataHandle& hOutputRotate);
 
   MVector position(const MMatrix& m) { return MVector(m[3][0], m[3][1], m[3][2]); }
+
+  MMatrix offsetMatrix(const MMatrix& m, const MQuaternion& r, const MVector& t);
 
   void calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
                           const MMatrix& target, const MVector& pv, MMatrix& ikA, MMatrix& ikB);
@@ -98,15 +103,18 @@ class IKRigNode : public MPxNode {
   MMatrixArray inputMatrix_;
   MMatrixArray inputBindPreMatrix_;
   MMatrixArray targetRestMatrix_;
-  MMatrixArray outputDelta_;
+  std::vector<MQuaternion> rotationDelta_;
+  MVectorArray translationDelta_;
   MMatrix rootMotion_;
   MMatrix scaledRootMotion_;
   MMatrix toScaledRootMotion_;
+  MMatrix chest_;
   double hipScale_;
   double spineScale_;
   double neckScale_;
   double strideScale_;
   double rootMotionScale_;
+  double characterScale_;
   std::queue<MVector> prevForward_;
 };
 
