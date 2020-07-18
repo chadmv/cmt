@@ -61,6 +61,7 @@ class IKRigNode : public MPxNode {
   static MObject aStrideScale;
   static MObject aRootMotionScale;
   static MObject aCharacterScale;
+  static MObject aLeftHandOffset;
 
  private:
   static void affects(const MObject& attribute);
@@ -74,7 +75,7 @@ class IKRigNode : public MPxNode {
   MStatus calculateChestIk(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
 
   MStatus calculateArmIk(unsigned int clavicleIdx, unsigned int upArm, unsigned int loArm,
-                         unsigned int hand, const MMatrix& chest, float twist,
+                         unsigned int hand, const MMatrix& chest, float twist, const MMatrix& offset,
                          MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
 
   MStatus calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutputTranslate,
@@ -113,6 +114,7 @@ class IKRigNode : public MPxNode {
   MMatrix toScaledRootMotion_;
   MMatrix hips_;
   MMatrix chest_;
+  MMatrix leftHandOffset_;
   double hipScale_;
   double spineScale_;
   double neckScale_;
