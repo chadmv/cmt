@@ -184,7 +184,6 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
 
   // Calculate Root Motion
   rootMotion_ = calculateRootMotion();
-  std::cerr << "first rootMotion_ = " << rootMotion_ << std::endl;
   scaledRootMotion_ = rootMotion_;
   scaledRootMotion_[3][0] *= rootMotionScale_;
   scaledRootMotion_[3][2] *= rootMotionScale_;
