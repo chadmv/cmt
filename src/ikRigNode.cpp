@@ -323,11 +323,11 @@ MStatus IKRigNode::calculateLegIk(unsigned int upLegIdx, unsigned int loLegIdx,
   MVector footTranslationDelta = translationDelta_[footIdx];
   footTranslationDelta.y *= hipScale_;
   footTarget = offsetMatrix(footTarget, rotationDelta_[footIdx], footTranslationDelta);
-  footTarget *= rootMotion_.inverse() * flatFootBindMatrix;
+  footTarget *= rootMotion_.inverse() * flatFootBindMatrix.inverse();
   // Scale foot position relative to resting stance
   footTarget[3][0] *= strideScale_;
   footTarget[3][2] *= strideScale_;
-  footTarget *= flatFootBindMatrix.inverse() * rootMotion_;
+  footTarget *= flatFootBindMatrix * rootMotion_;
 
   // Calculate leg ik
   MVector ia = position(inputBindPreMatrix_[upLegIdx].inverse());
@@ -379,37 +379,27 @@ MMatrix IKRigNode::offsetMatrix(const MMatrix& m, const MQuaternion& r, const MV
     in root motion space
 */
 MMatrix IKRigNode::scaleRelativeTo(unsigned int inputChildIdx, unsigned int inputParentIdx,
-                                   double scale, const MVector& targetParentPosition) {
-  // Put child xform in the space of root motion at the parent position
-  MMatrix rootMotionFromParent = rootMotion_;
-  rootMotionFromParent[3][0] = inputMatrix_[inputParentIdx][3][0];
-  rootMotionFromParent[3][1] = inputMatrix_[inputParentIdx][3][1];
-  rootMotionFromParent[3][2] = inputMatrix_[inputParentIdx][3][2];
-  MMatrix currentChild = inputMatrix_[inputChildIdx] * rootMotionFromParent.inverse();
+                                   double scale, const MMatrix& targetParent) {
+  MMatrix restChild = inputBindPreMatrix_[inputChildIdx].inverse() *
+                      inputBindPreMatrix_[inputParentIdx] * inputMatrix_[inputParentIdx];
 
-  // Put rest parent xform in the space of rest root motion at the parent position
-  MMatrix rootMotionFromParentRest;
-  MMatrix restParent = inputBindPreMatrix_[inputParentIdx].inverse();
-  MVector restInputParent = position(restParent);
-  rootMotionFromParentRest[3][0] = restInputParent.x;
-  rootMotionFromParentRest[3][1] = restInputParent.y;
-  rootMotionFromParentRest[3][2] = restInputParent.z;
-  MMatrix restChild =
-      inputBindPreMatrix_[inputChildIdx].inverse() * rootMotionFromParentRest.inverse();
+  MTransformationMatrix tMatRest(restChild);
+  MQuaternion rRest = tMatRest.rotation();
+  MVector tRest = tMatRest.translation(MSpace::kWorld);
 
-  MVector restChildPosition = position(restChild);
-  MVector scaledChildPosition =
-      restChildPosition + (position(currentChild) - restChildPosition) * scale;
+  MTransformationMatrix tMatCurrent(inputMatrix_[inputChildIdx]);
+  MQuaternion rCurrent = tMatCurrent.rotation();
+  MVector tCurrent = tMatCurrent.translation(MSpace::kWorld);
 
-  currentChild[3][0] = scaledChildPosition.x;
-  currentChild[3][1] = scaledChildPosition.y;
-  currentChild[3][2] = scaledChildPosition.z;
+  MQuaternion rotationDelta = rRest.inverse() * rCurrent;
+  MVector translationDelta = tCurrent - tRest;
+  translationDelta *= scale;
 
-  /*rootMotionFromParent[3][0] = targetParentPosition.x;
-  rootMotionFromParent[3][1] = targetParentPosition.y;
-  rootMotionFromParent[3][2] = targetParentPosition.z;*/
-  currentChild *= rootMotionFromParent;
-  return currentChild;
+  MMatrix restTarget =
+      targetRestMatrix_[inputChildIdx] * targetRestMatrix_[inputParentIdx].inverse() * targetParent;
+  restTarget = offsetMatrix(restTarget, rotationDelta, translationDelta);
+
+  return restTarget;
 }
 
 void IKRigNode::calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
@@ -485,11 +475,7 @@ MStatus IKRigNode::calculateChestIk(MArrayDataHandle& hOutputTranslate,
                            position(inputBindPreMatrix_[IKRig_Hips].inverse()).y;
   // Scale the local xform translation delta of the of the chest based on the spine length ratio
   spineScale_ = targetSpineLength / inputSpineLength;
-  MVector hips = position(hips_);
-  MMatrix chest = scaleRelativeTo(IKRig_Chest, IKRig_Hips, spineScale_, hips);
-  MVector chestDelta = position(chest) - position(inputBindPreMatrix_[IKRig_Chest].inverse());
-
-  chest_ = offsetMatrix(targetRestMatrix_[IKRig_Chest], rotationDelta_[IKRig_Chest], chestDelta);
+  chest_ = scaleRelativeTo(IKRig_Chest, IKRig_Hips, spineScale_, hips_);
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Chest, chest_ * toScaledRootMotion_);
   CHECK_MSTATUS_AND_RETURN_IT(status);
   return MS::kSuccess;
@@ -532,18 +518,7 @@ MStatus IKRigNode::calculateArmIk(unsigned int clavicleIdx, unsigned int upArmId
 
   float armScale = targetArmLength / inArmLength;
   MVector upArmPosition = position(upArm);
-  std::cerr << "hand" << std::endl;
-  MMatrix handTarget = scaleRelativeTo(handIdx, upArmIdx, armScale, upArmPosition);
-  MVector handTargetDelta = position(handTarget) - position(inputBindPreMatrix_[handIdx].inverse());
-  std::cerr << "hand delta = " << handTargetDelta << std::endl;
-  handTarget = offsetMatrix(targetRestMatrix_[handIdx], rotationDelta_[handIdx], handTargetDelta);
-
-  /*handTarget *= rootMotion_.inverse();
-  MTransformationMatrix tOffset(offset);
-  MQuaternion offsetRotation = tOffset.rotation();
-  MVector offsetTranslation = tOffset.translation(MSpace::kTransform);
-  handTarget = offsetMatrix(handTarget, offsetRotation, offsetTranslation);
-  handTarget *= rootMotion_;*/
+  MMatrix handTarget = scaleRelativeTo(handIdx, clavicleIdx, armScale, clavicle);
 
   // Calculate arm ik
   MVector ia = position(inputBindPreMatrix_[upArmIdx].inverse());
@@ -609,12 +584,7 @@ MStatus IKRigNode::calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutp
                           position(inputBindPreMatrix_[IKRig_Neck].inverse()).y;
   // Scale the local xform translation delta of the of the chest based on the spine length ratio
   neckScale_ = targetNeckLength / inputNeckLength;
-  MVector neckPosition = position(neck);
-  MMatrix head = scaleRelativeTo(IKRig_Head, IKRig_Neck, neckScale_, neckPosition);
-
-  MVector headDelta = position(head) - position(inputBindPreMatrix_[IKRig_Head].inverse());
-
-  head = offsetMatrix(targetRestMatrix_[IKRig_Head], rotationDelta_[IKRig_Head], headDelta);
+  MMatrix head = scaleRelativeTo(IKRig_Head, IKRig_Neck, neckScale_, neck);
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Head, head * toScaledRootMotion_);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 

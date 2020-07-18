@@ -23,7 +23,9 @@ class Parts(object):
     right_foot = 17
 
 
-def create():
+def create(prefix=None):
+    if prefix is None:
+        prefix = ""
     node = cmds.createNode("ikRig")
     joints = ['Hips', 'Spine3', 'Neck', 'Head', 'Clavicle_L', 'UpperArm_L', 'Forearm_L', 'Hand_L', 'Thigh_L',
               'Knee_L', 'Foot_L', 'Clavicle_R', 'UpperArm_R', 'Forearm_R', 'Hand_R', 'Thigh_R', 'Knee_R', 'Foot_R']
@@ -31,6 +33,7 @@ def create():
     out_joints = ['pelvis', 'spine_03', 'neck_01', 'head', 'clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l',
                   'thigh_l', 'calf_l', 'foot_l', 'clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r', 'thigh_r',
                   'calf_r', 'foot_r']
+    out_joints = ["{}{}".format(prefix, j) for j in out_joints]
 
     locs = []
     for i, j in enumerate(joints):
@@ -43,7 +46,7 @@ def create():
         matrix = list(path.inclusiveMatrix())
         cmds.setAttr("{}.targetRestMatrix[{}]".format(node, i), *matrix, type="matrix")
 
-        loc = cmds.spaceLocator(name="ikrig_{}".format(j))[0]
+        loc = cmds.spaceLocator(name="ikrig_{}".format(out_joints[i]))[0]
         cmds.connectAttr("{}.outputTranslate[{}]".format(node, i), "{}.t".format(loc))
         cmds.connectAttr("{}.outputRotate[{}]".format(node, i), "{}.r".format(loc))
 

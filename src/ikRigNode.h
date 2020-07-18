@@ -86,7 +86,7 @@ class IKRigNode : public MPxNode {
   MMatrix offsetMatrix(const MMatrix& m, const MQuaternion& r, const MVector& t);
 
   MMatrix scaleRelativeTo(unsigned int inputChildIdx, unsigned int inputParentIdx, double scale,
-                          const MVector& targetParentPosition);
+                          const MMatrix& targetParent);
 
   void calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
                           const MMatrix& target, const MVector& pv, MMatrix& ikA, MMatrix& ikB);
