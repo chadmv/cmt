@@ -54,7 +54,7 @@ class IKRigNode : public MPxNode {
 
   // Input Skeleton
   static MObject aInMatrix;
-  static MObject aInBindPreMatrix;
+  static MObject aInRestMatrix;
   static MObject aTargetRestMatrix;
   static MObject aLeftLegTwistOffset;
   static MObject aRightLegTwistOffset;
@@ -105,7 +105,7 @@ class IKRigNode : public MPxNode {
   }
 
   MMatrixArray inputMatrix_;
-  MMatrixArray inputBindPreMatrix_;
+  MMatrixArray inputRestMatrix_;
   MMatrixArray targetRestMatrix_;
   std::vector<MQuaternion> rotationDelta_;
   MVectorArray translationDelta_;

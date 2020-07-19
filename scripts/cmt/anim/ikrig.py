@@ -39,8 +39,8 @@ def create(prefix=None):
     for i, j in enumerate(joints):
         cmds.connectAttr("{}.worldMatrix[0]".format(j), "{}.inMatrix[{}]".format(node, i))
         path = shortcuts.get_dag_path2(j)
-        pre_matrix = list(path.inclusiveMatrixInverse())
-        cmds.setAttr("{}.inBindPreMatrix[{}]".format(node, i), *pre_matrix, type="matrix")
+        rest_matrix = list(path.inclusiveMatrix())
+        cmds.setAttr("{}.inRestMatrix[{}]".format(node, i), *rest_matrix, type="matrix")
 
         path = shortcuts.get_dag_path2(out_joints[i])
         matrix = list(path.inclusiveMatrix())
