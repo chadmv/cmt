@@ -62,6 +62,7 @@ class IKRigNode : public MPxNode {
   static MObject aRootMotionScale;
   static MObject aCharacterScale;
   static MObject aLeftHandOffset;
+  static MObject aHipSpace;
 
  private:
   static void affects(const MObject& attribute);
@@ -75,8 +76,9 @@ class IKRigNode : public MPxNode {
   MStatus calculateChestIk(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
 
   MStatus calculateArmIk(unsigned int clavicleIdx, unsigned int upArm, unsigned int loArm,
-                         unsigned int hand, const MMatrix& chest, float twist, const MMatrix& offset,
-                         MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
+                         unsigned int hand, const MMatrix& chest, float twist,
+                         const MMatrix& offset, MArrayDataHandle& hOutputTranslate,
+                         MArrayDataHandle& hOutputRotate);
 
   MStatus calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutputTranslate,
                           MArrayDataHandle& hOutputRotate);
@@ -103,6 +105,9 @@ class IKRigNode : public MPxNode {
     }
     return inValue;
   }
+
+  template <class T>
+  T lerp(const T& a, const T& b, double t) { return (b * t) + a * (1.0 - t); }
 
   MMatrixArray inputMatrix_;
   MMatrixArray inputRestMatrix_;

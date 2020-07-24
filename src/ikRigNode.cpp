@@ -31,6 +31,7 @@ MObject IKRigNode::aStrideScale;
 MObject IKRigNode::aRootMotionScale;
 MObject IKRigNode::aCharacterScale;
 MObject IKRigNode::aLeftHandOffset;
+MObject IKRigNode::aHipSpace;
 
 const MString IKRigNode::kName("ikRig");
 
@@ -108,6 +109,13 @@ MStatus IKRigNode::initialize() {
   addAttribute(aLeftHandOffset);
   affects(aLeftHandOffset);
 
+  aHipSpace = nAttr.create("hipSpace", "hipSpace", MFnNumericData::kFloat, 0.0);
+  nAttr.setKeyable(true);
+  nAttr.setMin(0.0);
+  nAttr.setMax(1.0);
+  addAttribute(aHipSpace);
+  affects(aHipSpace);
+
   MATRIX_INPUT(aInMatrix, "inMatrix");
   MATRIX_INPUT(aInRestMatrix, "inRestMatrix");
   MATRIX_INPUT(aTargetRestMatrix, "targetRestMatrix");
@@ -167,6 +175,7 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   strideScale_ = data.inputValue(aStrideScale).asFloat();
   characterScale_ = data.inputValue(aCharacterScale).asFloat();
   leftHandOffset_ = data.inputValue(aLeftHandOffset).asMatrix();
+  float hipSpace = data.inputValue(aHipSpace).asFloat();
 
   // Calculate outputs
   for (unsigned int i = 0; i < IKRig_Count; ++i) {
@@ -198,6 +207,7 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
 
   // Hips
   hipScale_ = position(targetRestMatrix_[IKRig_Hips]).y / position(inputRestMatrix_[IKRig_Hips]).y;
+  hipScale_ = lerp(hipScale_, 1.0, hipSpace);
   hips_ = inputMatrix_[IKRig_Hips] * rootMotion_.inverse();
   MVector restInputHips = position(inputRestMatrix_[IKRig_Hips]);
   MVector scaledHipPosition = restInputHips + (position(hips_) - restInputHips) * hipScale_;
@@ -205,7 +215,9 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   hips_[3][1] = scaledHipPosition.y;
   hips_[3][2] = scaledHipPosition.z;
   hips_ *= rootMotion_;
-  MVector hipDelta = position(hips_) - restInputHips;
+  MVector hipDeltaCharacter = position(hips_) - restInputHips;
+  MVector hipDeltaWorld = position(hips_) - position(targetRestMatrix_[IKRig_Hips]);
+  MVector hipDelta = lerp(hipDeltaCharacter, hipDeltaWorld, hipSpace);
   hips_ = offsetMatrix(targetRestMatrix_[IKRig_Hips], rotationDelta_[IKRig_Hips], hipDelta);
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Hips, hips_ * toScaledRootMotion_);
   CHECK_MSTATUS_AND_RETURN_IT(status);
