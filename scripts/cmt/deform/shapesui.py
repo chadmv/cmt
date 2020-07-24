@@ -14,7 +14,8 @@ from PySide2.QtWidgets import *
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 import maya.cmds as cmds
 
-from cmt.ui.widgets.filepathwidget import FilePathWidget, StringCache
+from cmt.ui.widgets.filepathwidget import FilePathWidget
+from cmt.ui.stringcache import StringCache
 import cmt.deform.blendshape as bs
 import cmt.deform.np_mesh as np_mesh
 

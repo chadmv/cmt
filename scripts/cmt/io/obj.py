@@ -1,5 +1,7 @@
 import os
 import maya.cmds as cmds
+import logging
+logger = logging.getLogger(__name__)
 
 
 def import_obj(file_path):
@@ -31,3 +33,4 @@ def export_obj(mesh, file_path):
         typ="OBJexport",
         es=True,
     )
+    logger.info("Exported {}".format(file_path))
