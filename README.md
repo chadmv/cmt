@@ -7,15 +7,22 @@ the tools in your own projects or just browse the code for inspiration or to sil
 
 Full documentation can be found here: https://chadmv.github.io/cmt
 
-# Plug-in Dependencies
+# Installing the Maya Module
+
+## Download Pre-built Release
+Built plug-ins are provided via my [Releases](https://github.com/chadmv/cmt/releases)
+
+## Compile Your Own
+
+### Plug-in Compilation Dependencies
 * [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)
 
-# Plug-in Compilation Instructions
+### Plug-in Compilation Instructions
 Download [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page) and extract into `third-party/Eigen`.
 
 The project is setup to use CMake to generate build files.
 
-### Windows
+#### Windows
 The build.bat included will build for 2018, 2019 and 2020. Or:
 
 ```
@@ -26,8 +33,8 @@ cmake --build . --target install --config Release
 ```
 
 # Installation Instructions
-cmt is Maya module that can be installed like all other Maya modules.  You can do one of the following:
+cmt is a Maya module that can be installed like all other [Maya modules](http://help.autodesk.com/view/MAYAUL/2020/ENU//?guid=Maya_SDK_MERGED_Distributing_Maya_Plug_ins_Distributing_Multi_File_Modules_html).  You can do one of the following:
 
 * Add the cmt root directory to the MAYA_MODULE_PATH environment variable.
-* Add the cmt root directory to the MAYA_MODULE_PATH in your Maya.env.  e.g.  MAYA_MODULE_PATH += /path/to/cmt
+* Add the cmt root directory to the MAYA_MODULE_PATH in your Maya.env.  e.g.  MAYA_MODULE_PATH=/path/to/cmt
 * Edit the cmt.mod file, and replace the ./ with the full path to the cmt root directory, then copy the cmt.mod file to where your modules are loaded from.
