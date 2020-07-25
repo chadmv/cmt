@@ -1,20 +1,17 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Curve Control Creator &#8212; cmt  documentation</title>
     <link rel="stylesheet" href="../_static/bootstrap-sphinx.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-    <script type="text/javascript" src="../_static/jquery.js"></script>
-    <script type="text/javascript" src="../_static/underscore.js"></script>
-    <script type="text/javascript" src="../_static/doctools.js"></script>
-    <script type="text/javascript" src="../_static/js/jquery-1.11.0.min.js"></script>
-    <script type="text/javascript" src="../_static/js/jquery-fix.js"></script>
-    <script type="text/javascript" src="../_static/bootstrap-3.3.7/js/bootstrap.min.js"></script>
-    <script type="text/javascript" src="../_static/bootstrap-sphinx.js"></script>
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Dependency Graph Expressions" href="../dge.html" />
@@ -23,6 +20,10 @@
 <meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
 <meta name="apple-mobile-web-app-capable" content="yes">
+<script type="text/javascript" src="../_static/js/jquery-1.11.0.min.js "></script>
+<script type="text/javascript" src="../_static/js/jquery-fix.js "></script>
+<script type="text/javascript" src="../_static/bootstrap-3.3.7/js/bootstrap.min.js "></script>
+<script type="text/javascript" src="../_static/bootstrap-sphinx.js "></script>
 
   </head><body>
 
@@ -56,6 +57,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Instructions</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../rigging.html">Rigging Tools</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../dge.html">Dependency Graph Expressions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../customwidgets.html">Custom Widgets</a></li>
 </ul>
 </ul>
 </li>
@@ -121,7 +123,7 @@
 
 <div class="container">
   <div class="row">
-    <div class="col-md-12 content">
+    <div class="body col-md-12 content" role="main">
       
   <div class="section" id="module-cmt.rig.control">
 <span id="curve-control-creator"></span><h1>Curve Control Creator<a class="headerlink" href="#module-cmt.rig.control" title="Permalink to this headline">¶</a></h1>
@@ -174,253 +176,207 @@ in an automated build.</p>
 <span class="n">control</span><span class="o">.</span><span class="n">mirror_curve</span><span class="p">(</span><span class="n">new_node</span><span class="p">,</span> <span class="n">mirrored</span><span class="p">)</span>
 </pre></div>
 </div>
-<dl class="function">
+<dl class="py class">
+<dt id="cmt.rig.control.CurveShape">
+<em class="property">class </em><code class="sig-prename descclassname">cmt.rig.control.</code><code class="sig-name descname">CurveShape</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">transform</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">cvs</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">degree</span><span class="o">=</span><span class="default_value">3</span></em>, <em class="sig-param"><span class="n">form</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">knots</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">color</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents the data required to build a nurbs curve shape</p>
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.create">
+<code class="sig-name descname">create</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">transform</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">as_controller</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.create" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a curve.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>transform</strong> – Name of the transform to create the curve shape under.
+If the transform does not exist, it will be created.</p></li>
+<li><p><strong>as_controller</strong> – True to mark the curve transform as a controller.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The transform of the new curve shapes.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.rotate_by">
+<code class="sig-name descname">rotate_by</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">z</span></em>, <em class="sig-param"><span class="n">local</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.rotate_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.rotate_by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rotate the curve cvs by the given euler rotation values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Rotate X</p></li>
+<li><p><strong>y</strong> – Rotate Y</p></li>
+<li><p><strong>z</strong> – Rotate Z</p></li>
+<li><p><strong>local</strong> – True for local space, False for world</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.scale_by">
+<code class="sig-name descname">scale_by</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">z</span></em>, <em class="sig-param"><span class="n">local</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.scale_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.scale_by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Scale the curve cvs by the given amount.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Scale X</p></li>
+<li><p><strong>y</strong> – Scale Y</p></li>
+<li><p><strong>z</strong> – Scale Z</p></li>
+<li><p><strong>local</strong> – True for local space, False for world</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.set_rotation">
+<code class="sig-name descname">set_rotation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">z</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.set_rotation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.set_rotation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the absolute rotation of the curve shape in euler rotations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Rotate X</p></li>
+<li><p><strong>y</strong> – Rotate Y</p></li>
+<li><p><strong>z</strong> – Rotate Z</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.set_scale">
+<code class="sig-name descname">set_scale</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">z</span></em>, <em class="sig-param"><span class="n">local</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.set_scale"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.set_scale" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the absolute scale of the curve shape.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Scale X</p></li>
+<li><p><strong>y</strong> – Scale Y</p></li>
+<li><p><strong>z</strong> – Scale Z</p></li>
+<li><p><strong>local</strong> – True for local space, False for world</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.set_translation">
+<code class="sig-name descname">set_translation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">z</span></em>, <em class="sig-param"><span class="n">local</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.set_translation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.set_translation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the absolute translation of the curve shape.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Translate X</p></li>
+<li><p><strong>y</strong> – Translate Y</p></li>
+<li><p><strong>z</strong> – Translate Z</p></li>
+<li><p><strong>local</strong> – True for local space, False for world</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="cmt.rig.control.CurveShape.translate_by">
+<code class="sig-name descname">translate_by</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">z</span></em>, <em class="sig-param"><span class="n">local</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.translate_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.translate_by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate the curve cvs by the given values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – Translate X</p></li>
+<li><p><strong>y</strong> – Translate Y</p></li>
+<li><p><strong>z</strong> – Translate Z</p></li>
+<li><p><strong>local</strong> – True for local space, False for world</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
 <dt id="cmt.rig.control.export_curves">
-<code class="descclassname">cmt.rig.control.</code><code class="descname">export_curves</code><span class="sig-paren">(</span><em>controls=None</em>, <em>file_path=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#export_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.export_curves" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cmt.rig.control.</code><code class="sig-name descname">export_curves</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">controls</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">file_path</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#export_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.export_curves" title="Permalink to this definition">¶</a></dt>
 <dd><p>Serializes the given curves into the control library.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>controls</strong> – Optional list of controls to export. If no controls are specified,
-the selected curves will be exported.</li>
-<li><strong>file_path</strong> – File path to export to</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>controls</strong> – Optional list of controls to export. If no controls are specified,
+the selected curves will be exported.</p></li>
+<li><p><strong>file_path</strong> – File path to export to</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The exported list of ControlShapes.</p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The exported list of ControlShapes.</p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="function">
-<dt id="cmt.rig.control.import_new_curves">
-<code class="descclassname">cmt.rig.control.</code><code class="descname">import_new_curves</code><span class="sig-paren">(</span><em>file_path=None</em>, <em>tag_as_controller=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#import_new_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.import_new_curves" title="Permalink to this definition">¶</a></dt>
-<dd><p>Imports control shapes from disk onto new transforms.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>file_path</strong> – Path to the control file.</li>
-<li><strong>tag_as_controller</strong> – True to tag the curve transform as a controller</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The new curve transforms</p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
+<dl class="py function">
 <dt id="cmt.rig.control.import_curves_on_selected">
-<code class="descclassname">cmt.rig.control.</code><code class="descname">import_curves_on_selected</code><span class="sig-paren">(</span><em>file_path=None</em>, <em>tag_as_controller=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#import_curves_on_selected"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.import_curves_on_selected" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cmt.rig.control.</code><code class="sig-name descname">import_curves_on_selected</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">file_path</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">tag_as_controller</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#import_curves_on_selected"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.import_curves_on_selected" title="Permalink to this definition">¶</a></dt>
 <dd><p>Imports a control shape from disk onto the selected transform.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>file_path</strong> – Path to the control file.</li>
-<li><strong>tag_as_controller</strong> – True to tag the curve transform as a controller</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_path</strong> – Path to the control file.</p></li>
+<li><p><strong>tag_as_controller</strong> – True to tag the curve transform as a controller</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The new curve transform</p>
-</td>
-</tr>
-</tbody>
-</table>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new curve transform</p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="function">
+<dl class="py function">
+<dt id="cmt.rig.control.import_new_curves">
+<code class="sig-prename descclassname">cmt.rig.control.</code><code class="sig-name descname">import_new_curves</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">file_path</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">tag_as_controller</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#import_new_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.import_new_curves" title="Permalink to this definition">¶</a></dt>
+<dd><p>Imports control shapes from disk onto new transforms.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file_path</strong> – Path to the control file.</p></li>
+<li><p><strong>tag_as_controller</strong> – True to tag the curve transform as a controller</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new curve transforms</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt id="cmt.rig.control.load_curves">
-<code class="descclassname">cmt.rig.control.</code><code class="descname">load_curves</code><span class="sig-paren">(</span><em>file_path=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#load_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.load_curves" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cmt.rig.control.</code><code class="sig-name descname">load_curves</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">file_path</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#load_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.load_curves" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load the CurveShape objects from disk.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>file_path</strong> – </td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>file_path</strong> – </p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
 </dd></dl>
 
-<dl class="function">
+<dl class="py function">
 <dt id="cmt.rig.control.mirror_curve">
-<code class="descclassname">cmt.rig.control.</code><code class="descname">mirror_curve</code><span class="sig-paren">(</span><em>source</em>, <em>destination</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#mirror_curve"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.mirror_curve" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cmt.rig.control.</code><code class="sig-name descname">mirror_curve</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">source</span></em>, <em class="sig-param"><span class="n">destination</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#mirror_curve"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.mirror_curve" title="Permalink to this definition">¶</a></dt>
 <dd><p>Mirrors the curve on source across the YZ plane to destination.</p>
 <p>The cvs will be mirrored in world space no matter the transform of destination.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>source</strong> – Source transform</li>
-<li><strong>destination</strong> – Destination transform</li>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source</strong> – Source transform</p></li>
+<li><p><strong>destination</strong> – Destination transform</p></li>
 </ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The mirrored CurveShape object</p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="class">
-<dt id="cmt.rig.control.CurveShape">
-<em class="property">class </em><code class="descclassname">cmt.rig.control.</code><code class="descname">CurveShape</code><span class="sig-paren">(</span><em>transform=None</em>, <em>cvs=None</em>, <em>degree=3</em>, <em>form=0</em>, <em>knots=None</em>, <em>color=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape" title="Permalink to this definition">¶</a></dt>
-<dd><p>Represents the data required to build a nurbs curve shape</p>
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.create">
-<code class="descname">create</code><span class="sig-paren">(</span><em>transform=None</em>, <em>as_controller=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.create" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create a curve.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>transform</strong> – Name of the transform to create the curve shape under.
-If the transform does not exist, it will be created.</li>
-<li><strong>as_controller</strong> – True to mark the curve transform as a controller.</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">The transform of the new curve shapes.</p>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.rotate_by">
-<code class="descname">rotate_by</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>local=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.rotate_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.rotate_by" title="Permalink to this definition">¶</a></dt>
-<dd><p>Rotate the curve cvs by the given euler rotation values</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>x</strong> – Rotate X</li>
-<li><strong>y</strong> – Rotate Y</li>
-<li><strong>z</strong> – Rotate Z</li>
-<li><strong>local</strong> – True for local space, False for world</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.scale_by">
-<code class="descname">scale_by</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>local=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.scale_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.scale_by" title="Permalink to this definition">¶</a></dt>
-<dd><p>Scale the curve cvs by the given amount.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>x</strong> – Scale X</li>
-<li><strong>y</strong> – Scale Y</li>
-<li><strong>z</strong> – Scale Z</li>
-<li><strong>local</strong> – True for local space, False for world</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.set_rotation">
-<code class="descname">set_rotation</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.set_rotation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.set_rotation" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the absolute rotation of the curve shape in euler rotations.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>x</strong> – Rotate X</li>
-<li><strong>y</strong> – Rotate Y</li>
-<li><strong>z</strong> – Rotate Z</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.set_scale">
-<code class="descname">set_scale</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>local=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.set_scale"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.set_scale" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the absolute scale of the curve shape.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>x</strong> – Scale X</li>
-<li><strong>y</strong> – Scale Y</li>
-<li><strong>z</strong> – Scale Z</li>
-<li><strong>local</strong> – True for local space, False for world</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.set_translation">
-<code class="descname">set_translation</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>local=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.set_translation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.set_translation" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the absolute translation of the curve shape.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>x</strong> – Translate X</li>
-<li><strong>y</strong> – Translate Y</li>
-<li><strong>z</strong> – Translate Z</li>
-<li><strong>local</strong> – True for local space, False for world</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="cmt.rig.control.CurveShape.translate_by">
-<code class="descname">translate_by</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>z</em>, <em>local=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/cmt/rig/control.html#CurveShape.translate_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cmt.rig.control.CurveShape.translate_by" title="Permalink to this definition">¶</a></dt>
-<dd><p>Translate the curve cvs by the given values</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>x</strong> – Translate X</li>
-<li><strong>y</strong> – Translate Y</li>
-<li><strong>z</strong> – Translate Z</li>
-<li><strong>local</strong> – True for local space, False for world</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The mirrored CurveShape object</p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -440,7 +396,7 @@ If the transform does not exist, it will be created.</li>
     </p>
     <p>
         &copy; Copyright 2018, Chad Vernon.<br/>
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.2.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 3.1.2.<br/>
     </p>
   </div>
 </footer>
