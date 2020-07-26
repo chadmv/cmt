@@ -88,19 +88,19 @@ MStatus RBFNode::initialize() {
   addAttribute(aInputRestQuats);
   affects(aInputRestQuats);
 
-  aInputValueCount = nAttr.create("inputValueCount", "inputValueCount", MFnNumericData::kLong);
+  aInputValueCount = nAttr.create("inputValueCount", "inputValueCount", MFnNumericData::kInt);
   addAttribute(aInputValueCount);
   affects(aInputValueCount);
 
-  aInputQuatCount = nAttr.create("inputQuatCount", "inputQuatCount", MFnNumericData::kLong);
+  aInputQuatCount = nAttr.create("inputQuatCount", "inputQuatCount", MFnNumericData::kInt);
   addAttribute(aInputQuatCount);
   affects(aInputQuatCount);
 
-  aOutputValueCount = nAttr.create("outputValueCount", "outputValueCount", MFnNumericData::kLong);
+  aOutputValueCount = nAttr.create("outputValueCount", "outputValueCount", MFnNumericData::kInt);
   addAttribute(aOutputValueCount);
   affects(aOutputValueCount);
 
-  aOutputQuatCount = nAttr.create("outputQuatCount", "outputQuatCount", MFnNumericData::kLong);
+  aOutputQuatCount = nAttr.create("outputQuatCount", "outputQuatCount", MFnNumericData::kInt);
   addAttribute(aOutputQuatCount);
   affects(aOutputQuatCount);
 
@@ -250,10 +250,10 @@ MStatus RBFNode::compute(const MPlug& plug, MDataBlock& data) {
 
   short rbf = data.inputValue(aRBFFunction).asShort();
   double radius = data.inputValue(aRadius).asDouble();
-  int inputCount = data.inputValue(aInputValueCount).asLong();
-  int inputQuatCount = data.inputValue(aInputQuatCount).asLong();
-  int outputCount = data.inputValue(aOutputValueCount).asLong();
-  int outputQuatCount = data.inputValue(aOutputQuatCount).asLong();
+  int inputCount = data.inputValue(aInputValueCount).asInt();
+  int inputQuatCount = data.inputValue(aInputQuatCount).asInt();
+  int outputCount = data.inputValue(aOutputValueCount).asInt();
+  int outputQuatCount = data.inputValue(aOutputQuatCount).asInt();
   short outputMode = data.inputValue(aSampleOutputMode).asShort();
 
   // Get the inputs

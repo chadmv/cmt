@@ -1,5 +1,4 @@
 #include "linearRegressionSolver.h"
-#include "common.h"
 
 #include <maya/MAngle.h>
 #include <maya/MEulerRotation.h>
@@ -11,6 +10,8 @@
 #include <maya/MFnNumericData.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MQuaternion.h>
+
+#include "common.h"
 
 LinearRegressionSolver::LinearRegressionSolver() {}
 
@@ -109,9 +110,9 @@ void LinearRegressionSolver::setFeatures(
     for (auto& rd : mQuat) {
       // Apply rbf with per-pose radius to quaternion inputs
       for (int i = 0; i < sampleCount; ++i) {
-        applyRbf(rd.block(0, i * 2, sampleCount, 2), rbf_, sampleRadius_[i] * radius_);
+        auto m = rd.block(0, i * 2, sampleCount, 2);
+        applyRbf(m, rbf_, sampleRadius_[i] * radius_);
       }
-      // std::cout << "rd after rbf = " << rd << std::endl;
 
       m.block(0, valueCols + rd.cols() * quatIndex, sampleCount, rd.cols()) = rd;
       ++quatIndex;
@@ -131,8 +132,8 @@ void LinearRegressionSolver::setFeatures(
 }
 
 VectorXd LinearRegressionSolver::solve(const VectorXd& inputValues,
-                                   const std::vector<MQuaternion>& inputQuats, VectorXd& outputs,
-                                   MatrixXd& outputQuats) {
+                                       const std::vector<MQuaternion>& inputQuats,
+                                       VectorXd& outputs, MatrixXd& outputQuats) {
   int sampleCount = featureMatrix_.rows() ? featureMatrix_.rows() : featureQuatMatrix_.size();
   if (sampleCount <= 1) {
     return VectorXd();
