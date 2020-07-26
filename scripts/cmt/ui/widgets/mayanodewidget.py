@@ -55,6 +55,7 @@ class MayaNodeWidget(QWidget):
         super(MayaNodeWidget, self).__init__(parent)
         self.cache = StringCache("cmt.mayanodewidget.{}".format(name), parent=self)
         self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self._layout)
 
         if label:

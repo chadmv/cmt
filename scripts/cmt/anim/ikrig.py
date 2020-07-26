@@ -19,7 +19,8 @@ import cmt.shortcuts as shortcuts
 
 from cmt.ui.widgets.mayanodewidget import MayaNodeWidget
 from cmt.ui.widgets.filepathwidget import FilePathWidget
-from cmt.io.fbx import import_fbx
+from cmt.ui.widgets.accordionwidget import AccordionWidget
+from cmt.io.fbx import import_fbx, export_animation_fbx
 
 logger = logging.getLogger(__name__)
 
@@ -122,12 +123,38 @@ class IKRigWindow(MayaQWidgetBaseMixin, QMainWindow):
         super(IKRigWindow, self).__init__(*args, **kwargs)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setWindowTitle("IK Rig")
-        self.resize(1000, 600)
+        self.resize(800, 1000)
 
-        widget = QWidget()
-        self.setCentralWidget(widget)
-        vbox = QVBoxLayout(widget)
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
 
+        vbox = QVBoxLayout(main_widget)
+
+        splitter = QSplitter(orientation=Qt.Vertical)
+        vbox.addWidget(splitter)
+
+        self.correspondence_widget = SkeletonCorrespondenceWidget(self)
+        splitter.addWidget(self.correspondence_widget)
+
+        self.export_options = ExportOptionsWidget(self)
+        self.fbx_browser = FBXFileBrowser(self.correspondence_widget, self.export_options, self)
+        bottom_splitter = QSplitter(orientation=Qt.Horizontal)
+        bottom_splitter.addWidget(self.fbx_browser)
+        self.accordion = AccordionWidget()
+        self.accordion.addItem("New File Name", self.export_options)
+        bottom_splitter.addWidget(self.accordion)
+        bottom_splitter.setStretchFactor(2, 1)
+        splitter.addWidget(bottom_splitter)
+
+        splitter.setStretchFactor(1, 3)
+        # accordion.addItem("Retarget Animations", self.fbx_browser)
+
+
+class SkeletonCorrespondenceWidget(QWidget):
+    def __init__(self, parent=None):
+        super(SkeletonCorrespondenceWidget, self).__init__(parent)
+        header_font_size = 16.0
+        vbox = QVBoxLayout(self)
         scroll = QScrollArea()
         vbox.addWidget(scroll)
 
@@ -138,7 +165,7 @@ class IKRigWindow(MayaQWidgetBaseMixin, QMainWindow):
         layout = QVBoxLayout(source_widget)
         label = QLabel("Source")
         font = label.font()
-        font.setPointSize(18.0)
+        font.setPointSize(header_font_size)
         label.setFont(font)
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
@@ -164,9 +191,6 @@ class IKRigWindow(MayaQWidgetBaseMixin, QMainWindow):
         retarget_button.released.connect(self.attach_skeletons)
         vbox.addWidget(retarget_button)
 
-        self.fbx_browser = FBXFileBrowser(self)
-        vbox.addWidget(self.fbx_browser)
-
     def attach_skeletons(self):
         source_joints = self.source.joints()
         target_joints = self.target.joints()
@@ -182,6 +206,7 @@ class SkeletonDefinitionWidget(QWidget):
         """
         super(SkeletonDefinitionWidget, self).__init__(parent)
         layout = QFormLayout(self)
+        layout.setSpacing(500)
         for part in Parts():
             setattr(
                 self, part, MayaNodeWidget(name="{}.{}".format(name, part), parent=self)
@@ -195,14 +220,52 @@ class SkeletonDefinitionWidget(QWidget):
         return [getattr(self, part).node for part in Parts()]
 
 
-class FBXFileBrowser(QWidget):
+class ExportOptionsWidget(QWidget):
     def __init__(self, parent=None):
+        super(ExportOptionsWidget, self).__init__(parent)
+        layout = QFormLayout(self)
+        self.prefix = QLineEdit()
+        layout.addRow("Prefix:", self.prefix)
+        self.suffix = QLineEdit()
+        layout.addRow("Suffix:", self.suffix)
+        self.search = QLineEdit()
+        layout.addRow("Search:", self.search)
+        self.replace = QLineEdit()
+        layout.addRow("Replace:", self.replace)
+        self.export_directory = FilePathWidget(
+            file_mode=FilePathWidget.directory, name="ikrig.export", parent=self
+        )
+        layout.addRow("Export Directory:", self.export_directory)
+
+    def get_export_path(self, path):
+        """Get the generated export path given an input path.
+
+        :param path: Input path
+        :return: Export path
+        """
+        name = os.path.basename(path)
+        prefix = self.prefix.text().strip()
+        suffix = self.suffix.text().strip()
+        search = self.search.text().strip()
+        replace = self.replace.text().strip()
+        if search:
+            name = name.replace(search, replace)
+        name = "{}{}{}".format(prefix, name, suffix)
+        path = os.path.realpath(os.path.join(self.export_directory.path, name))
+        return path
+
+
+class FBXFileBrowser(QWidget):
+    def __init__(self, correspondence_widget, export_options_widget, parent=None):
         """Constructor
 
         :param parent: Parent QWidget.
         """
         super(FBXFileBrowser, self).__init__(parent)
         self.create_actions()
+
+        self.correspondence_widget = correspondence_widget
+        self.export_options = export_options_widget
 
         layout = QVBoxLayout(self)
         self.file_model = QFileSystemModel(self)
@@ -229,21 +292,15 @@ class FBXFileBrowser(QWidget):
         )
         self.file_tree_view.doubleClicked.connect(self.on_file_tree_double_clicked)
         self.file_tree_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.file_tree_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.file_tree_view)
         self.set_root_path(self.root_path.path)
 
     def create_actions(self):
-        return
-        self.propagate_neutral_action = QAction(
-            "Propagate Neutral Update",
-            toolTip="Propagate updates to a neutral mesh to the selected targets.",
-            triggered=self.propagate_neutral_update,
-        )
-
-        self.export_selected_action = QAction(
-            "Export Selected Meshes",
-            toolTip="Export the selected meshes to the selected directory",
-            triggered=self.export_selected,
+        self.retarget_selected_action = QAction(
+            "Retarget Selected",
+            toolTip="Retarget and export the selected files.",
+            triggered=self.retarget_selected,
         )
 
     def create_menu(self):
@@ -276,7 +333,7 @@ class FBXFileBrowser(QWidget):
         sel = cmds.ls(sl=True)
 
         menu = QMenu()
-        # menu.addAction(QAction("Import selected", self, triggered=self.import_selected_objs))
+        menu.addAction(self.retarget_selected_action)
         # menu.addAction(QAction("Retarget selected", self, triggered=self.import_selected_objs))
         menu.exec_(self.file_tree_view.mapToGlobal(pos))
 
@@ -291,7 +348,7 @@ class FBXFileBrowser(QWidget):
         ]
         return paths
 
-    def import_selected_fbx(self):
+    def retarget_selected(self):
         """Import the selected shapes in the tree view.
 
         If a mesh with a blendshape is selected in the scene, the shapes will be added
@@ -301,4 +358,23 @@ class FBXFileBrowser(QWidget):
         if not indices:
             return None
         paths = self.get_selected_paths()
-        # Import fbx
+
+        # Get the root joint
+        root = self.correspondence_widget.target.joints()[0]
+        parent = cmds.listRelatives(root, parent=True, path=True)
+        while parent and cmds.nodeType(parent[0]) == "joint":
+            root = parent[0]
+            parent = cmds.listRelatives(root, parent=True, path=True)
+
+        progress = QProgressDialog("Retargeting files...", "Abort", 0, len(paths), self)
+        progress.setWindowModality(Qt.WindowModal)
+        for i, path in enumerate(paths):
+            progress.setValue(i)
+            if progress.wasCanceled():
+                break
+            import_fbx(path)
+            output_path = self.export_options.get_export_path(path)
+            export_animation_fbx(root, output_path)
+        progress.setValue(len(paths))
+
+

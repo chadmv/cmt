@@ -67,6 +67,7 @@ class FilePathWidget(QWidget):
         self.file_filter = file_filter
         self.cache = StringCache("cmt.filepathwidget.{}".format(name), parent=self)
         self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self._layout)
 
         if label:
@@ -76,8 +77,9 @@ class FilePathWidget(QWidget):
 
         self._combo_box = QComboBox(self)
         self._combo_box.setEditable(True)
-        self._combo_box.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._combo_box.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
         self._combo_box.setInsertPolicy(QComboBox.InsertAtTop)
+        self._combo_box.setMinimumWidth(50)
         self._combo_box.setModel(self.cache)
         self._combo_box.editTextChanged.connect(self.edit_changed)
         self._layout.addWidget(self._combo_box)

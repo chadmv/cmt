@@ -24,7 +24,7 @@ Example Usage
 
 from PySide2.QtCore import Qt, QRect, QPoint
 from PySide2.QtGui import QBrush, QColor, QPolygon, QPainter, QPalette, QPen
-from PySide2.QtWidgets import QGroupBox, QVBoxLayout, QScrollArea
+from PySide2.QtWidgets import QGroupBox, QVBoxLayout, QScrollArea, QSizePolicy, QWidget
 import os.path
 
 
@@ -41,6 +41,7 @@ class AccordionItem(QGroupBox):
         self.setLayout(layout)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.setContentsMargins(0, 0, 0, 0)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # create custom properties
         self._widget = widget
