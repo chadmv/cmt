@@ -1,5 +1,4 @@
 #include "rbfNode.h"
-#include "common.h"
 
 #include <maya/MAngle.h>
 #include <maya/MEulerRotation.h>
@@ -11,6 +10,8 @@
 #include <maya/MFnNumericData.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MQuaternion.h>
+
+#include "common.h"
 
 MTypeId RBFNode::id(0x0011581A);
 MObject RBFNode::aInputValues;
@@ -578,7 +579,20 @@ MStatus RBFNode::getQuaternionValues(MArrayDataHandle& hArray, int count,
     CHECK_MSTATUS_AND_RETURN_IT(status);
     MDataHandle hQuaternion = hArray.inputValue(&status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
+
+#if MAYA_API_VERSION < 20190000
+    // Maya 2018 and earlier don't have MDataHandle::asDouble4
+    // Use asDouble3 and just grab the fourth value since they *should*
+    // be in continuous memory.
+    double3& values3 = hQuaternion.asDouble3();
+    double4 values;
+    values[0] = values3[0];
+    values[1] = values3[1];
+    values[2] = values3[2];
+    values[3] = values3[3];
+#else
     double4& values = hQuaternion.asDouble4();
+#endif
     MQuaternion q(values);
     quaternions[i] = q;
   }

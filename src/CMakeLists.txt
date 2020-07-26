@@ -35,6 +35,10 @@ if (OPENMP_FOUND)
 	set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
+# Eigen requires /bigobj to compile in DEBUG
+add_compile_options("$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:DEBUG>>:/bigobj>")
+
+
 find_package(Maya REQUIRED)
 find_package(Eigen3 REQUIRED)
 
