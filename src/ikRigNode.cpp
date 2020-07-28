@@ -21,7 +21,6 @@ MObject IKRigNode::aOutRotate;
 MObject IKRigNode::aOutRotateX;
 MObject IKRigNode::aOutRotateY;
 MObject IKRigNode::aOutRotateZ;
-MObject IKRigNode::aOutRootMotion;
 MObject IKRigNode::aInMatrix;
 MObject IKRigNode::aInRestMatrix;
 MObject IKRigNode::aTargetRestMatrix;
@@ -32,10 +31,13 @@ MObject IKRigNode::aRootMotionScale;
 MObject IKRigNode::aCharacterScale;
 MObject IKRigNode::aLeftHandOffset;
 MObject IKRigNode::aHipSpace;
+MObject IKRigNode::aLeftHandSpace;
+MObject IKRigNode::aRightHandSpace;
+MObject IKRigNode::aCalculateRootMotion;
 
 const MString IKRigNode::kName("ikRig");
 
-#define MATRIX_INPUT(obj, name)          \
+#define MATRIX_ARRAY_INPUT(obj, name)    \
   {                                      \
     obj = mAttr.create(name, name);      \
     addAttribute(obj);                   \
@@ -69,10 +71,11 @@ MStatus IKRigNode::initialize() {
   nAttr.setStorable(false);
   addAttribute(aOutRotate);
 
-  aOutRootMotion = mAttr.create("rootMotion", "rootMotion");
-  mAttr.setWritable(false);
-  mAttr.setStorable(false);
-  addAttribute(aOutRootMotion);
+  aCalculateRootMotion =
+      nAttr.create("calculateRootMotion", "calculateRootMotion", MFnNumericData::kBoolean, 0.0);
+  nAttr.setKeyable(true);
+  addAttribute(aCalculateRootMotion);
+  affects(aCalculateRootMotion);
 
   aLeftLegTwistOffset =
       nAttr.create("leftLegTwistOffset", "leftLegTwistOffset", MFnNumericData::kFloat, 0.0);
@@ -116,9 +119,23 @@ MStatus IKRigNode::initialize() {
   addAttribute(aHipSpace);
   affects(aHipSpace);
 
-  MATRIX_INPUT(aInMatrix, "inMatrix");
-  MATRIX_INPUT(aInRestMatrix, "inRestMatrix");
-  MATRIX_INPUT(aTargetRestMatrix, "targetRestMatrix");
+  aLeftHandSpace = nAttr.create("leftHandSpace", "leftHandSpace", MFnNumericData::kFloat, 0.0);
+  nAttr.setKeyable(true);
+  nAttr.setMin(0.0);
+  nAttr.setMax(1.0);
+  addAttribute(aLeftHandSpace);
+  affects(aLeftHandSpace);
+
+  aRightHandSpace = nAttr.create("rightHandSpace", "rightHandSpace", MFnNumericData::kFloat, 0.0);
+  nAttr.setKeyable(true);
+  nAttr.setMin(0.0);
+  nAttr.setMax(1.0);
+  addAttribute(aRightHandSpace);
+  affects(aRightHandSpace);
+
+  MATRIX_ARRAY_INPUT(aInMatrix, "inMatrix");
+  MATRIX_ARRAY_INPUT(aInRestMatrix, "inRestMatrix");
+  MATRIX_ARRAY_INPUT(aTargetRestMatrix, "targetRestMatrix");
 
   return MS::kSuccess;
 }
@@ -129,7 +146,6 @@ void IKRigNode::affects(const MObject& attribute) {
   attributeAffects(attribute, aOutRotateX);
   attributeAffects(attribute, aOutRotateY);
   attributeAffects(attribute, aOutRotateZ);
-  attributeAffects(attribute, aOutRootMotion);
 }
 
 void* IKRigNode::creator() { return new IKRigNode(); }
@@ -149,7 +165,7 @@ IKRigNode::~IKRigNode() {}
 MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   MStatus status;
 
-  if (plug != aOutTranslate && plug != aOutRotate && plug != aOutRootMotion) {
+  if (plug != aOutTranslate && plug != aOutRotate) {
     return MS::kUnknownParameter;
   }
 
@@ -176,6 +192,8 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   characterScale_ = data.inputValue(aCharacterScale).asFloat();
   leftHandOffset_ = data.inputValue(aLeftHandOffset).asMatrix();
   float hipSpace = data.inputValue(aHipSpace).asFloat();
+  float leftHandSpace = data.inputValue(aLeftHandSpace).asFloat();
+  float rightHandSpace = data.inputValue(aRightHandSpace).asFloat();
 
   // Calculate outputs
   for (unsigned int i = 0; i < IKRig_Count; ++i) {
@@ -191,35 +209,25 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
     translationDelta_[i] = tCurrent - tRest;
   }
 
-  // Calculate Root Motion
-  rootMotion_ = calculateRootMotion();
-  scaledRootMotion_ = rootMotion_;
-  scaledRootMotion_[3][0] *= rootMotionScale_;
-  scaledRootMotion_[3][2] *= rootMotionScale_;
-  toScaledRootMotion_ = rootMotion_.inverse() * scaledRootMotion_;
-  MDataHandle hRootMotion = data.outputValue(aOutRootMotion);
-  hRootMotion.setMMatrix(scaledRootMotion_);
-  hRootMotion.setClean();
-
-  // Set outputs
   MArrayDataHandle hOutputTranslate = data.outputArrayValue(aOutTranslate);
   MArrayDataHandle hOutputRotate = data.outputArrayValue(aOutRotate);
 
+  // Calculate Root Motion
+  bool shouldCalculateRootMotion = data.inputValue(aCalculateRootMotion, &status).asBool();
+  if (shouldCalculateRootMotion) {
+    inputMatrix_[IKRig_Root] = calculateRootMotion();
+    inputRestMatrix_[IKRig_Root] = MMatrix::identity;
+  }
+
+  scaledRootMotion_ = inputMatrix_[IKRig_Root];
+  scaledRootMotion_[3][0] *= rootMotionScale_;
+  scaledRootMotion_[3][2] *= rootMotionScale_;
+  toScaledRootMotion_ = inputMatrix_[IKRig_Root].inverse() * scaledRootMotion_;
+  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Root, scaledRootMotion_);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+
   // Hips
-  hipScale_ = position(targetRestMatrix_[IKRig_Hips]).y / position(inputRestMatrix_[IKRig_Hips]).y;
-  hipScale_ = lerp(hipScale_, 1.0, hipSpace);
-  hips_ = inputMatrix_[IKRig_Hips] * rootMotion_.inverse();
-  MVector restInputHips = position(inputRestMatrix_[IKRig_Hips]);
-  MVector scaledHipPosition = restInputHips + (position(hips_) - restInputHips) * hipScale_;
-  hips_[3][0] = scaledHipPosition.x;
-  hips_[3][1] = scaledHipPosition.y;
-  hips_[3][2] = scaledHipPosition.z;
-  hips_ *= rootMotion_;
-  MVector hipDeltaCharacter = position(hips_) - restInputHips;
-  MVector hipDeltaWorld = position(hips_) - position(targetRestMatrix_[IKRig_Hips]);
-  MVector hipDelta = lerp(hipDeltaCharacter, hipDeltaWorld, hipSpace);
-  hips_ = offsetMatrix(targetRestMatrix_[IKRig_Hips], rotationDelta_[IKRig_Hips], hipDelta);
-  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Hips, hips_ * toScaledRootMotion_);
+  status = calculateHipIk(hipSpace, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
   // Left leg
@@ -239,17 +247,72 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
   // Left arm
-  status = calculateArmIk(IKRig_LeftClavicle, IKRig_LeftShoulder, IKRig_LeftElbow, IKRig_LeftHand,
-                          chest_, 0.0f, leftHandOffset_, hOutputTranslate, hOutputRotate);
+  status = calculateArmIk(leftHandSpace, IKRig_LeftClavicle, IKRig_LeftShoulder, IKRig_LeftElbow,
+                          IKRig_LeftHand, chest_, 0.0f, leftHandOffset_, hOutputTranslate,
+                          hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
   // Right arm
-  status =
-      calculateArmIk(IKRig_RightClavicle, IKRig_RightShoulder, IKRig_RightElbow, IKRig_RightHand,
-                     chest_, 0.0f, MMatrix::identity, hOutputTranslate, hOutputRotate);
+  status = calculateArmIk(rightHandSpace, IKRig_RightClavicle, IKRig_RightShoulder,
+                          IKRig_RightElbow, IKRig_RightHand, chest_, 0.0f, MMatrix::identity,
+                          hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
+  // Head
   status = calculateHeadIk(chest_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+
+  // Fingers
+  unsigned int finger[3];
+  finger[0] = IKRig_LeftThumb01;
+  finger[1] = IKRig_LeftThumb02;
+  finger[2] = IKRig_LeftThumb03;
+  status = calculateFingerIk(finger, IKRig_LeftHand, leftHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_LeftIndex01;
+  finger[1] = IKRig_LeftIndex02;
+  finger[2] = IKRig_LeftIndex03;
+  status = calculateFingerIk(finger, IKRig_LeftHand, leftHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_LeftMiddle01;
+  finger[1] = IKRig_LeftMiddle02;
+  finger[2] = IKRig_LeftMiddle03;
+  status = calculateFingerIk(finger, IKRig_LeftHand, leftHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_LeftRing01;
+  finger[1] = IKRig_LeftRing02;
+  finger[2] = IKRig_LeftRing03;
+  status = calculateFingerIk(finger, IKRig_LeftHand, leftHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_LeftPinky01;
+  finger[1] = IKRig_LeftPinky02;
+  finger[2] = IKRig_LeftPinky03;
+  status = calculateFingerIk(finger, IKRig_LeftHand, leftHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_RightThumb01;
+  finger[1] = IKRig_RightThumb02;
+  finger[2] = IKRig_RightThumb03;
+  status = calculateFingerIk(finger, IKRig_RightHand, rightHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_RightIndex01;
+  finger[1] = IKRig_RightIndex02;
+  finger[2] = IKRig_RightIndex03;
+  status = calculateFingerIk(finger, IKRig_RightHand, rightHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_RightMiddle01;
+  finger[1] = IKRig_RightMiddle02;
+  finger[2] = IKRig_RightMiddle03;
+  status = calculateFingerIk(finger, IKRig_RightHand, rightHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_RightRing01;
+  finger[1] = IKRig_RightRing02;
+  finger[2] = IKRig_RightRing03;
+  status = calculateFingerIk(finger, IKRig_RightHand, rightHand_, hOutputTranslate, hOutputRotate);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  finger[0] = IKRig_RightPinky01;
+  finger[1] = IKRig_RightPinky02;
+  finger[2] = IKRig_RightPinky03;
+  status = calculateFingerIk(finger, IKRig_RightHand, rightHand_, hOutputTranslate, hOutputRotate);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
   hOutputTranslate.setAllClean();
@@ -308,6 +371,28 @@ MMatrix IKRigNode::calculateRootMotion() {
   return m;
 }
 
+MStatus IKRigNode::calculateHipIk(float hipSpace, MArrayDataHandle& hOutputTranslate,
+                                  MArrayDataHandle& hOutputRotate) {
+  MStatus status;
+  hipScale_ = position(targetRestMatrix_[IKRig_Hips]).y / position(inputRestMatrix_[IKRig_Hips]).y;
+  hipScale_ = lerp(hipScale_, 1.0, hipSpace);
+  hips_ = inputMatrix_[IKRig_Hips] * inputMatrix_[IKRig_Root].inverse();
+  MVector restInputHips =
+      position(inputRestMatrix_[IKRig_Hips]) * inputRestMatrix_[IKRig_Root].inverse();
+  MVector scaledHipPosition = restInputHips + (position(hips_) - restInputHips) * hipScale_;
+  hips_[3][0] = scaledHipPosition.x;
+  hips_[3][1] = scaledHipPosition.y;
+  hips_[3][2] = scaledHipPosition.z;
+  hips_ *= inputMatrix_[IKRig_Root];
+  MVector hipDeltaCharacter = position(hips_) - (restInputHips * inputRestMatrix_[IKRig_Root]);
+  MVector hipDeltaWorld = position(hips_) - position(targetRestMatrix_[IKRig_Hips]);
+  MVector hipDelta = lerp(hipDeltaCharacter, hipDeltaWorld, hipSpace);
+  hips_ = offsetMatrix(targetRestMatrix_[IKRig_Hips], rotationDelta_[IKRig_Hips], hipDelta);
+  status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Hips, hips_ * toScaledRootMotion_);
+  CHECK_MSTATUS_AND_RETURN_IT(status);
+  return MS::kSuccess;
+}
+
 MStatus IKRigNode::calculateLegIk(unsigned int upLegIdx, unsigned int loLegIdx,
                                   unsigned int footIdx, const MMatrix& hips, float twist,
                                   MArrayDataHandle& hOutputTranslate,
@@ -332,11 +417,11 @@ MStatus IKRigNode::calculateLegIk(unsigned int upLegIdx, unsigned int loLegIdx,
   MVector footTranslationDelta = translationDelta_[footIdx];
   footTranslationDelta.y *= hipScale_;
   footTarget = offsetMatrix(footTarget, rotationDelta_[footIdx], footTranslationDelta);
-  footTarget *= rootMotion_.inverse() * flatFootBindMatrix.inverse();
+  footTarget *= inputMatrix_[IKRig_Root].inverse() * flatFootBindMatrix.inverse();
   // Scale foot position relative to resting stance
   footTarget[3][0] *= strideScale_;
   footTarget[3][2] *= strideScale_;
-  footTarget *= flatFootBindMatrix * rootMotion_;
+  footTarget *= flatFootBindMatrix * inputMatrix_[IKRig_Root];
 
   // Calculate leg ik
   MVector ia = position(inputRestMatrix_[upLegIdx]);
@@ -389,7 +474,8 @@ MMatrix IKRigNode::offsetMatrix(const MMatrix& m, const MQuaternion& r, const MV
     in root motion space
 */
 MMatrix IKRigNode::scaleRelativeTo(unsigned int inputChildIdx, unsigned int inputParentIdx,
-                                   double scale, const MMatrix& targetParent) {
+                                   double scale, const MMatrix& targetParent,
+                                   float localToWorldSpace) {
   MMatrix restChild = inputRestMatrix_[inputChildIdx] * inputRestMatrix_[inputParentIdx].inverse() *
                       inputMatrix_[inputParentIdx];
 
@@ -404,12 +490,28 @@ MMatrix IKRigNode::scaleRelativeTo(unsigned int inputChildIdx, unsigned int inpu
   MQuaternion rotationDelta = rRest.inverse() * rCurrent;
   MVector translationDelta = tCurrent - tRest;
   translationDelta *= scale;
+  
 
   MMatrix restTarget =
       targetRestMatrix_[inputChildIdx] * targetRestMatrix_[inputParentIdx].inverse() * targetParent;
+
+  MVector worldDelta = tCurrent - position(restTarget);
+  translationDelta = lerp(translationDelta, worldDelta, localToWorldSpace);
+
   restTarget = offsetMatrix(restTarget, rotationDelta, translationDelta);
 
   return restTarget;
+}
+
+MMatrix IKRigNode::orientConstraint(unsigned int partIdx, unsigned int parentIdx,
+                                    const MMatrix& parent) {
+  MQuaternion offset = MTransformationMatrix(targetRestMatrix_[partIdx]).rotation() *
+                       MTransformationMatrix(inputRestMatrix_[partIdx].inverse()).rotation();
+  MQuaternion rotation = offset * MTransformationMatrix(inputMatrix_[partIdx]).rotation();
+  MMatrix ikPos = targetRestMatrix_[partIdx] * targetRestMatrix_[parentIdx].inverse() * parent;
+  MTransformationMatrix tIkNeck(ikPos);
+  tIkNeck.setRotationQuaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+  return tIkNeck.asMatrix();
 }
 
 void IKRigNode::calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
@@ -491,26 +593,14 @@ MStatus IKRigNode::calculateChestIk(MArrayDataHandle& hOutputTranslate,
   return MS::kSuccess;
 }
 
-MStatus IKRigNode::calculateArmIk(unsigned int clavicleIdx, unsigned int upArmIdx,
+MStatus IKRigNode::calculateArmIk(float handSpace, unsigned int clavicleIdx, unsigned int upArmIdx,
                                   unsigned int loArmIdx, unsigned int handIdx, const MMatrix& chest,
                                   float twist, const MMatrix& offset,
                                   MArrayDataHandle& hOutputTranslate,
                                   MArrayDataHandle& hOutputRotate) {
   MStatus status;
 
-  MQuaternion clavicleOffset =
-      MTransformationMatrix(targetRestMatrix_[clavicleIdx]).rotation() *
-      MTransformationMatrix(inputRestMatrix_[clavicleIdx].inverse()).rotation();
-  MQuaternion clavicleRotation =
-      clavicleOffset * MTransformationMatrix(inputMatrix_[clavicleIdx]).rotation();
-  MPoint claviclePosition =
-      MTransformationMatrix(targetRestMatrix_[clavicleIdx]).translation(MSpace::kWorld);
-  claviclePosition *= targetRestMatrix_[IKRig_Chest].inverse() * chest;
-  MMatrix clavicle = clavicleRotation.asMatrix();
-  clavicle[3][0] = claviclePosition.x;
-  clavicle[3][1] = claviclePosition.y;
-  clavicle[3][2] = claviclePosition.z;
-
+  MMatrix clavicle = orientConstraint(clavicleIdx, IKRig_Chest, chest);
   MMatrix upArm = targetRestMatrix_[upArmIdx] * targetRestMatrix_[clavicleIdx].inverse() * clavicle;
   MMatrix loArm = targetRestMatrix_[loArmIdx] * targetRestMatrix_[upArmIdx].inverse() * upArm;
   MMatrix hand = targetRestMatrix_[handIdx] * targetRestMatrix_[loArmIdx].inverse() * loArm;
@@ -526,7 +616,7 @@ MStatus IKRigNode::calculateArmIk(unsigned int clavicleIdx, unsigned int upArmId
 
   float armScale = targetArmLength / inArmLength;
   MVector upArmPosition = position(upArm);
-  MMatrix handTarget = scaleRelativeTo(handIdx, clavicleIdx, armScale, clavicle);
+  MMatrix handTarget = scaleRelativeTo(handIdx, clavicleIdx, armScale, clavicle, handSpace);
 
   // Calculate arm ik
   MVector ia = position(inputRestMatrix_[upArmIdx]);
@@ -556,6 +646,12 @@ MStatus IKRigNode::calculateArmIk(unsigned int clavicleIdx, unsigned int upArmId
   clavicle *= toScaledRootMotion_;
   ikUpArm *= toScaledRootMotion_;
   ikLoArm *= toScaledRootMotion_;
+
+  if (handIdx == IKRig_LeftHand) {
+    leftHand_ = ikHand;
+  } else {
+    rightHand_ = ikHand;
+  }
   ikHand *= toScaledRootMotion_;
 
   status = setOutput(hOutputTranslate, hOutputRotate, clavicleIdx, clavicle);
@@ -574,15 +670,7 @@ MStatus IKRigNode::calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutp
   MStatus status;
 
   // Neck rotation
-  MQuaternion neckOffset = MTransformationMatrix(targetRestMatrix_[IKRig_Neck]).rotation() *
-                           MTransformationMatrix(inputRestMatrix_[IKRig_Neck].inverse()).rotation();
-  MQuaternion neckRotation =
-      neckOffset * MTransformationMatrix(inputMatrix_[IKRig_Neck]).rotation();
-  MMatrix ikNeckPos =
-      targetRestMatrix_[IKRig_Neck] * targetRestMatrix_[IKRig_Chest].inverse() * chest;
-  MTransformationMatrix tIkNeck(ikNeckPos);
-  tIkNeck.setRotationQuaternion(neckRotation.x, neckRotation.y, neckRotation.z, neckRotation.w);
-  MMatrix neck = tIkNeck.asMatrix();
+  MMatrix neck = orientConstraint(IKRig_Neck, IKRig_Chest, chest);
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Neck, neck * toScaledRootMotion_);
   CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -595,6 +683,22 @@ MStatus IKRigNode::calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutp
   MMatrix head = scaleRelativeTo(IKRig_Head, IKRig_Neck, neckScale_, neck);
   status = setOutput(hOutputTranslate, hOutputRotate, IKRig_Head, head * toScaledRootMotion_);
   CHECK_MSTATUS_AND_RETURN_IT(status);
+
+  return MS::kSuccess;
+}
+
+MStatus IKRigNode::calculateFingerIk(unsigned int finger[3], unsigned int handIdx,
+                                     const MMatrix& hand, MArrayDataHandle& hOutputTranslate,
+                                     MArrayDataHandle& hOutputRotate) {
+  MStatus status;
+  MMatrix parent = hand;
+  unsigned int parentIdx = handIdx;
+  for (int i = 0; i < 3; ++i) {
+    parent = orientConstraint(finger[i], parentIdx, parent);
+    parentIdx = finger[i];
+    status = setOutput(hOutputTranslate, hOutputRotate, finger[i], parent * toScaledRootMotion_);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+  }
 
   return MS::kSuccess;
 }

@@ -28,29 +28,59 @@ _win = None
 
 
 class Parts(object):
-    hips = 0
-    chest = 1
-    neck = 2
-    head = 3
-    left_clavicle = 4
-    left_shoulder = 5
-    left_elbow = 6
-    left_hand = 7
-    left_up_leg = 8
-    left_lo_leg = 9
-    left_foot = 10
-    right_clavicle = 11
-    right_shoulder = 12
-    right_elbow = 13
-    right_hand = 14
-    right_up_leg = 15
-    right_lo_leg = 16
-    right_foot = 17
+    parts = [
+        "root",
+        "hips",
+        "chest",
+        "neck",
+        "head",
+        "left_clavicle",
+        "left_shoulder",
+        "left_elbow",
+        "left_hand",
+        "left_up_leg",
+        "left_lo_leg",
+        "left_foot",
+        "right_clavicle",
+        "right_shoulder",
+        "right_elbow",
+        "right_hand",
+        "right_up_leg",
+        "right_lo_leg",
+        "right_foot",
+        "left_thumb_01",
+        "left_thumb_02",
+        "left_thumb_03",
+        "left_index_01",
+        "left_index_02",
+        "left_index_03",
+        "left_middle_01",
+        "left_middle_02",
+        "left_middle_03",
+        "left_ring_01",
+        "left_ring_02",
+        "left_ring_03",
+        "left_pinky_01",
+        "left_pinky_02",
+        "left_pinky_03",
+        "right_thumb_01",
+        "right_thumb_02",
+        "right_thumb_03",
+        "right_index_01",
+        "right_index_02",
+        "right_index_03",
+        "right_middle_01",
+        "right_middle_02",
+        "right_middle_03",
+        "right_ring_01",
+        "right_ring_02",
+        "right_ring_03",
+        "right_pinky_01",
+        "right_pinky_02",
+        "right_pinky_03",
+    ]
 
     def __init__(self):
-        parts = [x for x in dir(Parts) if re.search("^(?!next)[a-zA-Z]\w*", x)]
-        self.parts = [(p, getattr(Parts, p)) for p in parts]
-        self.parts.sort(key=lambda x: x[1])
         self.current = 0
 
     def __iter__(self):
@@ -60,8 +90,8 @@ class Parts(object):
         return self.next()
 
     def next(self):
-        if self.current < len(self.parts):
-            part = self.parts[self.current][0]
+        if self.current < len(Parts.parts):
+            part = Parts.parts[self.current]
             self.current = self.current + 1
             return part
         else:
@@ -79,28 +109,37 @@ def attach_skeletons(source_joints, target_joints):
     node = cmds.createNode("ikRig")
     locs = []
     for i, j in enumerate(source_joints):
-        cmds.connectAttr(
-            "{}.worldMatrix[0]".format(j), "{}.inMatrix[{}]".format(node, i)
-        )
-        path = shortcuts.get_dag_path2(j)
-        rest_matrix = list(path.inclusiveMatrix())
-        cmds.setAttr("{}.inRestMatrix[{}]".format(node, i), *rest_matrix, type="matrix")
+        if j and not cmds.objExists(j):
+            raise RuntimeError("Joint {} does not exist".format(j))
+        if target_joints[i] and not cmds.objExists(target_joints[i]):
+            raise RuntimeError("Joint {} does not exist".format(target_joints[i]))
 
-        path = shortcuts.get_dag_path2(target_joints[i])
-        matrix = list(path.inclusiveMatrix())
-        cmds.setAttr("{}.targetRestMatrix[{}]".format(node, i), *matrix, type="matrix")
+        if j:
+            cmds.connectAttr(
+                "{}.worldMatrix[0]".format(j), "{}.inMatrix[{}]".format(node, i)
+            )
+            path = shortcuts.get_dag_path2(j)
+            rest_matrix = list(path.inclusiveMatrix())
+            cmds.setAttr("{}.inRestMatrix[{}]".format(node, i), *rest_matrix, type="matrix")
 
-        loc = cmds.spaceLocator(name="ikrig_{}".format(target_joints[i]))[0]
-        cmds.connectAttr("{}.outputTranslate[{}]".format(node, i), "{}.t".format(loc))
-        cmds.connectAttr("{}.outputRotate[{}]".format(node, i), "{}.r".format(loc))
+        if target_joints[i]:
+            path = shortcuts.get_dag_path2(target_joints[i])
+            matrix = list(path.inclusiveMatrix())
+            cmds.setAttr("{}.targetRestMatrix[{}]".format(node, i), *matrix, type="matrix")
 
-        cmds.setAttr("{}Shape.localScale".format(loc), 5, 5, 5)
-        locs.append(loc)
+            loc = cmds.spaceLocator(name="ikrig_{}".format(target_joints[i]))[0]
+            cmds.connectAttr("{}.outputTranslate[{}]".format(node, i), "{}.t".format(loc))
+            cmds.connectAttr("{}.outputRotate[{}]".format(node, i), "{}.r".format(loc))
+
+            cmds.setAttr("{}Shape.localScale".format(loc), 5, 5, 5)
+            locs.append(loc)
+        else:
+            locs.append(None)
 
     for loc, joint in zip(locs, target_joints):
-        cmds.parentConstraint(loc, joint)
-    loc = cmds.spaceLocator(name="rootMotion")[0]
-    cmds.connectAttr("{}.rootMotion".format(node), "{}.opm".format(loc))
+        if loc and joint:
+            cmds.parentConstraint(loc, joint)
+
     return node
 
 
@@ -137,7 +176,9 @@ class IKRigWindow(MayaQWidgetBaseMixin, QMainWindow):
         splitter.addWidget(self.correspondence_widget)
 
         self.export_options = ExportOptionsWidget(self)
-        self.fbx_browser = FBXFileBrowser(self.correspondence_widget, self.export_options, self)
+        self.fbx_browser = FBXFileBrowser(
+            self.correspondence_widget, self.export_options, self
+        )
         bottom_splitter = QSplitter(orientation=Qt.Horizontal)
         bottom_splitter.addWidget(self.fbx_browser)
         self.accordion = AccordionWidget()
@@ -376,5 +417,3 @@ class FBXFileBrowser(QWidget):
             output_path = self.export_options.get_export_path(path)
             export_animation_fbx(root, output_path)
         progress.setValue(len(paths))
-
-
