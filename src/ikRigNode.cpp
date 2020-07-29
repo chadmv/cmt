@@ -441,11 +441,34 @@ MStatus IKRigNode::calculateLegIk(float footSpace, unsigned int upLegIdx, unsign
   flatFootBindMatrix[3][0] = footRest[3][0];
   flatFootBindMatrix[3][2] = footRest[3][2];
 
-  MMatrix footTarget = inputRestMatrix_[footIdx];
+  /*MMatrix footTarget = inputRestMatrix_[footIdx];
   footTarget[3][1] += ankleHeightDelta;
   MVector footTranslationDelta = translationDelta_[footIdx];
   footTranslationDelta.y *= hipScale_;
-  footTarget = offsetMatrix(footTarget, rotationDelta_[footIdx], footTranslationDelta);
+  footTarget = offsetMatrix(footTarget, rotationDelta_[footIdx], footTranslationDelta);*/
+
+  MMatrix currentLocalInputFoot = inputMatrix_[footIdx] * inputMatrix_[IKRig_Root].inverse();
+  currentLocalInputFoot[3][0] *= hipScale_;
+  currentLocalInputFoot[3][1] *= hipScale_;
+  currentLocalInputFoot[3][2] *= hipScale_;
+  MMatrix restLocalInputFoot = inputRestMatrix_[footIdx] * inputRestMatrix_[IKRig_Root].inverse();
+  restLocalInputFoot[3][0] *= hipScale_;
+  restLocalInputFoot[3][1] *= hipScale_;
+  restLocalInputFoot[3][2] *= hipScale_;
+
+  // Parent constrain the target foot from the scaled input foot position relative to the root
+  // motion
+  MMatrix offset = targetRestMatrix_[footIdx] * inputRestMatrix_[IKRig_Root].inverse() *
+                   restLocalInputFoot.inverse();
+  MMatrix footTarget = offset * currentLocalInputFoot * inputMatrix_[IKRig_Root];
+
+  MVector localPos = position(footTarget);
+  MVector worldPos = position(inputMatrix_[footIdx]);
+  MVector footPos = lerp(localPos, worldPos, footSpace);
+  footTarget[3][0] = footPos.x;
+  footTarget[3][1] = footPos.y;
+  footTarget[3][2] = footPos.z;
+
   footTarget *= inputMatrix_[IKRig_Root].inverse() * flatFootBindMatrix.inverse();
   // Scale foot position relative to resting stance
   footTarget[3][0] *= strideScale_;
