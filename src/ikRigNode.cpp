@@ -29,13 +29,14 @@ MObject IKRigNode::aRightLegTwistOffset;
 MObject IKRigNode::aStrideScale;
 MObject IKRigNode::aRootMotionScale;
 MObject IKRigNode::aCharacterScale;
-MObject IKRigNode::aLeftHandOffset;
 MObject IKRigNode::aHipSpace;
 MObject IKRigNode::aLeftHandSpace;
 MObject IKRigNode::aRightHandSpace;
 MObject IKRigNode::aLeftFootSpace;
 MObject IKRigNode::aRightFootSpace;
 MObject IKRigNode::aCalculateRootMotion;
+MObject IKRigNode::aLeftHandOffset;
+MObject IKRigNode::aHipOffset;
 
 const MString IKRigNode::kName("ikRig");
 
@@ -113,6 +114,10 @@ MStatus IKRigNode::initialize() {
   aLeftHandOffset = mAttr.create("leftHandOffset", "leftHandOffset");
   addAttribute(aLeftHandOffset);
   affects(aLeftHandOffset);
+
+  aHipOffset = mAttr.create("hipOffset", "hipOffset");
+  addAttribute(aHipOffset);
+  affects(aHipOffset);
 
   aHipSpace = nAttr.create("hipSpace", "hipSpace", MFnNumericData::kFloat, 0.0);
   nAttr.setKeyable(true);
@@ -207,6 +212,7 @@ MStatus IKRigNode::compute(const MPlug& plug, MDataBlock& data) {
   strideScale_ = data.inputValue(aStrideScale).asFloat();
   characterScale_ = data.inputValue(aCharacterScale).asFloat();
   leftHandOffset_ = data.inputValue(aLeftHandOffset).asMatrix();
+  hipOffset_ = data.inputValue(aHipOffset).asMatrix();
   float hipSpace = data.inputValue(aHipSpace).asFloat();
   float leftHandSpace = data.inputValue(aLeftHandSpace).asFloat();
   float rightHandSpace = data.inputValue(aRightHandSpace).asFloat();
@@ -408,7 +414,7 @@ MStatus IKRigNode::calculateHipIk(float hipSpace, MArrayDataHandle& hOutputTrans
   // Parent constrain the target hips from the scaled input hip position relative to the root motion
   MMatrix offset = targetRestMatrix_[IKRig_Hips] * inputRestMatrix_[IKRig_Root].inverse() *
                    restLocalInputHips.inverse();
-  hips_ = offset * currentLocalInputHips * inputMatrix_[IKRig_Root];
+  hips_ = hipOffset_ * offset * currentLocalInputHips * inputMatrix_[IKRig_Root];
 
   MVector localPos = position(hips_);
   MVector worldPos = position(inputMatrix_[IKRig_Hips]);

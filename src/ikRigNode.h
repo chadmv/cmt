@@ -96,13 +96,15 @@ class IKRigNode : public MPxNode {
   static MObject aStrideScale;
   static MObject aRootMotionScale;
   static MObject aCharacterScale;
-  static MObject aLeftHandOffset;
   static MObject aHipSpace;
   static MObject aLeftHandSpace;
   static MObject aRightHandSpace;
   static MObject aLeftFootSpace;
   static MObject aRightFootSpace;
   static MObject aCalculateRootMotion;
+  static MObject aHipOffset;
+  static MObject aLeftHandOffset;
+
 
  private:
   static void affects(const MObject& attribute);
@@ -174,6 +176,7 @@ class IKRigNode : public MPxNode {
   MMatrix leftHand_;
   MMatrix rightHand_;
   MMatrix leftHandOffset_;
+  MMatrix hipOffset_;
   double hipScale_;
   double spineScale_;
   double neckScale_;
