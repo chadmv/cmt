@@ -100,6 +100,8 @@ class IKRigNode : public MPxNode {
   static MObject aHipSpace;
   static MObject aLeftHandSpace;
   static MObject aRightHandSpace;
+  static MObject aLeftFootSpace;
+  static MObject aRightFootSpace;
   static MObject aCalculateRootMotion;
 
  private:
@@ -110,7 +112,7 @@ class IKRigNode : public MPxNode {
   MStatus calculateHipIk(float hipSpace, MArrayDataHandle& hOutputTranslate,
                          MArrayDataHandle& hOutputRotate);
 
-  MStatus calculateLegIk(unsigned int upLeg, unsigned int loLeg, unsigned int foot,
+  MStatus calculateLegIk(float footSpace, unsigned int upLeg, unsigned int loLeg, unsigned int foot,
                          const MMatrix& hips, float twist, MArrayDataHandle& hOutputTranslate,
                          MArrayDataHandle& hOutputRotate);
 
