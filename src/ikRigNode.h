@@ -103,8 +103,9 @@ class IKRigNode : public MPxNode {
   static MObject aRightFootSpace;
   static MObject aCalculateRootMotion;
   static MObject aHipOffset;
+  static MObject aChestOffset;
   static MObject aLeftHandOffset;
-
+  static MObject aRightHandOffset;
 
  private:
   static void affects(const MObject& attribute);
@@ -121,15 +122,14 @@ class IKRigNode : public MPxNode {
   MStatus calculateChestIk(MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
 
   MStatus calculateArmIk(float handSpace, unsigned int clavicleIdx, unsigned int upArm,
-                         unsigned int loArm,
-                         unsigned int hand, const MMatrix& chest, float twist,
+                         unsigned int loArm, unsigned int hand, const MMatrix& chest, float twist,
                          const MMatrix& offset, MArrayDataHandle& hOutputTranslate,
-                         MArrayDataHandle& hOutputRotate);
+                         MArrayDataHandle& hOutputRotate, MQuaternion* rotationOffset = nullptr);
 
   MStatus calculateHeadIk(const MMatrix& chest, MArrayDataHandle& hOutputTranslate,
                           MArrayDataHandle& hOutputRotate);
 
-  MStatus calculateFingerIk(unsigned int finger[3], unsigned int handIdx, const MMatrix& hand,
+  MStatus calculateFingerIk(unsigned int finger[3], unsigned int handIdx, const MMatrix& hand, const MQuaternion& handOffset,
                             MArrayDataHandle& hOutputTranslate, MArrayDataHandle& hOutputRotate);
 
   MVector position(const MMatrix& m) { return MVector(m[3][0], m[3][1], m[3][2]); }
@@ -137,9 +137,13 @@ class IKRigNode : public MPxNode {
   MMatrix offsetMatrix(const MMatrix& m, const MQuaternion& r, const MVector& t);
 
   MMatrix scaleRelativeTo(unsigned int inputChildIdx, unsigned int inputParentIdx, double scale,
-                          const MMatrix& targetParent, float localToWorldSpace=0.0f);
+                          const MMatrix& targetParent, float localToWorldSpace = 0.0f,
+                          const MMatrix& offset = MMatrix::identity, MQuaternion* rotationOffset = nullptr);
 
-  MMatrix orientConstraint(unsigned int partIdx, unsigned int parentIdx, const MMatrix& parent);
+  MMatrix orientConstraint(unsigned int partIdx, unsigned int parentIdx, const MMatrix& parent,
+                           const MQuaternion& offset = MQuaternion::identity);
+  MMatrix parentConstraint(unsigned int partIdx, unsigned int parentIdx, float scale = 1.0f,
+                           const MMatrix& offset = MMatrix::identity);
 
   void calculateTwoBoneIk(const MMatrix& root, const MMatrix& mid, const MMatrix& effector,
                           const MMatrix& target, const MVector& pv, MMatrix& ikA, MMatrix& ikB);
@@ -176,7 +180,9 @@ class IKRigNode : public MPxNode {
   MMatrix leftHand_;
   MMatrix rightHand_;
   MMatrix leftHandOffset_;
+  MMatrix rightHandOffset_;
   MMatrix hipOffset_;
+  MMatrix chestOffset_;
   double hipScale_;
   double spineScale_;
   double neckScale_;
