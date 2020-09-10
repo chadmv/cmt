@@ -4,7 +4,9 @@ import cmt.shortcuts as shortcuts
 import cmt.rig.common as common
 from cmt.dge import dge
 import cmt.rig.twoboneik as twoboneik
+import cmt.rig.spaceswitch as spaceswitch
 
+reload(common)
 reload(twoboneik)
 
 
@@ -30,6 +32,8 @@ class LegRig(object):
     ):
         if not cmds.objExists(self.group):
             self.group = cmds.createNode("transform", name=self.group)
+            cmds.setAttr("{}.v".format(self.group), 0)
+            common.lock_and_hide(self.group, "trsv")
 
         self.__create_ik(
             ik_control, pole_vector, global_scale_attr, pivots, scale_stretch, parent
@@ -52,14 +56,16 @@ class LegRig(object):
             startJoint=self.two_bone_ik.end_joint,
             endEffector=self.ball_joint,
         )[0]
-        self.ik_handle_toe = cmds.ikHandle(
-            name="{}_toe_ikh".format(self.name),
-            solver="ikSCsolver",
-            startJoint=self.ball_joint,
-            endEffector=self.toe_joint,
-        )[0]
+        if self.toe_joint:
+            self.ik_handle_toe = cmds.ikHandle(
+                name="{}_toe_ikh".format(self.name),
+                solver="ikSCsolver",
+                startJoint=self.ball_joint,
+                endEffector=self.toe_joint,
+            )[0]
         for node in [self.ik_handle_ball, self.ik_handle_toe]:
-            cmds.setAttr("{}.v".format(node), 0)
+            if node:
+                cmds.setAttr("{}.v".format(node), 0)
 
         self.__create_pivots(ik_control, pivots)
         self.two_bone_ik.create(
@@ -137,7 +143,8 @@ class LegRig(object):
             [self.ball_joint, hierarchy.toe_ctrl],
             [self.ball_joint, hierarchy.heel_ctrl],
         ]:
-            common.snap_to_position(driven, driver)
+            if driver and driven:
+                common.snap_to_position(driven, driver)
         for node, position in pivots.items():
             node = getattr(hierarchy, node, None)
             if not node:
@@ -150,9 +157,11 @@ class LegRig(object):
                 cmds.parent(children, node)
 
         hierarchy.parent_to_heel_ctrl(self.ik_handle_ball)
-        hierarchy.parent_to_toe_ctrl(self.ik_handle_toe)
-        common.lock_and_hide(hierarchy.heel_ctrl, "t")
-        common.lock_and_hide(hierarchy.toe_pivot_ctrl, "t")
+        if self.ik_handle_toe:
+            hierarchy.parent_to_toe_ctrl(self.ik_handle_toe)
+        for node in hierarchy:
+            common.lock_and_hide(node, "t")
+
         cmds.setAttr("{}.rotateOrder".format(hierarchy.heel_ctrl), 2)  # zxy
 
         self.hierarchy = hierarchy
@@ -162,7 +171,8 @@ class LegRig(object):
             "{}.ikBlend".format(self.two_bone_ik.ik_handle), d=False, plugs=True
         )[0]
         for ikh in [self.ik_handle_ball, self.ik_handle_toe]:
-            cmds.connectAttr(ik_switch, "{}.ikBlend".format(ikh))
+            if ikh:
+                cmds.connectAttr(ik_switch, "{}.ikBlend".format(ikh))
         self.ball_fk_ctrl = cmds.createNode(
             "transform", name="{}_fk_ctrl".format(self.ball_joint)
         )
@@ -170,7 +180,24 @@ class LegRig(object):
         common.lock_and_hide(self.ball_fk_ctrl, "sv")
         cmds.parent(self.ball_fk_ctrl, self.two_bone_ik.end_fk_control)
         common.freeze_to_parent_offset(self.ball_fk_ctrl)
-        ori = cmds.orientConstraint(self.ball_fk_ctrl, self.ball_joint)[0]
+
+        if self.ik_handle_toe:
+            ori = cmds.orientConstraint(self.ball_fk_ctrl, self.ball_joint)[0]
+        else:
+            # Without a toe joint, like in the UE4 Mannequin, use a constraint instead of ik
+            ori_target = cmds.duplicate(
+                self.hierarchy.toe_ctrl,
+                name="{}_ori".format(self.hierarchy.toe_pivot_ctrl),
+                po=True,
+            )[0]
+            cmds.parent(ori_target, self.hierarchy.toe_ctrl)
+            common.snap_to(ori_target, self.ball_joint)
+
+            ori = cmds.orientConstraint(
+                self.ball_fk_ctrl, ori_target, self.ball_joint,
+            )[0]
+            cmds.connectAttr(ik_switch, "{}.{}W1".format(ori, ori_target))
+
         cmds.connectAttr(
             "{}.ikFk".format(self.two_bone_ik.config_control),
             "{}.{}W0".format(ori, self.ball_fk_ctrl),
