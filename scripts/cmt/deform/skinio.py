@@ -39,7 +39,7 @@ EXTENSION = ".skin"
 KEY_STORE = "skinio.start_directory"
 
 
-def import_skin(file_path=None, shape=None, to_selected_shapes=False):
+def import_skin(file_path=None, shape=None, to_selected_shapes=False, enable_remap=True):
     """Creates a skinCluster on the specified shape if one does not already exist
     and then import the weight data.
     """
@@ -95,15 +95,15 @@ def import_skin(file_path=None, shape=None, to_selected_shapes=False):
         unused_imports, no_match = get_joints_that_need_remapping(joints)
 
         # If there were unmapped influences ask the user to map them
-        if unused_imports and no_match:
+        if unused_imports and no_match and enable_remap:
             mapping_dialog = WeightRemapDialog(file_path)
             mapping_dialog.set_influences(unused_imports, no_match)
-            mapping_dialog.exec_()
+            result = mapping_dialog.exec_()
             remap_weights(mapping_dialog.mapping, data["weights"])
 
         # Create the skinCluster with post normalization so setting the weights does not
         # normalize all the weights
-        joints = data["weights"].keys()
+        joints = [x for x in data["weights"].keys() if cmds.objExists(x)]
         kwargs = {}
         if data["maintainMaxInfluences"]:
             kwargs["obeyMaxInfluences"] = True
@@ -426,9 +426,13 @@ class WeightRemapDialog(MayaQWidgetBaseMixin, QDialog):
         hbox = QHBoxLayout()
         mainvbox.addLayout(hbox)
         hbox.addStretch()
-        btn = QPushButton("Ok")
-        btn.released.connect(self.accept)
-        hbox.addWidget(btn)
+
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            Qt.Horizontal, self)
+        hbox.addWidget(self.buttons)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
 
     def set_influences(self, imported_influences, existing_influences):
         infs = list(existing_influences)
