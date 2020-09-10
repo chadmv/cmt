@@ -44,6 +44,14 @@ class OrientJointsWindow(object):
         cmds.button(label="Insert Joints", c=self.insert_joints)
 
         cmds.setParent("..")
+
+        cmds.gridLayout(numberOfColumns=3, cellWidthHeight=(116, 30))
+        cmds.button(label="Left", c=self.set_left)
+        cmds.button(label="Center", c=self.set_center)
+        cmds.button(label="Right", c=self.set_right)
+
+        cmds.setParent("..")
+
         cmds.setParent("..")
 
         cmds.frameLayout(
@@ -186,6 +194,27 @@ class OrientJointsWindow(object):
         joints = cmds.ls(sl=True, type="joint") or []
         amount = cmds.floatField(self.offset_z, q=True, value=True) * direction
         offset_orient(joints, amount, Axis.z)
+
+    def set_left(self, *args):
+        self.set_side(1)
+
+    def set_center(self, *args):
+        self.set_side(0)
+
+    def set_right(self, *args):
+        self.set_side(2)
+
+    def set_side(self, side):
+        nodes = cmds.ls(sl=True)
+        for n in nodes:
+            hierarchy = cmds.listRelatives(n, ad=True)
+            hierarchy.append(n)
+            for node in hierarchy:
+                attr = "{}.side".format(node)
+                if cmds.objExists(attr):
+                    cmds.setAttr(attr, side)
+
+        pass
 
 
 class Axis:
