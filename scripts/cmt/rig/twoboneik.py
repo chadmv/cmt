@@ -120,6 +120,11 @@ class TwoBoneIk(object):
                 "{}.worldMatrix[0]".format(parent[0]),
                 "{}.offsetParentMatrix".format(self.start_loc),
             )
+        else:
+            # Check if opm is connected
+            connection = cmds.listConnections("{}.opm".format(self.start_joint), plugs=True, d=False)
+            if connection:
+                cmds.connectAttr(connection[0], "{}.opm".format(self.start_loc))
         common.snap_to_position(self.start_loc, self.start_joint)
 
         # Locator for end distance measurement
