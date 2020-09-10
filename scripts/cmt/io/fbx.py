@@ -24,7 +24,17 @@ def export_fbx(nodes, file_path):
     mel.eval('FBXExport -f "{}" -s'.format(file_path))
 
 
-def export_animation_fbx(root, file_path, start_frame=None, end_frame=None):
+def export_animation_fbx(root=None, file_path=None, start_frame=None, end_frame=None):
+    if root is None:
+        root = cmds.ls(sl=True)
+        if not root:
+            raise RuntimeError("Select the root joint to export")
+        root = root[0]
+
+    if file_path is None:
+        file_path = shortcuts.get_save_file_name("*.fbx", "cmt.fbx.export")
+        if not file_path:
+            return
 
     if start_frame is None:
         start_frame = int(cmds.playbackOptions(q=True, min=True))
@@ -74,7 +84,8 @@ class ExportSkeleton(object):
 
     def __exit__(self, type, value, traceback):
         cmds.delete(self.joints)
-        cmds.namespace(removeNamespace=":{}".format(ExportSkeleton.temp_namespace), mergeNamespaceWithRoot=True)
+        if cmds.namespace(exists=":{}".format(ExportSkeleton.temp_namespace)):
+            cmds.namespace(removeNamespace=":{}".format(ExportSkeleton.temp_namespace), mergeNamespaceWithRoot=True)
 
 
 def create_export_skeleton(root):
