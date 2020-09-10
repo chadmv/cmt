@@ -1,9 +1,11 @@
 import os
+from six import string_types
 import maya.cmds as cmds
 
 from cmt.io.obj import import_obj, export_obj
 import cmt.shortcuts as shortcuts
 import cmt.deform.np_mesh as np_mesh
+import cmt.rig.common as common
 
 
 def get_blendshape_node(geometry):
@@ -193,3 +195,30 @@ def propagate_neutral_update(old_neutral, new_neutral, shapes):
         new_shape = _shape + delta
         new_shape.to_maya_mesh(shape)
 
+
+def create_shapes_joint(blendshapes, parent, name="shapes"):
+    """Create a joint with a weight attribute per each blendshape target.
+
+    This is used to export blendshape animation with the skeleton.
+
+    :param blendshapes: List of blendshape nodes.
+    :param parent: Joint to parent the new joint under.
+    :param name: Name of the new joint. "shapes" by default.
+    :return: The new joint name
+    """
+    joint = cmds.createNode("joint", name=name)
+    common.snap_to(joint, parent)
+    cmds.parent(joint, parent)
+    cmds.makeIdentity(joint, t=True, r=True, s=True, apply=True)
+    if isinstance(blendshapes, string_types):
+        blendshapes = [blendshapes]
+
+    for blendshape in blendshapes:
+        targets = get_target_list(blendshape)
+        for t in targets:
+            attr = "{}.{}".format(joint, t)
+            if not cmds.objExists(attr):
+                cmds.addAttr(joint, ln=t, keyable=True)
+            if not cmds.listConnections(attr, d=False):
+                cmds.connectAttr("{}.{}".format(blendshape, t), attr)
+    return joint
