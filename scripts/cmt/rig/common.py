@@ -14,6 +14,7 @@ class RigHierarchy(object):
         self.prefix = prefix or ""
         self.suffix = "_grp" if suffix is None else suffix
         self.lock_and_hide = lock_and_hide or ["t", "r", "s", "v"]
+        self.nodes = []
 
     def create(self, hierarchy=None, parent=None):
         if hierarchy is None:
@@ -25,6 +26,7 @@ class RigHierarchy(object):
             setattr(self, "parent_to_{}".format(name), func)
             if not cmds.objExists(node):
                 node = cmds.createNode("transform", name=node)
+            self.nodes.append(node)
             if parent:
                 current_parent = cmds.listRelatives(node, parent=True, path=True)
                 if current_parent:
@@ -43,6 +45,18 @@ class RigHierarchy(object):
         cmds.delete(getattr(self, name))
         delattr(self, name)
 
+    def __iter__(self):
+        self.n = 0
+        return self
+
+    def __next__(self):
+        if self.n < len(self.nodes):
+            result = self.nodes[self.n]
+            self.n = self.n + 1
+            return result
+        raise StopIteration
+
+    next = __next__  # for Python 2
 
 def _create_parent_method(node):
     def func(nodes_to_parent):
@@ -189,6 +203,32 @@ def freeze_to_parent_offset(node=None):
             cmds.setAttr("{}.{}".format(node, attr), lock=True)
 
 
+def freeze_to_joint_orient(node=None):
+    """Transfer the local matrix and offset parent matrix of the specified node into the
+    joint orient
+
+    :param node: Node name or list of node names
+    """
+    if node is None:
+        node = cmds.ls(sl=True)
+    if node is None:
+        return
+
+    if not isinstance(node, string_types):
+        for n in node:
+            freeze_to_joint_orient(n)
+        return
+
+    if cmds.about(api=True) < 20200000:
+        raise RuntimeError("offsetParentMatrix is only available starting in Maya 2020")
+
+    offset = local_offset(node)
+    identity = OpenMaya.MMatrix()
+    cmds.setAttr("{}.offsetParentMatrix".format(node), list(identity), type="matrix")
+    cmds.xform(node, m=list(offset))
+    cmds.makeIdentity(node, t=True, r=True, s=True, apply=True)
+
+
 def local_offset(node):
     """Get the local matrix relative to the node's parent.
 
@@ -249,7 +289,7 @@ def align(node, target, axis, world_up):
     cmds.setAttr("{}.offsetParentMatrix".format(node), list(m), type="matrix")
 
 
-def place_pole_vector(start, mid, end, pole_vector, offset):
+def place_pole_vector(start, mid, end, pole_vector, offset=None):
     """Place a pole vector along the plane of the 2 bone ik
 
     :param start: Start joint
@@ -265,6 +305,9 @@ def place_pole_vector(start, mid, end, pole_vector, offset):
     e1 = (v3 - v1).normal()
     e2 = v2 - v1
     v = v1 + e1 * (e1 * e2)
+
+    if offset is None:
+        offset = ((v2 - v1).length() + (v3 - v2).length()) * 0.5
     pos = v2 + (v2 - v).normal() * offset
     cmds.xform(pole_vector, ws=True, t=list(pos))
 
@@ -279,8 +322,9 @@ def opm_parent_constraint(
     :param maintain_offset: True to maintain offset
     :param freeze: True to 0 out the local xforms
     :param segment_scale_compensate: True to remove the resulting scale and shear
+    :return: The multMatrix node used in the network
     """
-    opm_constraint(
+    return opm_constraint(
         driver,
         driven,
         maintain_offset=maintain_offset,
@@ -296,8 +340,9 @@ def opm_point_constraint(driver, driven, maintain_offset=False, freeze=True):
     :param driven: Transform to drive
     :param maintain_offset: True to maintain offset
     :param freeze: True to 0 out the local xforms
+    :return: The multMatrix node used in the network
     """
-    opm_constraint(
+    return opm_constraint(
         driver,
         driven,
         maintain_offset=maintain_offset,
@@ -330,21 +375,25 @@ def opm_constraint(
     :param use_scale: True to use the scale of the driver matrix
     :param use_shear: True to use the shear of the driver matrix
     :param segment_scale_compensate: True to remove the resulting scale and shear
+    :return: The multMatrix node used in the network
     """
-    mult = cmds.createNode("multMatrix")
+    mult = cmds.createNode(
+        "multMatrix", name="{}_offset_parent_constraint_mult_matrix".format(driven)
+    )
 
     if maintain_offset:
-        offset = OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(driven)))
-        if not freeze:
-            offset *= OpenMaya.MMatrix(
-                cmds.getAttr("{}.matrix".format(driven))
-            ).inverse()
+        if freeze:
+            offset = OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(driven)))
+        else:
+            offset = shortcuts.get_dag_path2(driven).exclusiveMatrix()
         offset *= OpenMaya.MMatrix(
             cmds.getAttr("{}.worldInverseMatrix[0]".format(driver))
         )
         cmds.setAttr("{}.matrixIn[0]".format(mult), list(offset), type="matrix")
 
-    pick = cmds.createNode("pickMatrix")
+    pick = cmds.createNode(
+        "pickMatrix", name="{}_offset_parent_constraint_pick".format(driven)
+    )
     cmds.connectAttr("{}.worldMatrix[0]".format(driver), "{}.inputMatrix".format(pick))
     cmds.setAttr("{}.useTranslate".format(pick), use_translate)
     cmds.setAttr("{}.useRotate".format(pick), use_rotate)
@@ -361,7 +410,9 @@ def opm_constraint(
         freeze_to_parent_offset(driven)
 
     if segment_scale_compensate:
-        pick = cmds.createNode("pickMatrix")
+        pick = cmds.createNode(
+            "pickMatrix", name="{}_segment_scale_compensate".format(driven)
+        )
         cmds.setAttr("{}.useScale".format(pick), False)
         cmds.setAttr("{}.useShear".format(pick), False)
         cmds.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(pick))
@@ -370,6 +421,7 @@ def opm_constraint(
         output = "{}.matrixSum".format(mult)
 
     cmds.connectAttr(output, "{}.offsetParentMatrix".format(driven))
+    return mult
 
 
 def opm_aim_constraint(
@@ -432,3 +484,36 @@ def opm_aim_constraint(
     cmds.connectAttr(
         "{}.matrixSum".format(mult), "{}.offsetParentMatrix".format(driven)
     )
+
+
+def shift_mult_matrix_inputs(node, shift):
+    if cmds.nodeType(node) != "multMatrix":
+        raise RuntimeError(
+            "{} is not a multMatrix node.  Unable to shift inputs.".format(node)
+        )
+    if shift == 0:
+        return
+    indices = cmds.getAttr("{}.matrixIn".format(node), mi=True)
+    if not indices:
+        return
+    if shift > 0:
+        indices.reverse()
+
+    for index in indices:
+        new_index = index + shift
+        if new_index < 0:
+            raise RuntimeError("Cannot shift matrix input index < 0")
+        plug = "{}.matrixIn[{}]".format(node, index)
+        new_plug = "{}.matrixIn[{}]".format(node, new_index)
+
+        # Disconnect any existing connection at the new slot
+        existing_connection = cmds.listConnections(new_plug, d=False, plugs=True)
+        if existing_connection:
+            cmds.disconnectAttr(existing_connection[0], new_plug)
+
+        connection = cmds.listConnections(plug, d=False, plugs=True)
+        if connection:
+            cmds.connectAttr(connection[0], new_plug)
+        else:
+            value = cmds.getAttr(plug)
+            cmds.setAttr(new_plug, value, type="matrix")
