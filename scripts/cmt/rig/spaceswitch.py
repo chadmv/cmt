@@ -25,6 +25,8 @@ Example Usage
 import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
 from cmt.dge import dge
+import cmt.rig.common as common
+import cmt.shortcuts as shortcuts
 
 
 def create_space_switch(
@@ -98,15 +100,14 @@ def _create_bool_attribute(node, attribute, default_value):
 
 def _connect_driver_matrix_network(blend, node, driver, index, to_parent_local):
     # The multMatrix node will calculate the transformation to blend to when driven
-    # by this driver transform: driverWorld * nodeOffsetToDriver * nodeParentInverse
+    # by this driver transform
     mult = cmds.createNode(
         "multMatrix", name="spaceswitch_{}_to_{}".format(node, driver)
     )
 
     offset = (
-        OpenMaya.MMatrix(cmds.getAttr("{}.worldMatrix[0]".format(node)))
-        * OpenMaya.MMatrix(cmds.getAttr("{}.matrix".format(node))).inverse()
-        * OpenMaya.MMatrix(cmds.getAttr("{}.worldInverseMatrix[0]".format(driver)))
+         shortcuts.get_dag_path2(node).exclusiveMatrix()
+         * OpenMaya.MMatrix(cmds.getAttr("{}.worldInverseMatrix[0]".format(driver)))
     )
     cmds.setAttr("{}.matrixIn[0]".format(mult), list(offset), type="matrix")
 
