@@ -3,7 +3,9 @@
 
 # cmt
 cmt is a collection of various Maya tools I have written for my personal projects.  Feel free to use
-the tools in your own projects or just browse the code for inspiration or to silently judge me.
+the tools in your own projects, browse the code for inspiration, or silently judge me. These tools
+were never meant to be a professional product. Many areas are undocumented, I'm always experimenting but
+feel everyone is free to take and use any of the code in this project.
 
 Full documentation can be found here: https://chadmv.github.io/cmt
 
